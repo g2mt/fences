@@ -1,3 +1,4 @@
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
@@ -90,7 +91,7 @@ impl FenceIcon {
     pub fn new(parent_hwnd: HWND, title: &str, x: i32, y: i32) -> Self {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
-        
+
         let hwnd = unsafe {
             CreateWindowExW(
                 0,
@@ -107,7 +108,7 @@ impl FenceIcon {
                 std::ptr::null(),
             )
         };
-        
+
         Self {
             title: title.to_string(),
             x,

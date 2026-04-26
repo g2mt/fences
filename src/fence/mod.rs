@@ -1,3 +1,4 @@
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
@@ -12,11 +13,11 @@ pub const TITLE_BAR_HEIGHT: i32 = 24;
 pub fn register_classes() {
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
-        
+
         let mut wc: WNDCLASSW = std::mem::zeroed();
         wc.hInstance = h_instance;
         wc.hCursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
-        
+
         wc.lpszClassName = w!("FenceTitleBar");
         wc.lpfnWndProc = Some(title_bar_wndproc);
         RegisterClassW(&wc);
@@ -24,7 +25,7 @@ pub fn register_classes() {
         wc.lpszClassName = w!("FenceScrollArea");
         wc.lpfnWndProc = Some(scroll_area_wndproc);
         RegisterClassW(&wc);
-        
+
         icon::register_class();
     }
 }
@@ -131,10 +132,10 @@ pub struct Fence {
 impl Fence {
     pub fn new(parent_hwnd: HWND, x: i32, y: i32) -> Self {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
-        
+
         let title = "Untitled";
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
-        
+
         let hwnd_title = unsafe {
             CreateWindowExW(
                 0,
@@ -151,7 +152,7 @@ impl Fence {
                 std::ptr::null(),
             )
         };
-        
+
         let hwnd_scroll = unsafe {
             CreateWindowExW(
                 0,
@@ -181,8 +182,10 @@ impl Fence {
             hwnd_title,
             hwnd_scroll,
         };
-        
-        fence.icons.push(FenceIcon::new(hwnd_scroll, "Test Icon", 10, 10));
+
+        fence
+            .icons
+            .push(FenceIcon::new(hwnd_scroll, "Test Icon", 10, 10));
         fence
     }
 
@@ -236,7 +239,7 @@ impl Fence {
     pub fn update_layout(&self) {
         let width = self.rect.right - self.rect.left;
         let height = self.rect.bottom - self.rect.top;
-        
+
         unsafe {
             SetWindowPos(
                 self.hwnd_title,
@@ -247,7 +250,7 @@ impl Fence {
                 TITLE_BAR_HEIGHT,
                 SWP_NOZORDER | SWP_NOACTIVATE,
             );
-            
+
             SetWindowPos(
                 self.hwnd_scroll,
                 std::ptr::null_mut(),
@@ -265,13 +268,19 @@ impl Fence {
             SetWindowPos(
                 self.hwnd_title,
                 HWND_TOP,
-                0, 0, 0, 0,
+                0,
+                0,
+                0,
+                0,
                 SWP_NOMOVE | SWP_NOSIZE,
             );
             SetWindowPos(
                 self.hwnd_scroll,
                 HWND_TOP,
-                0, 0, 0, 0,
+                0,
+                0,
+                0,
+                0,
                 SWP_NOMOVE | SWP_NOSIZE,
             );
         }
