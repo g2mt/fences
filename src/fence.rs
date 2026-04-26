@@ -34,7 +34,8 @@ impl Fence {
     }
 
     pub fn hit_test(&self, x: i32, y: i32) -> HitTest {
-        if x < self.rect.left || x >= self.rect.right || y < self.rect.top || y >= self.rect.bottom {
+        if x < self.rect.left || x >= self.rect.right || y < self.rect.top || y >= self.rect.bottom
+        {
             return HitTest::None;
         }
 
@@ -54,10 +55,6 @@ impl Fence {
             (_, _, _, true) => HitTest::Bottom,
             _ => HitTest::Inside,
         }
-    }
-
-    pub fn contains(&self, x: i32, y: i32) -> bool {
-        self.hit_test(x, y) != HitTest::None
     }
 
     pub fn move_by(&mut self, dx: i32, dy: i32) {
