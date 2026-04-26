@@ -2,12 +2,13 @@ use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
-use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::Win32::UI::Controls::*;
+use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
-use crate::window::WinHandle;
 use icon::FenceIcon;
+
+use crate::window::WinHandle;
 
 pub const BORDER_THICKNESS: i32 = 3;
 pub const TITLE_BAR_HEIGHT: i32 = 24;
@@ -100,7 +101,7 @@ pub unsafe extern "system" fn scroll_area_wndproc(
             GetScrollInfo(hwnd, SB_VERT, &mut si);
 
             let cur_pos = si.nPos;
-            match (wparam & 0xFFFF) as u32 {
+            match (wparam & 0xFFFF) as i32 {
                 SB_TOP => si.nPos = si.nMin,
                 SB_BOTTOM => si.nPos = si.nMax,
                 SB_LINEUP => si.nPos -= 10,
@@ -113,7 +114,7 @@ pub unsafe extern "system" fn scroll_area_wndproc(
 
             si.fMask = SIF_POS;
             SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
-            GetScrollInfo(hwnd, SB_VERT, &si);
+            GetScrollInfo(hwnd, SB_VERT, &mut si);
 
             if si.nPos != cur_pos {
                 ScrollWindowEx(
@@ -237,7 +238,7 @@ impl Fence {
         fence
             .icons
             .push(FenceIcon::new(hwnd_scroll, "Test Icon", 10, 10));
-        
+
         fence.update_scroll_info();
         fence
     }
