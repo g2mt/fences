@@ -14,9 +14,12 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 // Class names
 
-static REGISTERED_CLASSNAMES: LazyLock<Mutex<HashSet<Rc<PCWSTR>>>> =
+static REGISTERED_CLASSNAMES: LazyLock<Mutex<HashSet<ClassName>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
+
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct ClassName(Rc<PCWSTR>);
+
 pub fn register_classname(name: PCWSTR) -> ClassName {
     pub unsafe extern "system" fn base_wndproc(
         hwnd: HWND,
@@ -38,9 +41,9 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
             base.window.wndproc(msg, wparam, lparam)
         }
     }
-    let mut registered: MutexGuard<'_, HashSet<Rc<PCWSTR>>> = REGISTERED_CLASSNAMES.lock().unwrap();
-    if let Some(rname) = registered.get(&name as &PCWSTR) {
-        return ClassName(rname.clone());
+    let mut registered: MutexGuard<'_, HashSet<ClassName>> = REGISTERED_CLASSNAMES.lock().unwrap();
+    if let Some(existing) = registered.get(&ClassName(Rc::new(name))) {
+        return existing.clone();
     }
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
@@ -51,9 +54,9 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
         wc.lpfnWndProc = Some(base_wndproc);
         RegisterClassW(&wc);
     }
-    let rname = Rc::new(name);
-    registered.insert(rname.clone());
-    ClassName(rname)
+    let class_name = ClassName(Rc::new(name));
+    registered.insert(class_name.clone());
+    class_name
 }
 
 // Base
