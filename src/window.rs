@@ -169,7 +169,7 @@ impl Base {
         *self.rect.lock().unwrap()
     }
 
-    pub fn resize(&self, dl: i32, dt: i32, dr: i32, db: i32) {
+    pub fn set_rect(&self, dl: i32, dt: i32, dr: i32, db: i32) {
         let mut rect = self.rect.lock().unwrap();
         rect.left += dl;
         rect.top += dt;

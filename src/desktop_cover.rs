@@ -240,15 +240,15 @@ impl DesktopCover {
 
             if let Some(fence) = inner.fences.last() {
                 match hit_type {
-                    HitTest::TitleBar => fence.resize(dx, dy, dx, dy),
-                    HitTest::Left => fence.resize(-dx, 0, dx, 0),
-                    HitTest::Right => fence.resize(0, 0, dx, 0),
-                    HitTest::Top => fence.resize(0, -dy, 0, dy),
-                    HitTest::Bottom => fence.resize(0, 0, 0, dy),
-                    HitTest::TopLeft => fence.resize(-dx, -dy, dx, dy),
-                    HitTest::TopRight => fence.resize(0, -dy, dx, dy),
-                    HitTest::BottomLeft => fence.resize(-dx, 0, dx, dy),
-                    HitTest::BottomRight => fence.resize(0, 0, dx, dy),
+                    HitTest::TitleBar => fence.set_rect(dx, dy, dx, dy),
+                    HitTest::Left => fence.set_rect(-dx, 0, dx, 0),
+                    HitTest::Right => fence.set_rect(0, 0, dx, 0),
+                    HitTest::Top => fence.set_rect(0, -dy, 0, dy),
+                    HitTest::Bottom => fence.set_rect(0, 0, 0, dy),
+                    HitTest::TopLeft => fence.set_rect(-dx, -dy, dx, dy),
+                    HitTest::TopRight => fence.set_rect(0, -dy, dx, dy),
+                    HitTest::BottomLeft => fence.set_rect(-dx, 0, dx, dy),
+                    HitTest::BottomRight => fence.set_rect(0, 0, dx, dy),
                     _ => {}
                 }
             }

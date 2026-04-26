@@ -355,8 +355,8 @@ impl Fence {
         }
     }
 
-    pub fn resize(&self, dl: i32, dt: i32, dr: i32, db: i32) {
-        self.base.resize(dl, dt, dr, db);
+    pub fn set_rect(&self, dl: i32, dt: i32, dr: i32, db: i32) {
+        self.base.set_rect(dl, dt, dr, db);
         self.update_layout();
     }
 
@@ -382,7 +382,7 @@ impl Fence {
         let width = rect.right - rect.left;
         let height = rect.bottom - rect.top;
 
-        self.title_bar.base().resize(0, 0, 0, 0); // Sync internal rect if needed, but here we just use SetWindowPos for children
+        self.title_bar.base().set_rect(0, 0, 0, 0); // Sync internal rect if needed, but here we just use SetWindowPos for children
         unsafe {
             SetWindowPos(
                 self.title_bar.base().handle(),
