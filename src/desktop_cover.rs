@@ -131,21 +131,13 @@ impl Window for DesktopCover {
                 let mut ps: PAINTSTRUCT = unsafe { std::mem::zeroed() };
                 let hdc = unsafe { BeginPaint(hwnd, &mut ps) };
 
-                // ARGB #33000000 is 20% opaque black.
-                // Since we are using LWA_COLORKEY on black background,
-                // we use a solid brush of the desired color.
-                let h_brush = unsafe { CreateSolidBrush(0x00333333) };
-                let old_brush = unsafe { SelectObject(hdc, h_brush) };
-
                 for fence in &self.fences {
                     unsafe {
-                        FillRect(hdc, &fence.rect, h_brush);
+                        fence.draw(hdc);
                     }
                 }
 
                 unsafe {
-                    SelectObject(hdc, old_brush);
-                    DeleteObject(h_brush);
                     EndPaint(hwnd, &ps);
                 }
                 0
