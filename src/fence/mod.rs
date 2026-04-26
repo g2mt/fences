@@ -1,25 +1,18 @@
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
-use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
+use std::sync::Arc;
+
 use icon::Icon;
 
-use std::sync::Arc;
-use crate::window::{BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub const BORDER_THICKNESS: i32 = 3;
 pub const TITLE_BAR_HEIGHT: i32 = 24;
-
-pub fn register_classes() {
-    register_classname(w!("Fence"));
-    register_classname(w!("FenceTitleBar"));
-    register_classname(w!("FenceScrollArea"));
-    icon::register_class();
-}
 
 pub struct TitleBar {
     pub base: BaseRef,
@@ -222,7 +215,8 @@ impl Fence {
                     parent_hwnd,
                     std::ptr::null_mut(),
                     h_instance,
-                ).unwrap()
+                )
+                .unwrap()
             };
 
             let title_bar = Arc::new_cyclic(|tb_weak| {
@@ -240,7 +234,8 @@ impl Fence {
                         base.handle(),
                         std::ptr::null_mut(),
                         h_instance,
-                    ).unwrap()
+                    )
+                    .unwrap()
                 };
                 TitleBar { base: tb_base }
             });
@@ -260,7 +255,8 @@ impl Fence {
                         base.handle(),
                         std::ptr::null_mut(),
                         h_instance,
-                    ).unwrap()
+                    )
+                    .unwrap()
                 };
                 ScrollArea { base: sa_base }
             });
@@ -279,7 +275,12 @@ impl Fence {
                 scroll_area,
             };
 
-            fence.icons.push(Icon::new(fence.scroll_area.base().handle(), "Test Icon", 10, 10));
+            fence.icons.push(Icon::new(
+                fence.scroll_area.base().handle(),
+                "Test Icon",
+                10,
+                10,
+            ));
             fence.update_scroll_info();
             fence
         })
