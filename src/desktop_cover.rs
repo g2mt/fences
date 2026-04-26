@@ -215,14 +215,14 @@ impl Window for DesktopCover {
 
                 if let Some((idx, hit)) = hit_idx {
                     let mut fence = self.fences.remove(idx);
-                    
+
                     if let HitTest::Icon(icon_idx) = hit {
                         fence.icons[icon_idx].set_selected(true);
                     }
 
                     fence.bring_to_front();
                     self.fences.push(fence);
-                    
+
                     match hit {
                         HitTest::Client | HitTest::Icon(_) => {
                             self.hit_type = None;
@@ -307,21 +307,21 @@ impl Window for DesktopCover {
 
                 if let Some((idx, hit)) = hit_idx {
                     let mut fence = self.fences.remove(idx);
-                    
+
                     if let HitTest::Icon(icon_idx) = hit {
                         for icon in &mut fence.icons {
                             icon.set_selected(false);
                         }
                         fence.icons[icon_idx].set_selected(true);
                     }
-                    
+
                     fence.bring_to_front();
                     self.fences.push(fence);
 
                     let mut pt = POINT { x, y };
                     unsafe { ClientToScreen(hwnd, &mut pt) };
                     let h_menu = unsafe { CreatePopupMenu() };
-                    
+
                     self.context_target = Some((self.fences.len() - 1, hit));
 
                     unsafe {
@@ -397,16 +397,9 @@ impl Window for DesktopCover {
                             }
                         }
                     }
-                    IDM_RUN_ICON => {
-                        unsafe {
-                            MessageBoxW(
-                                hwnd,
-                                w!("Clicked"),
-                                w!("Test"),
-                                MB_OK | MB_ICONINFORMATION,
-                            );
-                        }
-                    }
+                    IDM_RUN_ICON => unsafe {
+                        MessageBoxW(hwnd, w!("Clicked"), w!("Test"), MB_OK | MB_ICONINFORMATION);
+                    },
                     IDM_DELETE_ICON => {
                         if let Some((fence_idx, HitTest::Icon(icon_idx))) = self.context_target {
                             if fence_idx < self.fences.len() {
