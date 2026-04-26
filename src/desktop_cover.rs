@@ -18,10 +18,13 @@ pub const IDM_ADD_FENCE: usize = 102;
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
 
 pub struct DesktopCover {
+    /// The window handle for the desktop cover.
     handle: WinHandle,
+    /// The list of fences managed by this cover.
     fences: Vec<Fence>,
-    dragging_idx: Option<usize>,
-    hit_type: HitTest,
+    /// The type of hit test result for the currently focused/dragged fence.
+    hit_type: Option<HitTest>,
+    /// The last recorded mouse position during a drag operation.
     last_mouse_pos: POINT,
 }
 
@@ -101,8 +104,7 @@ impl DesktopCover {
         Ok(Box::new(DesktopCover {
             handle: WinHandle(hwnd),
             fences: Vec::new(),
-            dragging_idx: None,
-            hit_type: HitTest::None,
+            hit_type: None,
             last_mouse_pos: POINT { x: 0, y: 0 },
         }))
     }
@@ -178,38 +180,48 @@ impl Window for DesktopCover {
                 let x = (lparam & 0xFFFF) as i16 as i32;
                 let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
+                let mut hit_idx = None;
                 for (i, fence) in self.fences.iter().enumerate().rev() {
                     let hit = fence.hit_test(x, y);
                     if hit != HitTest::None {
-                        self.dragging_idx = Some(i);
-                        self.hit_type = hit;
-                        self.last_mouse_pos = POINT { x, y };
-                        unsafe { SetCapture(hwnd) };
+                        hit_idx = Some((i, hit));
                         break;
                     }
+                }
+
+                if let Some((idx, hit)) = hit_idx {
+                    let fence = self.fences.remove(idx);
+                    self.fences.push(fence);
+                    self.hit_type = Some(hit);
+                    self.last_mouse_pos = POINT { x, y };
+                    unsafe {
+                        SetCapture(hwnd);
+                        InvalidateRect(hwnd, std::ptr::null(), TRUE);
+                    };
                 }
                 0
             }
             WM_MOUSEMOVE => {
-                if let Some(idx) = self.dragging_idx {
+                if let Some(hit_type) = self.hit_type {
                     let x = (lparam & 0xFFFF) as i16 as i32;
                     let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
                     let dx = x - self.last_mouse_pos.x;
                     let dy = y - self.last_mouse_pos.y;
 
-                    let fence = &mut self.fences[idx];
-                    match self.hit_type {
-                        HitTest::Inside => fence.move_by(dx, dy),
-                        HitTest::Left => { fence.rect.left += dx; }
-                        HitTest::Right => { fence.rect.right += dx; }
-                        HitTest::Top => { fence.rect.top += dy; }
-                        HitTest::Bottom => { fence.rect.bottom += dy; }
-                        HitTest::TopLeft => { fence.rect.left += dx; fence.rect.top += dy; }
-                        HitTest::TopRight => { fence.rect.right += dx; fence.rect.top += dy; }
-                        HitTest::BottomLeft => { fence.rect.left += dx; fence.rect.bottom += dy; }
-                        HitTest::BottomRight => { fence.rect.right += dx; fence.rect.bottom += dy; }
-                        HitTest::None => {}
+                    if let Some(fence) = self.fences.last_mut() {
+                        match hit_type {
+                            HitTest::Inside => fence.move_by(dx, dy),
+                            HitTest::Left => { fence.rect.left += dx; }
+                            HitTest::Right => { fence.rect.right += dx; }
+                            HitTest::Top => { fence.rect.top += dy; }
+                            HitTest::Bottom => { fence.rect.bottom += dy; }
+                            HitTest::TopLeft => { fence.rect.left += dx; fence.rect.top += dy; }
+                            HitTest::TopRight => { fence.rect.right += dx; fence.rect.top += dy; }
+                            HitTest::BottomLeft => { fence.rect.left += dx; fence.rect.bottom += dy; }
+                            HitTest::BottomRight => { fence.rect.right += dx; fence.rect.bottom += dy; }
+                            HitTest::None => {}
+                        }
                     }
 
                     self.last_mouse_pos = POINT { x, y };
@@ -218,9 +230,8 @@ impl Window for DesktopCover {
                 0
             }
             WM_LBUTTONUP => {
-                if self.dragging_idx.is_some() {
-                    self.dragging_idx = None;
-                    self.hit_type = HitTest::None;
+                if self.hit_type.is_some() {
+                    self.hit_type = None;
                     unsafe { ReleaseCapture() };
                 }
                 0
