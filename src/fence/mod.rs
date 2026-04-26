@@ -230,6 +230,13 @@ impl Fence {
         Some(hit)
     }
 
+    pub fn add_icon(&mut self, title: &str) {
+        let x = 10;
+        let y = 10 + (self.icons.len() as i32 * 70);
+        self.icons
+            .push(FenceIcon::new(self.scroll_handle.0, title, x, y));
+    }
+
     pub fn move_by(&mut self, dx: i32, dy: i32) {
         self.rect.left += dx;
         self.rect.right += dx;

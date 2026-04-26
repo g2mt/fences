@@ -14,7 +14,8 @@ use crate::window::{WinHandle, Window};
 pub const IDM_EXIT: usize = 101;
 pub const IDM_ADD_FENCE: usize = 102;
 pub const IDM_DELETE_FENCE: usize = 103;
-pub const IDM_RUN_ICON: usize = 104;
+pub const IDM_ADD_ICON: usize = 104;
+pub const IDM_RUN_ICON: usize = 105;
 pub const IDM_DELETE_ICON: usize = 105;
 
 // Custom events
@@ -329,6 +330,7 @@ impl Window for DesktopCover {
                             AppendMenuW(h_menu, MF_STRING, IDM_RUN_ICON, w!("&Run"));
                             AppendMenuW(h_menu, MF_STRING, IDM_DELETE_ICON, w!("&Delete"));
                         } else {
+                            AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
                             AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
                         }
                         SetForegroundWindow(hwnd);
@@ -379,6 +381,14 @@ impl Window for DesktopCover {
                         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
                         self.fences
                             .push(Fence::new(hwnd, width / 2 - 150, height / 2 - 75));
+                    }
+                    IDM_ADD_ICON => {
+                        if let Some((fence_idx, _)) = self.context_target {
+                            if let Some(fence) = self.fences.get_mut(fence_idx) {
+                                let title = format!("Icon #{}", fence.icons.len());
+                                fence.add_icon(&title);
+                            }
+                        }
                     }
                     IDM_DELETE_FENCE => {
                         if let Some((fence_idx, _)) = self.context_target {
