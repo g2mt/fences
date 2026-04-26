@@ -3,6 +3,7 @@ use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::Win32::UI::Controls::*;
 
 mod icon;
 use crate::window::WinHandle;
@@ -84,7 +85,56 @@ pub unsafe extern "system" fn scroll_area_wndproc(
     lparam: LPARAM,
 ) -> LRESULT {
     match msg {
-        WM_NCHITTEST => HTTRANSPARENT as LRESULT,
+        WM_NCHITTEST => {
+            let res = DefWindowProcW(hwnd, msg, wparam, lparam);
+            if res == HTCLIENT as LRESULT {
+                HTTRANSPARENT as LRESULT
+            } else {
+                res
+            }
+        }
+        WM_VSCROLL => {
+            let mut si: SCROLLINFO = std::mem::zeroed();
+            si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
+            si.fMask = SIF_ALL;
+            GetScrollInfo(hwnd, SB_VERT, &mut si);
+
+            let cur_pos = si.nPos;
+            match (wparam & 0xFFFF) as u32 {
+                SB_TOP => si.nPos = si.nMin,
+                SB_BOTTOM => si.nPos = si.nMax,
+                SB_LINEUP => si.nPos -= 10,
+                SB_LINEDOWN => si.nPos += 10,
+                SB_PAGEUP => si.nPos -= si.nPage as i32,
+                SB_PAGEDOWN => si.nPos += si.nPage as i32,
+                SB_THUMBTRACK => si.nPos = (wparam >> 16) as i16 as i32,
+                _ => {}
+            }
+
+            si.fMask = SIF_POS;
+            SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
+            GetScrollInfo(hwnd, SB_VERT, &si);
+
+            if si.nPos != cur_pos {
+                ScrollWindowEx(
+                    hwnd,
+                    0,
+                    cur_pos - si.nPos,
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    SW_ERASE | SW_INVALIDATE | SW_SCROLLCHILDREN,
+                );
+            }
+            0
+        }
+        WM_MOUSEWHEEL => {
+            let delta = (wparam >> 16) as i16 as i32;
+            let msg = if delta > 0 { SB_LINEUP } else { SB_LINEDOWN };
+            SendMessageW(hwnd, WM_VSCROLL, msg as WPARAM, 0);
+            0
+        }
         WM_PAINT => {
             let mut ps: PAINTSTRUCT = std::mem::zeroed();
             let hdc = BeginPaint(hwnd, &mut ps);
@@ -159,7 +209,7 @@ impl Fence {
                 0,
                 w!("FenceScrollArea"),
                 std::ptr::null(),
-                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_VSCROLL,
                 x,
                 y + TITLE_BAR_HEIGHT,
                 300,
@@ -187,6 +237,8 @@ impl Fence {
         fence
             .icons
             .push(FenceIcon::new(hwnd_scroll, "Test Icon", 10, 10));
+        
+        fence.update_scroll_info();
         fence
     }
 
@@ -214,8 +266,13 @@ impl Fence {
                 if y < self.rect.top + TITLE_BAR_HEIGHT {
                     HitTest::TitleBar
                 } else {
+                    let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
+                    si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
+                    si.fMask = SIF_POS;
+                    unsafe { GetScrollInfo(self.scroll_handle.0, SB_VERT, &mut si) };
+
                     let rel_x = x - self.rect.left;
-                    let rel_y = y - (self.rect.top + TITLE_BAR_HEIGHT);
+                    let rel_y = y - (self.rect.top + TITLE_BAR_HEIGHT) + si.nPos;
                     let mut icon_hit = None;
                     for (i, icon) in self.icons.iter().enumerate() {
                         if icon.hit_test(rel_x, rel_y) {
@@ -235,6 +292,7 @@ impl Fence {
         let y = 10 + (self.icons.len() as i32 * 70);
         self.icons
             .push(FenceIcon::new(self.scroll_handle.0, title, x, y));
+        self.update_scroll_info();
     }
 
     pub fn move_by(&mut self, dx: i32, dy: i32) {
@@ -272,6 +330,29 @@ impl Fence {
                 SWP_NOZORDER | SWP_NOACTIVATE,
             );
         }
+        self.update_scroll_info();
+    }
+
+    pub fn update_scroll_info(&self) {
+        let mut rect: RECT = unsafe { std::mem::zeroed() };
+        unsafe { GetClientRect(self.scroll_handle.0, &mut rect) };
+        let view_height = rect.bottom - rect.top;
+
+        let mut max_y = 0;
+        for icon in &self.icons {
+            if icon.y + 64 > max_y {
+                max_y = icon.y + 64;
+            }
+        }
+        let content_height = max_y + 10;
+
+        let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
+        si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
+        si.fMask = SIF_RANGE | SIF_PAGE | SIF_DISABLENOSCROLL;
+        si.nMin = 0;
+        si.nMax = content_height;
+        si.nPage = view_height as u32;
+        unsafe { SetScrollInfo(self.scroll_handle.0, SB_VERT, &si, TRUE) };
     }
 
     pub fn bring_to_front(&self) {
