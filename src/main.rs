@@ -2,12 +2,21 @@ use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
+use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+
+const WM_USER_SHELLICON: u32 = WM_USER + 1;
+const IDM_EXIT: u32 = 101;
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CLOSE => 0,
         WM_DESTROY => {
+            let mut nid: NOTIFYICONDATAW = unsafe { std::mem::zeroed() };
+            nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
+            nid.hWnd = hwnd;
+            nid.uID = 1;
+            unsafe { Shell_NotifyIconW(NIM_DELETE, &nid) };
             unsafe { PostQuitMessage(0) };
             0
         }
@@ -52,6 +61,34 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             let x = (lparam & 0xFFFF) as i16;
             let y = ((lparam >> 16) & 0xFFFF) as i16;
             println!("Mouse click at: x={}, y={}", x, y);
+            0
+        }
+        WM_USER_SHELLICON => {
+            if lparam as u32 == WM_RBUTTONUP || lparam as u32 == WM_LBUTTONUP {
+                let mut pt = POINT { x: 0, y: 0 };
+                unsafe { GetCursorPos(&mut pt) };
+                let h_menu = unsafe { CreatePopupMenu() };
+                unsafe {
+                    AppendMenuW(h_menu, MF_STRING, IDM_EXIT as usize, w!("&Exit"));
+                    SetForegroundWindow(hwnd);
+                    TrackPopupMenu(
+                        h_menu,
+                        TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+                        pt.x,
+                        pt.y,
+                        0,
+                        hwnd,
+                        std::ptr::null(),
+                    );
+                    DestroyMenu(h_menu);
+                }
+            }
+            0
+        }
+        WM_COMMAND => {
+            if (wparam & 0xFFFF) as u32 == IDM_EXIT {
+                unsafe { DestroyWindow(hwnd) };
+            }
             0
         }
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
@@ -104,6 +141,20 @@ fn main() {
         if hwnd == std::ptr::null_mut() {
             return;
         }
+
+        // Add system tray icon
+        let mut nid: NOTIFYICONDATAW = std::mem::zeroed();
+        nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
+        nid.hWnd = hwnd;
+        nid.uID = 1;
+        nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+        nid.uCallbackMessage = WM_USER_SHELLICON;
+        nid.hIcon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
+        let tip = w!("Desktop Cover");
+        let len = tip.len().min(nid.szTip.len() - 1);
+        std::ptr::copy_nonoverlapping(tip, nid.szTip.as_mut_ptr(), len);
+
+        Shell_NotifyIconW(NIM_ADD, &nid);
 
         // Make the black background color transparent
         SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
