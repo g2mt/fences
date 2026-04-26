@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -12,6 +13,7 @@ pub struct Icon {
     pub title: String,
     pub x: i32,
     pub y: i32,
+    selected: AtomicBool,
 }
 
 impl Icon {
@@ -37,6 +39,7 @@ impl Icon {
                     title: title.to_string(),
                     x,
                     y,
+                    selected: AtomicBool::new(false),
                 }))
             },
         )
@@ -44,12 +47,8 @@ impl Icon {
     }
 
     pub fn set_selected(&self, selected: bool) {
+        self.selected.store(selected, Ordering::SeqCst);
         unsafe {
-            SetWindowLongPtrW(
-                self.base.handle(),
-                GWLP_USERDATA,
-                if selected { 1 } else { 0 },
-            );
             InvalidateRect(self.base.handle(), std::ptr::null(), TRUE);
         }
     }
@@ -77,7 +76,7 @@ impl Window for Icon {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
-                let selected = GetWindowLongPtrW(hwnd, GWLP_USERDATA) != 0;
+                let selected = self.selected.load(Ordering::SeqCst);
 
                 let bg_color = if selected { 0x00FFAA44 } else { 0x007D7D7D };
                 let brush = CreateSolidBrush(bg_color);
