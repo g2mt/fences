@@ -3,4 +3,10 @@ name = "fences"
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
+[dependencies.windows-sys]
+version = ">=0.61"
+features = [
+    "Win32_Security",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+]
