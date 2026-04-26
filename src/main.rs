@@ -34,7 +34,7 @@ impl App {
 static APP: OnceLock<Mutex<App>> = OnceLock::new();
 
 struct DesktopCover {
-    win_handle: WinHandle,
+    handle: WinHandle,
 }
 
 impl DesktopCover {
@@ -101,18 +101,18 @@ impl DesktopCover {
         }
 
         Ok(Box::new(DesktopCover {
-            win_handle: WinHandle(hwnd),
+            handle: WinHandle(hwnd),
         }))
     }
 }
 
 impl Window for DesktopCover {
     fn handle(&self) -> WinHandle {
-        self.win_handle
+        self.handle
     }
 
     fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.win_handle.0;
+        let hwnd = self.handle.0;
         match msg {
             WM_CLOSE => 0,
             WM_DESTROY => {
