@@ -1,16 +1,16 @@
 use anyhow::Result;
-use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 mod icon;
 use std::sync::{Arc, Mutex};
 
 use icon::Icon;
 
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 pub const BORDER_THICKNESS: i32 = 3;
 pub const TITLE_BAR_HEIGHT: i32 = 24;
@@ -280,7 +280,10 @@ impl Fence {
 
     pub fn hit_test(&self, x: i32, y: i32) -> Option<HitTest> {
         let inner = self.inner.lock().unwrap();
-        if x < inner.rect.left || x >= inner.rect.right || y < inner.rect.top || y >= inner.rect.bottom
+        if x < inner.rect.left
+            || x >= inner.rect.right
+            || y < inner.rect.top
+            || y >= inner.rect.bottom
         {
             return None;
         }
@@ -328,7 +331,8 @@ impl Fence {
         let mut inner = self.inner.lock().unwrap();
         let x = 10;
         let y = 10 + (inner.icons.len() as i32 * 70);
-        inner.icons
+        inner
+            .icons
             .push(Icon::new(self.scroll_area.base().handle(), title, x, y));
         drop(inner);
         self.update_scroll_info();

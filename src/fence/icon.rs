@@ -1,11 +1,12 @@
 use std::sync::Arc;
-use windows_sys::core::*;
+
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 pub struct Icon {
     base: BaseRef,
@@ -45,7 +46,11 @@ impl Icon {
 
     pub fn set_selected(&self, selected: bool) {
         unsafe {
-            SetWindowLongPtrW(self.base.handle(), GWLP_USERDATA, if selected { 1 } else { 0 });
+            SetWindowLongPtrW(
+                self.base.handle(),
+                GWLP_USERDATA,
+                if selected { 1 } else { 0 },
+            );
             InvalidateRect(self.base.handle(), std::ptr::null(), TRUE);
         }
     }

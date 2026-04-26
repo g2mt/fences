@@ -9,7 +9,7 @@ mod desktop_cover;
 mod fence;
 mod window;
 
-use crate::app::{lock_app, APP};
+use crate::app::{APP, lock_app};
 use crate::desktop_cover::DesktopCover;
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

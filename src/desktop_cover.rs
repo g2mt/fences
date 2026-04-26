@@ -1,15 +1,16 @@
-use anyhow::Result;
 use std::sync::{Arc, Mutex};
-use windows_sys::core::*;
+
+use anyhow::Result;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 use crate::fence::{Fence, HitTest};
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 // Menus
 pub const IDM_EXIT: usize = 101;
