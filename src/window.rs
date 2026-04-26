@@ -6,8 +6,8 @@ use anyhow::{anyhow, Result};
 use windows_sys::Win32::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, CREATESTRUCTW, DefWindowProcW, DestroyWindow, GetWindowLongPtrW,
-    GWLP_USERDATA, HMENU, SetWindowLongPtrW, WINDOW_EX_STYLE, WINDOW_STYLE, WM_NCCREATE,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowLongPtrW, SetWindowLongPtrW,
+    CREATESTRUCTW, GWLP_USERDATA, HMENU, WINDOW_EX_STYLE, WINDOW_STYLE, WM_NCCREATE,
 };
 
 // Class names
@@ -22,18 +22,19 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
         wparam: WPARAM,
         lparam: LPARAM,
     ) -> LRESULT {
-        if msg == WM_NCCREATE {
-            let cs = lparam as *const CREATESTRUCTW;
-            let ptr = (*cs).lpCreateParams as *mut dyn Window;
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, ptr as isize);
-            return DefWindowProcW(hwnd, msg, wparam, lparam);
+        unsafe {
+            if msg == WM_NCCREATE {
+                let cs = lparam as *const CREATESTRUCTW;
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, (*cs).lpCreateParams as isize);
+                return DefWindowProcW(hwnd, msg, wparam, lparam);
+            }
+            let userdata = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+            if userdata == 0 {
+                return DefWindowProcW(hwnd, msg, wparam, lparam);
+            }
+            let window = &mut *(userdata as *mut dyn Window);
+            window.wndproc(msg, wparam, lparam)
         }
-        let userdata = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
-        if userdata == 0 {
-            return DefWindowProcW(hwnd, msg, wparam, lparam);
-        }
-        let window = &mut *(userdata as *mut dyn Window);
-        window.wndproc(msg, wparam, lparam)
     }
     let registered = REGISTERED_CLASSNAMES.lock().unwrap();
     if let Some(rname) = registered.get(&name) {
