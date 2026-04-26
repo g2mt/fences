@@ -20,7 +20,7 @@ pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
 pub struct DesktopCover {
     /// The window handle for the desktop cover.
     handle: WinHandle,
-    /// The list of fences managed by this cover.
+    /// The list of fences managed by this cover. The focused fence is always the last fence.
     fences: Vec<Fence>,
     /// The type of hit test result for the currently focused/dragged fence.
     hit_type: Option<HitTest>,
@@ -212,14 +212,34 @@ impl Window for DesktopCover {
                     if let Some(fence) = self.fences.last_mut() {
                         match hit_type {
                             HitTest::Inside => fence.move_by(dx, dy),
-                            HitTest::Left => { fence.rect.left += dx; }
-                            HitTest::Right => { fence.rect.right += dx; }
-                            HitTest::Top => { fence.rect.top += dy; }
-                            HitTest::Bottom => { fence.rect.bottom += dy; }
-                            HitTest::TopLeft => { fence.rect.left += dx; fence.rect.top += dy; }
-                            HitTest::TopRight => { fence.rect.right += dx; fence.rect.top += dy; }
-                            HitTest::BottomLeft => { fence.rect.left += dx; fence.rect.bottom += dy; }
-                            HitTest::BottomRight => { fence.rect.right += dx; fence.rect.bottom += dy; }
+                            HitTest::Left => {
+                                fence.rect.left += dx;
+                            }
+                            HitTest::Right => {
+                                fence.rect.right += dx;
+                            }
+                            HitTest::Top => {
+                                fence.rect.top += dy;
+                            }
+                            HitTest::Bottom => {
+                                fence.rect.bottom += dy;
+                            }
+                            HitTest::TopLeft => {
+                                fence.rect.left += dx;
+                                fence.rect.top += dy;
+                            }
+                            HitTest::TopRight => {
+                                fence.rect.right += dx;
+                                fence.rect.top += dy;
+                            }
+                            HitTest::BottomLeft => {
+                                fence.rect.left += dx;
+                                fence.rect.bottom += dy;
+                            }
+                            HitTest::BottomRight => {
+                                fence.rect.right += dx;
+                                fence.rect.bottom += dy;
+                            }
                             HitTest::None => {}
                         }
                     }
