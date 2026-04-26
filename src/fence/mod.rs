@@ -34,12 +34,7 @@ impl TitleBar {
             parent_hwnd,
             std::ptr::null_mut(),
             h_instance,
-            |base| {
-                Arc::new_cyclic(|weak| Self {
-                    base: unsafe { std::mem::transmute(base) },
-                })
-                .map_err(|_| anyhow::anyhow!("Failed to create TitleBar"))
-            },
+            |base| Ok(Arc::new(Self { base })),
         )
     }
 }

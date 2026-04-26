@@ -107,8 +107,8 @@ impl Base {
             )?
         };
         let window = f(base)?;
-        base.window
-            .get_or_init(|| Arc::downgrade(&(window as Arc<dyn Window>)));
+        let window_weak: Weak<dyn Window> = Arc::downgrade(&(window.clone() as Arc<dyn Window>));
+        window.base().window.get_or_init(|| window_weak);
         Ok(window)
     }
 
