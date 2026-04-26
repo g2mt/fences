@@ -42,7 +42,7 @@ fn main() {
             hInstance: h_instance,
             hIcon: std::ptr::null_mut(),
             hCursor: LoadCursorW(std::ptr::null_mut(), IDC_ARROW),
-            hbrBackground: (COLOR_WINDOW + 1) as HBRUSH,
+            hbrBackground: GetStockObject(BLACK_BRUSH) as HBRUSH,
             lpszMenuName: std::ptr::null(),
             lpszClassName: class_name,
         };
@@ -56,8 +56,9 @@ fn main() {
         let height = GetSystemMetrics(SM_CYSCREEN);
 
         // Create a borderless window (WS_POPUP) that doesn't steal focus (WS_EX_NOACTIVATE)
+        // and supports transparency (WS_EX_LAYERED)
         let hwnd = CreateWindowExW(
-            WS_EX_NOACTIVATE,
+            WS_EX_NOACTIVATE | WS_EX_LAYERED,
             class_name,
             w!("Desktop Cover"),
             WS_POPUP | WS_VISIBLE,
@@ -74,6 +75,9 @@ fn main() {
         if hwnd == std::ptr::null_mut() {
             return;
         }
+
+        // Make the black background color transparent
+        SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
 
         // Push the window to the bottom initially
         SetWindowPos(
