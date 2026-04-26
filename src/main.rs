@@ -17,6 +17,73 @@ struct DesktopCover {
     hwnd: HWND,
 }
 
+impl DesktopCover {
+    unsafe fn new(h_instance: HINSTANCE, class_name: PCWSTR) -> Box<DesktopCover> {
+        let width = GetSystemMetrics(SM_CXSCREEN);
+        let height = GetSystemMetrics(SM_CYSCREEN);
+
+        let mut dc = Box::new(DesktopCover {
+            hwnd: std::ptr::null_mut(),
+        });
+        let dc_ptr = &mut *dc as *mut DesktopCover;
+
+        // Create window with WS_EX_NOACTIVATE | WS_EX_LAYERED
+        let hwnd = CreateWindowExW(
+            WS_EX_NOACTIVATE | WS_EX_LAYERED,
+            class_name,
+            w!("Desktop Cover"),
+            WS_POPUP | WS_VISIBLE,
+            0,
+            0,
+            width,
+            height,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            h_instance,
+            dc_ptr as *const _,
+        );
+
+        if hwnd == std::ptr::null_mut() {
+            panic!("CreateWindowExW failed");
+        }
+
+        dc.hwnd = hwnd;
+
+        // Add system tray icon
+        let mut nid: NOTIFYICONDATAW = std::mem::zeroed();
+        nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
+        nid.hWnd = hwnd;
+        nid.uID = 1;
+        nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+        nid.uCallbackMessage = WM_USER_SHELLICON;
+        nid.hIcon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
+        let tip: Vec<u16> = "Desktop Cover"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        let len = tip.len().min(nid.szTip.len());
+        nid.szTip[..len].copy_from_slice(&tip[..len]);
+
+        Shell_NotifyIconW(NIM_ADD, &nid);
+
+        // Make the black background color transparent
+        SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
+
+        // Push the window to the bottom initially
+        SetWindowPos(
+            hwnd,
+            HWND_BOTTOM,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        );
+
+        dc
+    }
+}
+
 impl Window for DesktopCover {
     fn hwnd(&self) -> HWND {
         self.hwnd
@@ -151,65 +218,7 @@ fn main() {
             return;
         }
 
-        // Get the full desktop dimensions
-        let width = GetSystemMetrics(SM_CXSCREEN);
-        let height = GetSystemMetrics(SM_CYSCREEN);
-
-        let mut desktop_cover = DesktopCover {
-            hwnd: std::ptr::null_mut(),
-        };
-
-        // Create a borderless window (WS_POPUP) that doesn't steal focus (WS_EX_NOACTIVATE)
-        // and supports transparency (WS_EX_LAYERED)
-        let hwnd = CreateWindowExW(
-            WS_EX_NOACTIVATE | WS_EX_LAYERED,
-            class_name,
-            w!("Desktop Cover"),
-            WS_POPUP | WS_VISIBLE,
-            0,
-            0,
-            width,
-            height,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            h_instance,
-            &mut desktop_cover as *mut _ as *const _,
-        );
-
-        if hwnd == std::ptr::null_mut() {
-            return;
-        }
-
-        // Add system tray icon
-        let mut nid: NOTIFYICONDATAW = std::mem::zeroed();
-        nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
-        nid.hWnd = hwnd;
-        nid.uID = 1;
-        nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-        nid.uCallbackMessage = WM_USER_SHELLICON;
-        nid.hIcon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
-        let tip: Vec<u16> = "Desktop Cover"
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
-        let len = tip.len().min(nid.szTip.len());
-        nid.szTip[..len].copy_from_slice(&tip[..len]);
-
-        Shell_NotifyIconW(NIM_ADD, &nid);
-
-        // Make the black background color transparent
-        SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
-
-        // Push the window to the bottom initially
-        SetWindowPos(
-            hwnd,
-            HWND_BOTTOM,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-        );
+        let _dc = DesktopCover::new(h_instance, class_name);
 
         // Standard message loop
         let mut msg = std::mem::zeroed();
