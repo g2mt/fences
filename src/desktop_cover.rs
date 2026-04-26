@@ -162,7 +162,6 @@ impl DesktopCover {
     }
 
     fn on_lbutton_dblclk(&self, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().handle();
         let x = (lparam & 0xFFFF) as i16 as i32;
         let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
@@ -178,9 +177,7 @@ impl DesktopCover {
         }
 
         if hit_icon {
-            unsafe {
-                MessageBoxW(hwnd, w!("Clicked"), w!("Test"), MB_OK | MB_ICONINFORMATION);
-            }
+            self.on_command(IDM_RUN_ICON);
         }
         0
     }
