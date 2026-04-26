@@ -16,7 +16,7 @@ pub const BORDER_THICKNESS: i32 = 3;
 pub const TITLE_BAR_HEIGHT: i32 = 24;
 
 pub struct TitleBar {
-    pub base: BaseRef,
+    base: BaseRef,
 }
 
 impl TitleBar {
@@ -88,7 +88,7 @@ impl Window for TitleBar {
 }
 
 pub struct ScrollArea {
-    pub base: BaseRef,
+    base: BaseRef,
 }
 
 impl ScrollArea {
@@ -212,7 +212,7 @@ pub enum HitTest {
 }
 
 pub struct Fence {
-    pub base: BaseRef,
+    base: BaseRef,
     pub rect: RECT,
     pub title: String,
     pub icons: Vec<Icon>,

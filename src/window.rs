@@ -36,7 +36,7 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
                 return DefWindowProcW(hwnd, msg, wparam, lparam);
             }
             let base = &*(userdata as *const () as *const Base);
-            if let Some(window) = base.window.upgrade() {
+            if let Some(window) = base.window.get().unwrap().upgrade() {
                 window.wndproc(msg, wparam, lparam)
             } else {
                 DefWindowProcW(hwnd, msg, wparam, lparam)
