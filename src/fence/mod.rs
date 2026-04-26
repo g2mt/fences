@@ -221,58 +221,52 @@ pub struct Fence {
 }
 
 impl Fence {
-    pub fn new(parent_hwnd: HWND, x: i32, y: i32) -> Arc<Self> {
+    pub fn new(parent_hwnd: HWND, x: i32, y: i32) -> Result<Arc<Self>> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
 
         let title = "Untitled";
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
 
-        Arc::new_cyclic(|weak| {
-            let base = unsafe {
-                Base::create_window(
-                    weak.clone(),
-                    0,
-                    register_classname(w!("Fence")),
-                    std::ptr::null(),
-                    WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
-                    x,
-                    y,
-                    300,
-                    150,
-                    parent_hwnd,
-                    std::ptr::null_mut(),
-                    h_instance,
-                )
-                .unwrap()
-            };
+        Base::create_window(
+            0,
+            register_classname(w!("Fence")),
+            std::ptr::null(),
+            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+            x,
+            y,
+            300,
+            150,
+            parent_hwnd,
+            std::ptr::null_mut(),
+            h_instance,
+            |base| {
+                let title_bar = TitleBar::new(base.handle(), title_u16.as_ptr(), 300)?;
+                let scroll_area = ScrollArea::new(base.handle(), 300, 150)?;
 
-            let title_bar = TitleBar::new(base.handle(), title_u16.as_ptr(), 300).unwrap();
+                let mut fence = Self {
+                    base,
+                    rect: RECT {
+                        left: x,
+                        top: y,
+                        right: x + 300,
+                        bottom: y + 150,
+                    },
+                    title: title.to_string(),
+                    icons: Vec::new(),
+                    title_bar,
+                    scroll_area,
+                };
 
-            let scroll_area = ScrollArea::new(base.handle(), 300, 150).unwrap();
-
-            let mut fence = Self {
-                base,
-                rect: RECT {
-                    left: x,
-                    top: y,
-                    right: x + 300,
-                    bottom: y + 150,
-                },
-                title: title.to_string(),
-                icons: Vec::new(),
-                title_bar,
-                scroll_area,
-            };
-
-            fence.icons.push(Icon::new(
-                fence.scroll_area.base().handle(),
-                "Test Icon",
-                10,
-                10,
-            ));
-            fence.update_scroll_info();
-            fence
-        })
+                fence.icons.push(Icon::new(
+                    fence.scroll_area.base().handle(),
+                    "Test Icon",
+                    10,
+                    10,
+                ));
+                fence.update_scroll_info();
+                Ok(Arc::new(fence))
+            },
+        )
     }
 
     pub fn hit_test(&self, x: i32, y: i32) -> Option<HitTest> {
