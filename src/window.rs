@@ -128,7 +128,10 @@ impl Drop for Base {
 
 unsafe impl Send for Base {}
 
+// Window
+
 pub trait Window: Send + Sync + 'static {
+    /// Returns the BaseRef contained in the Window struct
     fn base<'a>(&'a self) -> &'a BaseRef;
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
