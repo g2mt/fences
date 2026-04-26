@@ -6,7 +6,12 @@ use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 const WM_USER_SHELLICON: u32 = WM_USER + 1;
-const IDM_EXIT: u32 = 101;
+const IDM_EXIT: usize = 101;
+
+trait Window {
+    fn hwnd(&self) -> HWND;
+    fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
+}
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
@@ -69,7 +74,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 unsafe { GetCursorPos(&mut pt) };
                 let h_menu = unsafe { CreatePopupMenu() };
                 unsafe {
-                    AppendMenuW(h_menu, MF_STRING, IDM_EXIT as usize, w!("&Exit"));
+                    AppendMenuW(h_menu, MF_STRING, IDM_EXIT, w!("&Exit"));
                     SetForegroundWindow(hwnd);
                     TrackPopupMenu(
                         h_menu,
@@ -86,7 +91,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             0
         }
         WM_COMMAND => {
-            if (wparam & 0xFFFF) as u32 == IDM_EXIT {
+            if (wparam & 0xFFFF) == IDM_EXIT {
                 unsafe { DestroyWindow(hwnd) };
             }
             0
@@ -150,7 +155,10 @@ fn main() {
         nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
         nid.uCallbackMessage = WM_USER_SHELLICON;
         nid.hIcon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
-        let tip: Vec<u16> = "Desktop Cover".encode_utf16().chain(std::iter::once(0)).collect();
+        let tip: Vec<u16> = "Desktop Cover"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
         let len = tip.len().min(nid.szTip.len());
         nid.szTip[..len].copy_from_slice(&tip[..len]);
 
