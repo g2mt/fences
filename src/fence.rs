@@ -19,6 +19,7 @@ pub enum HitTest {
 
 pub struct Fence {
     pub rect: RECT,
+    pub title: String,
 }
 
 impl Fence {
@@ -30,6 +31,7 @@ impl Fence {
                 right: x + 300,
                 bottom: y + 150,
             },
+            title: "Untitled".to_string(),
         }
     }
 
@@ -103,6 +105,18 @@ impl Fence {
                 width,
                 height,
                 blend,
+            );
+
+            // Draw title text
+            SetBkMode(hdc, TRANSPARENT);
+            SetTextColor(hdc, 0x00FFFFFF); // White
+            let title_u16: Vec<u16> = self.title.encode_utf16().collect();
+            DrawTextW(
+                hdc,
+                title_u16.as_ptr(),
+                title_u16.len() as i32,
+                &mut self.rect as *mut RECT,
+                DT_CENTER | DT_VCENTER | DT_SINGLELINE,
             );
 
             SelectObject(mem_dc, old_bitmap);
