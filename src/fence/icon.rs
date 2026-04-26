@@ -79,11 +79,10 @@ impl Window for Icon {
 
                 let selected = GetWindowLongPtrW(hwnd, GWLP_USERDATA) != 0;
 
-                if selected {
-                    let brush = CreateSolidBrush(0x00FFAA44); // Light blue
-                    FillRect(hdc, &rect, brush);
-                    DeleteObject(brush);
-                }
+                let bg_color = if selected { 0x00FFAA44 } else { 0x007D7D7D };
+                let brush = CreateSolidBrush(bg_color);
+                FillRect(hdc, &rect, brush);
+                DeleteObject(brush);
 
                 let icon_width = 32;
                 let icon_height = 32;

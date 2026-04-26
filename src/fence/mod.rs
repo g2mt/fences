@@ -26,7 +26,7 @@ impl TitleBar {
             0,
             register_classname(w!("FenceTitleBar")),
             title,
-            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
             0,
             0,
             width,
@@ -98,7 +98,7 @@ impl ScrollArea {
             0,
             register_classname(w!("FenceScrollArea")),
             std::ptr::null(),
-            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_VSCROLL,
+            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_VSCROLL,
             0,
             TITLE_BAR_HEIGHT,
             width,
@@ -235,7 +235,7 @@ impl Fence {
             0,
             register_classname(w!("Fence")),
             std::ptr::null(),
-            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
             x,
             y,
             300,
@@ -396,6 +396,11 @@ impl Fence {
             InvalidateRect(self.base().handle(), std::ptr::null(), TRUE);
             InvalidateRect(self.title_bar.base().handle(), std::ptr::null(), TRUE);
             InvalidateRect(self.scroll_area.base().handle(), std::ptr::null(), TRUE);
+
+            let inner = self.inner.lock().unwrap();
+            for icon in &inner.icons {
+                InvalidateRect(icon.base().handle(), std::ptr::null(), TRUE);
+            }
         }
     }
 
