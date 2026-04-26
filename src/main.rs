@@ -6,6 +6,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
+        WM_CLOSE => 0,
         WM_DESTROY => {
             unsafe { PostQuitMessage(0) };
             0
