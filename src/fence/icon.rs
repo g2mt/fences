@@ -97,13 +97,13 @@ pub unsafe extern "system" fn icon_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    let mut icon = Icon {
+    let mut icon = std::mem::ManuallyDrop::new(Icon {
         title: String::new(),
         x: 0,
         y: 0,
         selected: false,
         handle: WinHandle(hwnd),
-    };
+    });
     icon.wndproc(msg, wparam, lparam)
 }
 

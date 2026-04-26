@@ -95,7 +95,7 @@ pub unsafe extern "system" fn title_bar_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    let mut title_bar = TitleBar { handle: WinHandle(hwnd) };
+    let mut title_bar = std::mem::ManuallyDrop::new(TitleBar { handle: WinHandle(hwnd) });
     title_bar.wndproc(msg, wparam, lparam)
 }
 
@@ -194,7 +194,7 @@ pub unsafe extern "system" fn scroll_area_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    let mut scroll_area = ScrollArea { handle: WinHandle(hwnd) };
+    let mut scroll_area = std::mem::ManuallyDrop::new(ScrollArea { handle: WinHandle(hwnd) });
     scroll_area.wndproc(msg, wparam, lparam)
 }
 
@@ -242,14 +242,14 @@ pub unsafe extern "system" fn fence_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    let mut fence = Fence {
+    let mut fence = std::mem::ManuallyDrop::new(Fence {
         handle: WinHandle(hwnd),
         rect: unsafe { std::mem::zeroed() },
         title: String::new(),
         icons: Vec::new(),
         title_bar: TitleBar { handle: WinHandle(std::ptr::null_mut()) },
         scroll_area: ScrollArea { handle: WinHandle(std::ptr::null_mut()) },
-    };
+    });
     fence.wndproc(msg, wparam, lparam)
 }
 
