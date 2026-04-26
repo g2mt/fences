@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use anyhow::{anyhow, Result};
@@ -16,12 +15,8 @@ use crate::app::APP;
 use crate::desktop_cover::DesktopCover;
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    if msg != WM_NCCREATE {
-        let app = APP
-            .get()
-            .unwrap()
-            .try_lock()
-            .expect("can only lock after initialization");
+    // try to unlock to prevent reentrancy from wndproc
+    if let Ok(app) = APP.get().unwrap().try_lock() {
         if let Some(window) = app.window(window::WinHandle(hwnd)) {
             return window.lock().unwrap().wndproc(msg, wparam, lparam);
         }
@@ -30,9 +25,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 }
 
 fn main() -> Result<()> {
-    APP.get_or_init(|| {
-        Mutex::new(app::App::new())
-    });
+    APP.get_or_init(|| Mutex::new(app::App::new()));
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
         let class_name = w!("BottomWindowClass");
