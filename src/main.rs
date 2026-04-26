@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
+use anyhow::{anyhow, Context, Result};
 
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
@@ -37,7 +38,7 @@ struct DesktopCover {
 }
 
 impl DesktopCover {
-    unsafe fn new(h_instance: HINSTANCE, class_name: PCWSTR) -> Box<DesktopCover> {
+    unsafe fn new(h_instance: HINSTANCE, class_name: PCWSTR) -> Result<Box<DesktopCover>> {
         let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
 
@@ -60,7 +61,7 @@ impl DesktopCover {
         };
 
         if hwnd == std::ptr::null_mut() {
-            panic!("CreateWindowExW failed");
+            return Err(anyhow!("CreateWindowExW failed"));
         }
 
         // Add system tray icon
@@ -100,9 +101,9 @@ impl DesktopCover {
             );
         }
 
-        Box::new(DesktopCover {
+        Ok(Box::new(DesktopCover {
             win_handle: WinHandle(hwnd),
-        })
+        }))
     }
 }
 
@@ -213,7 +214,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
 
-fn main() {
+fn main() -> Result<()> {
     APP.get_or_init(|| {
         Mutex::new(App {
             windows: BTreeMap::new(),
@@ -237,12 +238,12 @@ fn main() {
         };
 
         if RegisterClassW(&wc) == 0 {
-            return;
+            return Err(anyhow!("RegisterClassW failed"));
         }
 
         {
             let mut app = APP.get().unwrap().lock().unwrap();
-            app.add_window(DesktopCover::new(h_instance, class_name));
+            app.add_window(DesktopCover::new(h_instance, class_name)?);
         }
 
         // Standard message loop
@@ -252,4 +253,5 @@ fn main() {
             DispatchMessageW(&msg);
         }
     }
+    Ok(())
 }
