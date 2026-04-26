@@ -242,6 +242,9 @@ impl Fence {
         let height = self.rect.bottom - self.rect.top;
 
         unsafe {
+            let parent = GetParent(self.title_handle.0);
+            InvalidateRect(parent, std::ptr::null(), TRUE);
+
             SetWindowPos(
                 self.title_handle.0,
                 std::ptr::null_mut(),
