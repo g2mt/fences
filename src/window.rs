@@ -37,7 +37,11 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
                 return DefWindowProcW(hwnd, msg, wparam, lparam);
             }
             let base = &*(userdata as *const () as *const Base);
-            base.window.wndproc(msg, wparam, lparam)
+            if let Some(window) = base.window.upgrade() {
+                window.wndproc(msg, wparam, lparam)
+            } else {
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
         }
     }
     let mut registered: MutexGuard<'_, HashSet<ClassName>> = REGISTERED_CLASSNAMES.lock().unwrap();
@@ -62,7 +66,7 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
 
 pub struct Base {
     hwnd: HWND,
-    window: Arc<dyn Window>,
+    window: Weak<dyn Window>,
 }
 
 unsafe impl Sync for Base {}
@@ -71,7 +75,7 @@ pub type BaseRef = Pin<Box<Base>>; // pinned for win32
 
 impl Base {
     pub unsafe fn create_window(
-        window: Arc<dyn Window>,
+        window: Weak<dyn Window>,
         dwexstyle: WINDOW_EX_STYLE,
         classname: ClassName,
         lpwindowname: PCWSTR,
@@ -84,7 +88,7 @@ impl Base {
         hmenu: HMENU,
         hinstance: HINSTANCE,
     ) -> Result<BaseRef> {
-        let self_ref = Box::into_pin(Box::new(Self {
+        let mut self_ref = Box::into_pin(Box::new(Self {
             hwnd: std::ptr::null_mut(),
             window,
         }));
@@ -106,6 +110,10 @@ impl Base {
         };
         if hwnd.is_null() {
             return Err(anyhow!("CreateWindowExW failed"));
+        }
+        unsafe {
+            let mut_ref = Pin::get_unchecked_mut(self_ref.as_mut());
+            mut_ref.hwnd = hwnd;
         }
         Ok(self_ref)
     }
