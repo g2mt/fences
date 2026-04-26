@@ -3,6 +3,7 @@ use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
@@ -150,7 +151,7 @@ impl Window for DesktopCover {
                 let mut pt = POINT { x: 0, y: 0 };
                 unsafe { GetCursorPos(&mut pt) };
                 unsafe { ScreenToClient(hwnd, &mut pt) };
-                
+
                 let over_fence = self.fences.iter().any(|f| f.contains(pt.x, pt.y));
                 if over_fence {
                     unsafe {
@@ -164,7 +165,7 @@ impl Window for DesktopCover {
             WM_LBUTTONDOWN => {
                 let x = (lparam & 0xFFFF) as i16 as i32;
                 let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
-                
+
                 for (i, fence) in self.fences.iter().enumerate().rev() {
                     if fence.contains(x, y) {
                         self.dragging_idx = Some(i);
@@ -179,13 +180,13 @@ impl Window for DesktopCover {
                 if let Some(idx) = self.dragging_idx {
                     let x = (lparam & 0xFFFF) as i16 as i32;
                     let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
-                    
+
                     let dx = x - self.last_mouse_pos.x;
                     let dy = y - self.last_mouse_pos.y;
-                    
+
                     self.fences[idx].move_by(dx, dy);
                     self.last_mouse_pos = POINT { x, y };
-                    
+
                     unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
                 }
                 0
@@ -228,7 +229,8 @@ impl Window for DesktopCover {
                     IDM_ADD_FENCE => {
                         let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
                         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
-                        self.fences.push(Fence::new(width / 2 - 150, height / 2 - 75));
+                        self.fences
+                            .push(Fence::new(width / 2 - 150, height / 2 - 75));
                         unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
                     }
                     _ => {}
