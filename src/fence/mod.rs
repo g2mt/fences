@@ -8,45 +8,29 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 mod icon;
 use icon::Icon;
 
-use crate::window::{Base, WinHandle, Window};
+use std::sync::Arc;
+use crate::window::{BaseRef, Window, register_classname};
 
 pub const BORDER_THICKNESS: i32 = 3;
 pub const TITLE_BAR_HEIGHT: i32 = 24;
 
 pub fn register_classes() {
-    unsafe {
-        let h_instance = GetModuleHandleW(std::ptr::null());
-
-        let mut wc: WNDCLASSW = std::mem::zeroed();
-        wc.hInstance = h_instance;
-        wc.hCursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
-
-        wc.lpszClassName = w!("Fence");
-        wc.lpfnWndProc = Some(fence_wndproc);
-        RegisterClassW(&wc);
-
-        wc.lpszClassName = w!("FenceTitleBar");
-        wc.lpfnWndProc = Some(title_bar_wndproc);
-        RegisterClassW(&wc);
-
-        wc.lpszClassName = w!("FenceScrollArea");
-        wc.lpfnWndProc = Some(scroll_area_wndproc);
-        RegisterClassW(&wc);
-
-        icon::register_class();
-    }
+    register_classname(w!("Fence"));
+    register_classname(w!("FenceTitleBar"));
+    register_classname(w!("FenceScrollArea"));
+    icon::register_class();
 }
 
 pub struct TitleBar {
-    pub handle: WinHandle,
+    pub base: BaseRef,
 }
 
 impl Window for TitleBar {
-    fn handle(&self) -> WinHandle {
-        self.handle
+    fn base<'a>(&'a self) -> &'a BaseRef {
+        &self.base
     }
 
-    fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().handle();
         match msg {
             WM_NCHITTEST => HTTRANSPARENT as LRESULT,
@@ -89,28 +73,16 @@ impl Window for TitleBar {
     }
 }
 
-pub unsafe extern "system" fn title_bar_wndproc(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    let mut title_bar = std::mem::ManuallyDrop::new(TitleBar {
-        handle: WinHandle(hwnd),
-    });
-    title_bar.wndproc(msg, wparam, lparam)
-}
-
 pub struct ScrollArea {
-    base: Base,
+    pub base: BaseRef,
 }
 
 impl Window for ScrollArea {
-    fn base(&self) -> &Base {
+    fn base<'a>(&'a self) -> &'a BaseRef {
         &self.base
     }
 
-    fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().handle();
         match msg {
             WM_NCHITTEST => unsafe {
@@ -190,18 +162,6 @@ impl Window for ScrollArea {
     }
 }
 
-pub unsafe extern "system" fn scroll_area_wndproc(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    let mut scroll_area = std::mem::ManuallyDrop::new(ScrollArea {
-        handle: WinHandle(hwnd),
-    });
-    scroll_area.wndproc(msg, wparam, lparam)
-}
-
 #[derive(Clone, Copy, PartialEq)]
 pub enum HitTest {
     TitleBar,
@@ -218,20 +178,20 @@ pub enum HitTest {
 }
 
 pub struct Fence {
-    base: Base,
+    pub base: BaseRef,
     pub rect: RECT,
     pub title: String,
     pub icons: Vec<Icon>,
-    pub title_bar: TitleBar,
-    pub scroll_area: ScrollArea,
+    pub title_bar: Arc<TitleBar>,
+    pub scroll_area: Arc<ScrollArea>,
 }
 
 impl Window for Fence {
-    fn base(&self) -> &Base {
+    fn base<'a>(&'a self) -> &'a BaseRef {
         &self.base
     }
 
-    fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().handle();
         match msg {
             WM_NCHITTEST => HTTRANSPARENT as LRESULT,
@@ -240,109 +200,89 @@ impl Window for Fence {
     }
 }
 
-pub unsafe extern "system" fn fence_wndproc(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    let mut fence = std::mem::ManuallyDrop::new(Fence {
-        handle: WinHandle(hwnd),
-        rect: unsafe { std::mem::zeroed() },
-        title: String::new(),
-        icons: Vec::new(),
-        title_bar: TitleBar {
-            handle: WinHandle(std::ptr::null_mut()),
-        },
-        scroll_area: ScrollArea {
-            handle: WinHandle(std::ptr::null_mut()),
-        },
-    });
-    fence.wndproc(msg, wparam, lparam)
-}
-
 impl Fence {
-    pub fn new(parent_hwnd: HWND, x: i32, y: i32) -> Self {
+    pub fn new(parent_hwnd: HWND, x: i32, y: i32) -> Arc<Self> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
-
-        let hwnd_fence = unsafe {
-            CreateWindowExW(
-                0,
-                w!("Fence"),
-                std::ptr::null(),
-                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
-                x,
-                y,
-                300,
-                150,
-                parent_hwnd,
-                std::ptr::null_mut(),
-                h_instance,
-                std::ptr::null(),
-            )
-        };
 
         let title = "Untitled";
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
 
-        let hwnd_title = unsafe {
-            CreateWindowExW(
-                0,
-                w!("FenceTitleBar"),
-                title_u16.as_ptr(),
-                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
-                0,
-                0,
-                300,
-                TITLE_BAR_HEIGHT,
-                hwnd_fence,
-                std::ptr::null_mut(),
-                h_instance,
-                std::ptr::null(),
-            )
-        };
+        Arc::new_cyclic(|weak| {
+            let base = unsafe {
+                Base::create_window(
+                    weak.clone(),
+                    0,
+                    register_classname(w!("Fence")),
+                    std::ptr::null(),
+                    WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+                    x,
+                    y,
+                    300,
+                    150,
+                    parent_hwnd,
+                    std::ptr::null_mut(),
+                    h_instance,
+                ).unwrap()
+            };
 
-        let hwnd_scroll = unsafe {
-            CreateWindowExW(
-                0,
-                w!("FenceScrollArea"),
-                std::ptr::null(),
-                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_VSCROLL,
-                0,
-                TITLE_BAR_HEIGHT,
-                300,
-                150 - TITLE_BAR_HEIGHT,
-                hwnd_fence,
-                std::ptr::null_mut(),
-                h_instance,
-                std::ptr::null(),
-            )
-        };
+            let title_bar = Arc::new_cyclic(|tb_weak| {
+                let tb_base = unsafe {
+                    Base::create_window(
+                        tb_weak.clone(),
+                        0,
+                        register_classname(w!("FenceTitleBar")),
+                        title_u16.as_ptr(),
+                        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+                        0,
+                        0,
+                        300,
+                        TITLE_BAR_HEIGHT,
+                        base.handle(),
+                        std::ptr::null_mut(),
+                        h_instance,
+                    ).unwrap()
+                };
+                TitleBar { base: tb_base }
+            });
 
-        let mut fence = Self {
-            handle: WinHandle(hwnd_fence),
-            rect: RECT {
-                left: x,
-                top: y,
-                right: x + 300,
-                bottom: y + 150,
-            },
-            title: title.to_string(),
-            icons: Vec::new(),
-            title_bar: TitleBar {
-                handle: WinHandle(hwnd_title),
-            },
-            scroll_area: ScrollArea {
-                handle: WinHandle(hwnd_scroll),
-            },
-        };
+            let scroll_area = Arc::new_cyclic(|sa_weak| {
+                let sa_base = unsafe {
+                    Base::create_window(
+                        sa_weak.clone(),
+                        0,
+                        register_classname(w!("FenceScrollArea")),
+                        std::ptr::null(),
+                        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_VSCROLL,
+                        0,
+                        TITLE_BAR_HEIGHT,
+                        300,
+                        150 - TITLE_BAR_HEIGHT,
+                        base.handle(),
+                        std::ptr::null_mut(),
+                        h_instance,
+                    ).unwrap()
+                };
+                ScrollArea { base: sa_base }
+            });
 
-        fence
-            .icons
-            .push(Icon::new(hwnd_scroll, "Test Icon", 10, 10));
+            let mut fence = Self {
+                base,
+                rect: RECT {
+                    left: x,
+                    top: y,
+                    right: x + 300,
+                    bottom: y + 150,
+                },
+                title: title.to_string(),
+                icons: Vec::new(),
+                title_bar,
+                scroll_area,
+            };
 
-        fence.update_scroll_info();
-        fence
+            fence.icons.push(Icon::new(fence.scroll_area.base().handle(), "Test Icon", 10, 10));
+            fence.update_scroll_info();
+            fence
+        })
     }
 
     pub fn hit_test(&self, x: i32, y: i32) -> Option<HitTest> {
