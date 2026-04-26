@@ -150,10 +150,7 @@ fn main() {
         nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
         nid.uCallbackMessage = WM_USER_SHELLICON;
         nid.hIcon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
-        let tip = [
-            'D' as u16, 'e' as u16, 's' as u16, 'k' as u16, 't' as u16, 'o' as u16, 'p' as u16,
-            ' ' as u16, 'C' as u16, 'o' as u16, 'v' as u16, 'e' as u16, 'r' as u16, 0,
-        ];
+        let tip: Vec<u16> = "Desktop Cover".encode_utf16().chain(std::iter::once(0)).collect();
         let len = tip.len().min(nid.szTip.len());
         nid.szTip[..len].copy_from_slice(&tip[..len]);
 
