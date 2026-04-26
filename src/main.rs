@@ -1,5 +1,4 @@
 use anyhow::Result;
-use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod desktop_cover;
