@@ -8,6 +8,8 @@ use windows_sys::core::*;
 
 use crate::window::{Base, BaseRef, Window, register_classname};
 
+pub const ICON_SIZE: i32 = 64;
+
 pub struct Icon {
     base: BaseRef,
     pub title: String,
@@ -26,8 +28,8 @@ impl Icon {
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
             x,
             y,
-            64,
-            64,
+            ICON_SIZE,
+            ICON_SIZE,
             parent_hwnd,
             std::ptr::null_mut(),
             h_instance,
