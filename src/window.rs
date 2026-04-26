@@ -2,10 +2,10 @@ use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use std::rc::Rc;
-use std::sync::{Arc, LazyLock, Mutex, OnceLock, Weak};
+use std::sync::{Arc, LazyLock, Mutex, MutexGuard, OnceLock, Weak};
 
 use anyhow::{anyhow, Result};
-use windows_sys::Win32::core::*;
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowLongPtrW, SetWindowLongPtrW,
@@ -34,12 +34,11 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
             if userdata == 0 {
                 return DefWindowProcW(hwnd, msg, wparam, lparam);
             }
-            let base = &*(userdata as *const Base);
-            let mut window = Arc::as_ptr(&base.window) as *mut dyn Window;
-            (*window).wndproc(msg, wparam, lparam)
+            let base = &*(userdata as *const () as *const Base);
+            base.window.wndproc(msg, wparam, lparam)
         }
     }
-    let mut registered = REGISTERED_CLASSNAMES.lock().unwrap();
+    let mut registered: MutexGuard<'_, HashSet<Rc<PCWSTR>>> = REGISTERED_CLASSNAMES.lock().unwrap();
     if let Some(rname) = registered.get(&name as &PCWSTR) {
         return ClassName(rname.clone());
     }
@@ -128,7 +127,7 @@ impl Drop for Base {
 unsafe impl Send for Base {}
 
 pub trait Window: Send + Sync + 'static {
-    fn base<'a>(&'a self) -> &'a ;
+    fn base<'a>(&'a self) -> &'a BaseRef;
 
-    fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
+    fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
 }
