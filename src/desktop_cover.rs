@@ -158,15 +158,13 @@ impl Window for DesktopCover {
                 unsafe { ScreenToClient(hwnd, &mut pt) };
 
                 for fence in self.fences.iter().rev() {
-                    let hit = fence.hit_test(pt.x, pt.y);
-                    if hit != HitTest::None {
+                    if let Some(hit) = fence.hit_test(pt.x, pt.y) {
                         let cursor_id = match hit {
                             HitTest::Inside => IDC_SIZEALL,
                             HitTest::Left | HitTest::Right => IDC_SIZEWE,
                             HitTest::Top | HitTest::Bottom => IDC_SIZENS,
                             HitTest::TopLeft | HitTest::BottomRight => IDC_SIZENWSE,
                             HitTest::TopRight | HitTest::BottomLeft => IDC_SIZENESW,
-                            HitTest::None => IDC_ARROW,
                         };
                         unsafe {
                             let cursor = LoadCursorW(std::ptr::null_mut(), cursor_id);
@@ -183,8 +181,7 @@ impl Window for DesktopCover {
 
                 let mut hit_idx = None;
                 for (i, fence) in self.fences.iter().enumerate().rev() {
-                    let hit = fence.hit_test(x, y);
-                    if hit != HitTest::None {
+                    if let Some(hit) = fence.hit_test(x, y) {
                         hit_idx = Some((i, hit));
                         break;
                     }
@@ -241,7 +238,6 @@ impl Window for DesktopCover {
                                 fence.rect.right += dx;
                                 fence.rect.bottom += dy;
                             }
-                            HitTest::None => {}
                         }
                     }
 
@@ -263,7 +259,7 @@ impl Window for DesktopCover {
 
                 let mut hit_idx = None;
                 for (i, fence) in self.fences.iter().enumerate().rev() {
-                    if fence.hit_test(x, y) != HitTest::None {
+                    if fence.hit_test(x, y).is_some() {
                         hit_idx = Some(i);
                         break;
                     }
