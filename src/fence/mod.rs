@@ -91,6 +91,26 @@ pub struct ScrollArea {
     pub base: BaseRef,
 }
 
+impl ScrollArea {
+    pub fn new(parent_hwnd: HWND, width: i32, height: i32) -> Result<Arc<Self>> {
+        let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        Base::create_window(
+            0,
+            register_classname(w!("FenceScrollArea")),
+            std::ptr::null(),
+            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_VSCROLL,
+            0,
+            TITLE_BAR_HEIGHT,
+            width,
+            height - TITLE_BAR_HEIGHT,
+            parent_hwnd,
+            std::ptr::null_mut(),
+            h_instance,
+            |base| Ok(Arc::new(Self { base })),
+        )
+    }
+}
+
 impl Window for ScrollArea {
     fn base<'a>(&'a self) -> &'a BaseRef {
         &self.base
@@ -242,26 +262,7 @@ impl Fence {
 
             let title_bar = TitleBar::new(base.handle(), title_u16.as_ptr(), 300).unwrap();
 
-            let scroll_area = Arc::new_cyclic(|sa_weak| {
-                let sa_base = unsafe {
-                    Base::create_window(
-                        sa_weak.clone(),
-                        0,
-                        register_classname(w!("FenceScrollArea")),
-                        std::ptr::null(),
-                        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_VSCROLL,
-                        0,
-                        TITLE_BAR_HEIGHT,
-                        300,
-                        150 - TITLE_BAR_HEIGHT,
-                        base.handle(),
-                        std::ptr::null_mut(),
-                        h_instance,
-                    )
-                    .unwrap()
-                };
-                ScrollArea { base: sa_base }
-            });
+            let scroll_area = ScrollArea::new(base.handle(), 300, 150).unwrap();
 
             let mut fence = Self {
                 base,
