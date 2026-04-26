@@ -11,8 +11,6 @@ use crate::window::{Base, BaseRef, Window, register_classname};
 pub struct Icon {
     base: BaseRef,
     pub title: String,
-    pub x: i32,
-    pub y: i32,
     selected: AtomicBool,
 }
 
@@ -37,8 +35,6 @@ impl Icon {
                 Ok(Arc::new(Self {
                     base,
                     title: title.to_string(),
-                    x,
-                    y,
                     selected: AtomicBool::new(false),
                 }))
             },
@@ -54,9 +50,8 @@ impl Icon {
     }
 
     pub fn hit_test(&self, rel_x: i32, rel_y: i32) -> bool {
-        let width = 64;
-        let height = 64;
-        rel_x >= self.x && rel_x < self.x + width && rel_y >= self.y && rel_y < self.y + height
+        let rect = self.base.rect();
+        rel_x >= rect.left && rel_x < rect.right && rel_y >= rect.top && rel_y < rect.bottom
     }
 }
 
