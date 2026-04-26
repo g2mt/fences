@@ -7,10 +7,8 @@ use std::sync::{Arc, LazyLock, Mutex, MutexGuard, OnceLock, Weak};
 use anyhow::{anyhow, Result};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
-use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowLongPtrW, SetWindowLongPtrW,
-    CREATESTRUCTW, GWLP_USERDATA, HMENU, WINDOW_EX_STYLE, WINDOW_STYLE, WM_NCCREATE,
-};
+use windows_sys::Win32::System::LibraryLoader::*;
+use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 // Class names
 
@@ -18,7 +16,8 @@ static REGISTERED_CLASSNAMES: LazyLock<Mutex<HashSet<ClassName>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
 
 #[derive(Clone, Eq, PartialEq, Hash)]
-pub struct ClassName(Rc<PCWSTR>);
+pub struct ClassName(Arc<PCWSTR>);
+unsafe impl Send for ClassName {}
 
 pub fn register_classname(name: PCWSTR) -> ClassName {
     pub unsafe extern "system" fn base_wndproc(
@@ -42,7 +41,8 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
         }
     }
     let mut registered: MutexGuard<'_, HashSet<ClassName>> = REGISTERED_CLASSNAMES.lock().unwrap();
-    if let Some(existing) = registered.get(&ClassName(Rc::new(name))) {
+    let class_name = ClassName(Arc::new(name));
+    if let Some(existing) = registered.get(&class_name) {
         return existing.clone();
     }
     unsafe {
@@ -54,7 +54,6 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
         wc.lpfnWndProc = Some(base_wndproc);
         RegisterClassW(&wc);
     }
-    let class_name = ClassName(Rc::new(name));
     registered.insert(class_name.clone());
     class_name
 }
@@ -85,14 +84,14 @@ impl Base {
         hmenu: HMENU,
         hinstance: HINSTANCE,
     ) -> Result<BaseRef> {
-        let mut self_ref = Box::into_pin(Box::new(Self {
+        let self_ref = Box::into_pin(Box::new(Self {
             hwnd: std::ptr::null_mut(),
             window,
         }));
         let hwnd = unsafe {
             CreateWindowExW(
                 dwexstyle,
-                lpclassname,
+                *(classname.0),
                 lpwindowname,
                 dwstyle,
                 x,
