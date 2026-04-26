@@ -7,16 +7,18 @@ use windows_sys::core::*;
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_DESTROY => {
-            PostQuitMessage(0);
+            unsafe { PostQuitMessage(0) };
             0
         }
         WM_WINDOWPOSCHANGING => {
             // Force the window to stay at the bottom of the Z-order
             let pos = lparam as *mut WINDOWPOS;
-            (*pos).hwndInsertAfter = HWND_BOTTOM;
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            unsafe {
+                (*pos).hwndInsertAfter = HWND_BOTTOM;
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }
 
@@ -31,8 +33,8 @@ fn main() {
             cbClsExtra: 0,
             cbWndExtra: 0,
             hInstance: h_instance,
-            hIcon: 0,
-            hCursor: LoadCursorW(0, IDC_ARROW),
+            hIcon: std::ptr::null_mut(),
+            hCursor: LoadCursorW(std::ptr::null_mut(), IDC_ARROW),
             hbrBackground: (COLOR_WINDOW + 1) as HBRUSH,
             lpszMenuName: std::ptr::null(),
             lpszClassName: class_name,
@@ -56,13 +58,13 @@ fn main() {
             0,
             width,
             height,
-            0,
-            0,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
             h_instance,
             std::ptr::null(),
         );
 
-        if hwnd == 0 {
+        if hwnd == std::ptr::null_mut() {
             return;
         }
 
@@ -79,7 +81,7 @@ fn main() {
 
         // Standard message loop
         let mut msg = std::mem::zeroed();
-        while GetMessageW(&mut msg, 0, 0, 0) > 0 {
+        while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
