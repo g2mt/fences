@@ -9,7 +9,7 @@ mod desktop_cover;
 mod fence;
 mod window;
 
-use crate::app::APP;
+use crate::app::{lock_app, APP};
 use crate::desktop_cover::DesktopCover;
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -27,7 +27,7 @@ fn main() -> Result<()> {
     unsafe {
         let desktop_cover = DesktopCover::new(Some(wndproc))?;
         {
-            let mut app = APP.get().unwrap().lock().unwrap();
+            let mut app = lock_app();
             app.add_window(desktop_cover);
         }
         let mut msg = std::mem::zeroed();
