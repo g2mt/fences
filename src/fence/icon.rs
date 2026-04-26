@@ -4,6 +4,8 @@ use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
+use crate::window::WinHandle;
+
 pub fn register_class() {
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
@@ -84,7 +86,7 @@ pub struct FenceIcon {
     pub x: i32,
     pub y: i32,
     pub selected: bool,
-    pub hwnd: HWND,
+    pub handle: WinHandle,
 }
 
 impl FenceIcon {
@@ -114,15 +116,15 @@ impl FenceIcon {
             x,
             y,
             selected: false,
-            hwnd,
+            handle: WinHandle(hwnd),
         }
     }
 
     pub fn set_selected(&mut self, selected: bool) {
         self.selected = selected;
         unsafe {
-            SetWindowLongPtrW(self.hwnd, GWLP_USERDATA, if selected { 1 } else { 0 });
-            InvalidateRect(self.hwnd, std::ptr::null(), TRUE);
+            SetWindowLongPtrW(self.handle.0, GWLP_USERDATA, if selected { 1 } else { 0 });
+            InvalidateRect(self.handle.0, std::ptr::null(), TRUE);
         }
     }
 
@@ -136,8 +138,8 @@ impl FenceIcon {
 impl Drop for FenceIcon {
     fn drop(&mut self) {
         unsafe {
-            if self.hwnd != std::ptr::null_mut() {
-                DestroyWindow(self.hwnd);
+            if self.handle.0 != std::ptr::null_mut() {
+                DestroyWindow(self.handle.0);
             }
         }
     }
