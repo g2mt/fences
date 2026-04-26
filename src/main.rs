@@ -56,10 +56,9 @@ impl DesktopCover {
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 h_instance,
-                std::ptr::null_mut(), // no lpCreateParams – we will use the global map
+                std::ptr::null(),
             )
         };
-
         if hwnd == std::ptr::null_mut() {
             return Err(anyhow!("CreateWindowExW failed"));
         }
@@ -203,8 +202,12 @@ impl Window for DesktopCover {
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     // Look up the window object using the global map.
-    {
-        let app = APP.get().unwrap().lock().unwrap();
+    if msg != WM_NCCREATE {
+        let app = APP
+            .get()
+            .unwrap()
+            .try_lock()
+            .expect("can only lock after initialization");
         if let Some(window) = app.windows.get(&WinHandle(hwnd)) {
             return window.lock().unwrap().wndproc(msg, wparam, lparam);
         }
@@ -241,9 +244,10 @@ fn main() -> Result<()> {
             return Err(anyhow!("RegisterClassW failed"));
         }
 
+        let desktop_cover = DesktopCover::new(h_instance, class_name)?;
         {
             let mut app = APP.get().unwrap().lock().unwrap();
-            app.add_window(DesktopCover::new(h_instance, class_name)?);
+            app.add_window(desktop_cover);
         }
 
         // Standard message loop
