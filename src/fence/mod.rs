@@ -220,20 +220,6 @@ pub struct Fence {
     pub scroll_area: Arc<ScrollArea>,
 }
 
-impl Window for Fence {
-    fn base<'a>(&'a self) -> &'a BaseRef {
-        &self.base
-    }
-
-    fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().handle();
-        match msg {
-            WM_NCHITTEST => HTTRANSPARENT as LRESULT,
-            _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
-        }
-    }
-}
-
 impl Fence {
     pub fn new(parent_hwnd: HWND, x: i32, y: i32) -> Arc<Self> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
@@ -435,5 +421,19 @@ impl Fence {
             );
         }
         self.invalidate();
+    }
+}
+
+impl Window for Fence {
+    fn base<'a>(&'a self) -> &'a BaseRef {
+        &self.base
+    }
+
+    fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().handle();
+        match msg {
+            WM_NCHITTEST => HTTRANSPARENT as LRESULT,
+            _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        }
     }
 }
