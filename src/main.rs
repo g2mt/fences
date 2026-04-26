@@ -1,23 +1,27 @@
-useanyhow::Result;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
+
+use anyhow::{anyhow, Result};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
-use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod app;
-mod window;
 mod desktop_cover;
+mod window;
 
 use crate::app::APP;
 use crate::desktop_cover::DesktopCover;
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if msg != WM_NCCREATE {
-        let app = APP.get().unwrap().try_lock().expect("can only lock after initialization");
+        let app = APP
+            .get()
+            .unwrap()
+            .try_lock()
+            .expect("can only lock after initialization");
         if let Some(window) = app.windows.get(&window::WinHandle(hwnd)) {
             return window.lock().unwrap().wndproc(msg, wparam, lparam);
         }
@@ -26,7 +30,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 }
 
 fn main() -> Result<()> {
-    APP.get_or_init(|| Mutex::new(app::App { windows: BTreeMap::new() }));
+    APP.get_or_init(|| {
+        Mutex::new(app::App {
+            windows: BTreeMap::new(),
+        })
+    });
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
         let class_name = w!("BottomWindowClass");

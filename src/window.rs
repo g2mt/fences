@@ -1,6 +1,6 @@
 use windows_sys::Win32::Foundation::*;
-use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct WinHandle(pub HWND);
 unsafe impl Send for WinHandle {}
 

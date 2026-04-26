@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
 
-use anyhow::Result;
 use crate::window::{Window, WinHandle};
 
 pub struct App {
