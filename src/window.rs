@@ -1,4 +1,6 @@
+use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
+use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::{Arc, LazyLock, Mutex, OnceLock, Weak};
 
@@ -68,6 +70,10 @@ pub struct Base {
     window: Arc<dyn Window>,
 }
 
+unsafe impl Sync for Base {}
+
+pub type BaseRef = Pin<Box<Base>>; // pinned for win32
+
 impl Base {
     pub unsafe fn create_window(
         window: Arc<dyn Window>,
@@ -82,7 +88,11 @@ impl Base {
         hwndparent: HWND,
         hmenu: HMENU,
         hinstance: HINSTANCE,
-    ) -> Result<Self> {
+    ) -> Result<BaseRef> {
+        let mut self_ref = Box::into_pin(Box::new(Self {
+            hwnd: std::ptr::null_mut(),
+            window,
+        }));
         let hwnd = unsafe {
             CreateWindowExW(
                 dwexstyle,
@@ -96,13 +106,13 @@ impl Base {
                 hwndparent,
                 hmenu,
                 hinstance,
-                Arc::into_raw(window.clone()) as *const _,
+                &*self_ref as *const Base as *const _,
             )
         };
         if hwnd.is_null() {
             return Err(anyhow!("CreateWindowExW failed"));
         }
-        Ok(Self { hwnd, window })
+        Ok(self_ref)
     }
 
     pub fn handle(&self) -> HWND {
@@ -124,7 +134,7 @@ impl Drop for Base {
 unsafe impl Send for Base {}
 
 pub trait Window: Send + Sync + 'static {
-    fn base<'a>(&'a self) -> &'a Base;
+    fn base<'a>(&'a self) -> &'a ;
 
     fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
 }
