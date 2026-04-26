@@ -1,3 +1,4 @@
+use anyhow::Result;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -16,6 +17,10 @@ pub const TITLE_BAR_HEIGHT: i32 = 24;
 
 pub struct TitleBar {
     pub base: BaseRef,
+}
+
+impl TitleBar {
+    pub fn new() -> Result<Arc<Self>> {}
 }
 
 impl Window for TitleBar {

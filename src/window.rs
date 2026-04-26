@@ -1,7 +1,6 @@
 use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
-use std::rc::Rc;
 use std::sync::{Arc, LazyLock, Mutex, MutexGuard, OnceLock, Weak};
 
 use anyhow::{anyhow, Result};
@@ -66,7 +65,7 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
 
 pub struct Base {
     hwnd: HWND,
-    window: Weak<dyn Window>,
+    window: OnceLock<Weak<dyn Window>>,
 }
 
 unsafe impl Sync for Base {}
@@ -74,8 +73,46 @@ unsafe impl Sync for Base {}
 pub type BaseRef = Pin<Box<Base>>; // pinned for win32
 
 impl Base {
-    pub unsafe fn create_window(
-        window: Weak<dyn Window>,
+    pub fn create_window<W, F>(
+        dwexstyle: WINDOW_EX_STYLE,
+        classname: ClassName,
+        lpwindowname: PCWSTR,
+        dwstyle: WINDOW_STYLE,
+        x: i32,
+        y: i32,
+        nwidth: i32,
+        nheight: i32,
+        hwndparent: HWND,
+        hmenu: HMENU,
+        hinstance: HINSTANCE,
+        f: F,
+    ) -> Result<Arc<W>>
+    where
+        F: FnOnce(HWND) -> Result<Arc<W>>,
+        W: Window,
+    {
+        let base = unsafe {
+            Self::create_window_uninit(
+                dwexstyle,
+                classname,
+                lpwindowname,
+                dwstyle,
+                x,
+                y,
+                nwidth,
+                nheight,
+                hwndparent,
+                hmenu,
+                hinstance,
+            )?
+        };
+        let window = f(base.hwnd)?;
+        base.window
+            .get_or_init(|| Arc::downgrade(&(window as Arc<dyn Window>)));
+        Ok(window)
+    }
+
+    unsafe fn create_window_uninit(
         dwexstyle: WINDOW_EX_STYLE,
         classname: ClassName,
         lpwindowname: PCWSTR,
@@ -90,7 +127,7 @@ impl Base {
     ) -> Result<BaseRef> {
         let mut self_ref = Box::into_pin(Box::new(Self {
             hwnd: std::ptr::null_mut(),
-            window,
+            window: OnceLock::new(),
         }));
         let hwnd = unsafe {
             CreateWindowExW(
