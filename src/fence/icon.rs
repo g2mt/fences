@@ -1,38 +1,69 @@
+use std::sync::Arc;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-use crate::window::{WinHandle, Window};
-
-pub fn register_class() {
-    unsafe {
-        let h_instance = GetModuleHandleW(std::ptr::null());
-        let mut wc: WNDCLASSW = std::mem::zeroed();
-        wc.hInstance = h_instance;
-        wc.lpszClassName = w!("FenceIcon");
-        wc.lpfnWndProc = Some(icon_wndproc);
-        wc.hCursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
-        RegisterClassW(&wc);
-    }
-}
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub struct Icon {
+    base: BaseRef,
     pub title: String,
     pub x: i32,
     pub y: i32,
-    pub selected: bool,
-    pub handle: WinHandle,
+}
+
+impl Icon {
+    pub fn new(parent_hwnd: HWND, title: &str, x: i32, y: i32) -> Arc<Self> {
+        let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+
+        Base::create_window(
+            0,
+            register_classname(w!("FenceIcon")),
+            title_u16.as_ptr(),
+            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+            x,
+            y,
+            64,
+            64,
+            parent_hwnd,
+            std::ptr::null_mut(),
+            h_instance,
+            |base| {
+                Ok(Arc::new(Self {
+                    base,
+                    title: title.to_string(),
+                    x,
+                    y,
+                }))
+            },
+        )
+        .expect("Failed to create Icon window")
+    }
+
+    pub fn set_selected(&self, selected: bool) {
+        unsafe {
+            SetWindowLongPtrW(self.base.handle(), GWLP_USERDATA, if selected { 1 } else { 0 });
+            InvalidateRect(self.base.handle(), std::ptr::null(), TRUE);
+        }
+    }
+
+    pub fn hit_test(&self, rel_x: i32, rel_y: i32) -> bool {
+        let width = 64;
+        let height = 64;
+        rel_x >= self.x && rel_x < self.x + width && rel_y >= self.y && rel_y < self.y + height
+    }
 }
 
 impl Window for Icon {
-    fn handle(&self) -> WinHandle {
-        self.handle
+    fn base<'a>(&'a self) -> &'a BaseRef {
+        &self.base
     }
 
-    fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.handle.0;
+    fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().handle();
         match msg {
             WM_NCHITTEST => HTTRANSPARENT as LRESULT,
             WM_PAINT => unsafe {
@@ -87,78 +118,6 @@ impl Window for Icon {
                 0
             },
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
-        }
-    }
-}
-
-pub unsafe extern "system" fn icon_wndproc(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    let mut icon = std::mem::ManuallyDrop::new(Icon {
-        title: String::new(),
-        x: 0,
-        y: 0,
-        selected: false,
-        handle: WinHandle(hwnd),
-    });
-    icon.wndproc(msg, wparam, lparam)
-}
-
-impl Icon {
-    pub fn new(parent_hwnd: HWND, title: &str, x: i32, y: i32) -> Self {
-        let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
-        let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
-
-        let hwnd = unsafe {
-            CreateWindowExW(
-                0,
-                w!("FenceIcon"),
-                title_u16.as_ptr(),
-                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
-                x,
-                y,
-                64,
-                64,
-                parent_hwnd,
-                std::ptr::null_mut(),
-                h_instance,
-                std::ptr::null(),
-            )
-        };
-
-        Self {
-            title: title.to_string(),
-            x,
-            y,
-            selected: false,
-            handle: WinHandle(hwnd),
-        }
-    }
-
-    pub fn set_selected(&mut self, selected: bool) {
-        self.selected = selected;
-        unsafe {
-            SetWindowLongPtrW(self.handle.0, GWLP_USERDATA, if selected { 1 } else { 0 });
-            InvalidateRect(self.handle.0, std::ptr::null(), TRUE);
-        }
-    }
-
-    pub fn hit_test(&self, rel_x: i32, rel_y: i32) -> bool {
-        let width = 64;
-        let height = 64;
-        rel_x >= self.x && rel_x < self.x + width && rel_y >= self.y && rel_y < self.y + height
-    }
-}
-
-impl Drop for Icon {
-    fn drop(&mut self) {
-        unsafe {
-            if self.handle.0 != std::ptr::null_mut() {
-                DestroyWindow(self.handle.0);
-            }
         }
     }
 }

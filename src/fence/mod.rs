@@ -6,7 +6,7 @@ use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use icon::Icon;
 
@@ -213,11 +213,15 @@ pub enum HitTest {
 
 pub struct Fence {
     base: BaseRef,
-    pub rect: RECT,
-    pub title: String,
-    pub icons: Vec<Icon>,
+    inner: Mutex<FenceInner>,
     pub title_bar: Arc<TitleBar>,
     pub scroll_area: Arc<ScrollArea>,
+}
+
+struct FenceInner {
+    rect: RECT,
+    title: String,
+    icons: Vec<Arc<Icon>>,
 }
 
 impl Fence {
@@ -243,42 +247,48 @@ impl Fence {
                 let title_bar = TitleBar::new(base.handle(), title_u16.as_ptr(), 300)?;
                 let scroll_area = ScrollArea::new(base.handle(), 300, 150)?;
 
-                let mut fence = Self {
+                let fence = Arc::new(Self {
                     base,
-                    rect: RECT {
-                        left: x,
-                        top: y,
-                        right: x + 300,
-                        bottom: y + 150,
-                    },
-                    title: title.to_string(),
-                    icons: Vec::new(),
+                    inner: Mutex::new(FenceInner {
+                        rect: RECT {
+                            left: x,
+                            top: y,
+                            right: x + 300,
+                            bottom: y + 150,
+                        },
+                        title: title.to_string(),
+                        icons: Vec::new(),
+                    }),
                     title_bar,
                     scroll_area,
-                };
+                });
 
-                fence.icons.push(Icon::new(
-                    fence.scroll_area.base().handle(),
-                    "Test Icon",
-                    10,
-                    10,
-                ));
+                {
+                    let mut inner = fence.inner.lock().unwrap();
+                    inner.icons.push(Icon::new(
+                        fence.scroll_area.base().handle(),
+                        "Test Icon",
+                        10,
+                        10,
+                    ));
+                }
                 fence.update_scroll_info();
-                Ok(Arc::new(fence))
+                Ok(fence)
             },
         )
     }
 
     pub fn hit_test(&self, x: i32, y: i32) -> Option<HitTest> {
-        if x < self.rect.left || x >= self.rect.right || y < self.rect.top || y >= self.rect.bottom
+        let inner = self.inner.lock().unwrap();
+        if x < inner.rect.left || x >= inner.rect.right || y < inner.rect.top || y >= inner.rect.bottom
         {
             return None;
         }
 
-        let on_left = x < self.rect.left + BORDER_THICKNESS;
-        let on_right = x >= self.rect.right - BORDER_THICKNESS;
-        let on_top = y < self.rect.top + BORDER_THICKNESS;
-        let on_bottom = y >= self.rect.bottom - BORDER_THICKNESS;
+        let on_left = x < inner.rect.left + BORDER_THICKNESS;
+        let on_right = x >= inner.rect.right - BORDER_THICKNESS;
+        let on_top = y < inner.rect.top + BORDER_THICKNESS;
+        let on_bottom = y >= inner.rect.bottom - BORDER_THICKNESS;
 
         let hit = match (on_left, on_right, on_top, on_bottom) {
             (true, _, true, _) => HitTest::TopLeft,
@@ -290,7 +300,7 @@ impl Fence {
             (_, _, true, _) => HitTest::Top,
             (_, _, _, true) => HitTest::Bottom,
             _ => {
-                if y < self.rect.top + TITLE_BAR_HEIGHT {
+                if y < inner.rect.top + TITLE_BAR_HEIGHT {
                     HitTest::TitleBar
                 } else {
                     let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
@@ -298,10 +308,10 @@ impl Fence {
                     si.fMask = SIF_POS;
                     unsafe { GetScrollInfo(self.scroll_area.base().handle(), SB_VERT, &mut si) };
 
-                    let rel_x = x - self.rect.left;
-                    let rel_y = y - (self.rect.top + TITLE_BAR_HEIGHT) + si.nPos;
+                    let rel_x = x - inner.rect.left;
+                    let rel_y = y - (inner.rect.top + TITLE_BAR_HEIGHT) + si.nPos;
                     let mut icon_hit = None;
-                    for (i, icon) in self.icons.iter().enumerate() {
+                    for (i, icon) in inner.icons.iter().enumerate() {
                         if icon.hit_test(rel_x, rel_y) {
                             icon_hit = Some(HitTest::Icon(i));
                             break;
@@ -314,19 +324,63 @@ impl Fence {
         Some(hit)
     }
 
-    pub fn add_icon(&mut self, title: &str) {
+    pub fn add_icon(&self, title: &str) {
+        let mut inner = self.inner.lock().unwrap();
         let x = 10;
-        let y = 10 + (self.icons.len() as i32 * 70);
-        self.icons
+        let y = 10 + (inner.icons.len() as i32 * 70);
+        inner.icons
             .push(Icon::new(self.scroll_area.base().handle(), title, x, y));
+        drop(inner);
         self.update_scroll_info();
     }
 
-    pub fn move_by(&mut self, dx: i32, dy: i32) {
-        self.rect.left += dx;
-        self.rect.right += dx;
-        self.rect.top += dy;
-        self.rect.bottom += dy;
+    pub fn remove_icon(&self, index: usize) {
+        let mut inner = self.inner.lock().unwrap();
+        if index < inner.icons.len() {
+            inner.icons.remove(index);
+        }
+        drop(inner);
+        self.update_scroll_info();
+    }
+
+    pub fn icon_count(&self) -> usize {
+        self.inner.lock().unwrap().icons.len()
+    }
+
+    pub fn clear_selection(&self) {
+        let inner = self.inner.lock().unwrap();
+        for icon in &inner.icons {
+            icon.set_selected(false);
+        }
+    }
+
+    pub fn select_icon(&self, index: usize) {
+        let inner = self.inner.lock().unwrap();
+        if let Some(icon) = inner.icons.get(index) {
+            icon.set_selected(true);
+        }
+    }
+
+    pub fn move_by(&self, dx: i32, dy: i32) {
+        {
+            let mut inner = self.inner.lock().unwrap();
+            inner.rect.left += dx;
+            inner.rect.right += dx;
+            inner.rect.top += dy;
+            inner.rect.bottom += dy;
+        }
+        self.update_layout();
+    }
+
+    pub fn resize(&self, dl: i32, dt: i32, dr: i32, db: i32) {
+        {
+            let mut inner = self.inner.lock().unwrap();
+            inner.rect.left += dl;
+            inner.rect.top += dt;
+            inner.rect.right += dr;
+            inner.rect.bottom += db;
+        }
+        self.update_layout();
     }
 
     pub fn invalidate(&self) {
@@ -342,15 +396,16 @@ impl Fence {
     }
 
     pub fn update_layout(&self) {
-        let width = self.rect.right - self.rect.left;
-        let height = self.rect.bottom - self.rect.top;
+        let inner = self.inner.lock().unwrap();
+        let width = inner.rect.right - inner.rect.left;
+        let height = inner.rect.bottom - inner.rect.top;
 
         unsafe {
             SetWindowPos(
                 self.base().handle(),
                 std::ptr::null_mut(),
-                self.rect.left,
-                self.rect.top,
+                inner.rect.left,
+                inner.rect.top,
                 width,
                 height,
                 SWP_NOZORDER | SWP_NOACTIVATE,
@@ -376,6 +431,7 @@ impl Fence {
                 SWP_NOZORDER | SWP_NOACTIVATE,
             );
         }
+        drop(inner);
         self.update_scroll_info();
     }
 
@@ -384,8 +440,9 @@ impl Fence {
         unsafe { GetClientRect(self.scroll_area.base().handle(), &mut rect) };
         let view_height = rect.bottom - rect.top;
 
+        let inner = self.inner.lock().unwrap();
         let mut max_y = 0;
-        for icon in &self.icons {
+        for icon in &inner.icons {
             if icon.y + 64 > max_y {
                 max_y = icon.y + 64;
             }
@@ -399,6 +456,7 @@ impl Fence {
         si.nMax = content_height;
         si.nPage = view_height as u32;
         unsafe { SetScrollInfo(self.scroll_area.base().handle(), SB_VERT, &si, TRUE) };
+        drop(inner);
         self.invalidate();
     }
 

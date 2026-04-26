@@ -1,4 +1,5 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
+use std::sync::{Arc, Mutex};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -8,7 +9,7 @@ use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 use crate::fence::{Fence, HitTest};
-use crate::window::{WinHandle, Window};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Menus
 pub const IDM_EXIT: usize = 101;
@@ -22,108 +23,86 @@ pub const IDM_DELETE_ICON: usize = 106;
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
 
 pub struct DesktopCover {
-    /// The window handle for the desktop cover.
-    handle: WinHandle,
-    /// The list of fences managed by this cover. The focused fence is always the last fence.
-    fences: Vec<Fence>,
-    /// The type of hit test result for the currently focused/dragged fence.
+    base: BaseRef,
+    inner: Mutex<DesktopCoverInner>,
+}
+
+struct DesktopCoverInner {
+    fences: Vec<Arc<Fence>>,
     hit_type: Option<HitTest>,
-    /// The last recorded mouse position during a drag operation.
     last_mouse_pos: POINT,
-    /// The target for the context menu.
     context_target: Option<(usize, HitTest)>,
 }
 
 impl DesktopCover {
-    pub unsafe fn new(wndproc: WNDPROC) -> Result<Box<DesktopCover>> {
+    pub fn new() -> Result<Arc<Self>> {
         let h_instance = unsafe { GetModuleHandleW(std::ptr::null()) };
-        let class_name = w!("BottomWindowClass");
-        unsafe {
-            let wc = WNDCLASSW {
-                style: CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS,
-                lpfnWndProc: wndproc,
-                cbClsExtra: 0,
-                cbWndExtra: 0,
-                hInstance: h_instance,
-                hIcon: std::ptr::null_mut(),
-                hCursor: LoadCursorW(std::ptr::null_mut(), IDC_ARROW),
-                hbrBackground: GetStockObject(BLACK_BRUSH) as HBRUSH,
-                lpszMenuName: std::ptr::null(),
-                lpszClassName: class_name,
-            };
-            if RegisterClassW(&wc) == 0 {
-                return Err(anyhow!("RegisterClassW failed"));
-            }
-        }
-
         let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
-        let hwnd = unsafe {
-            CreateWindowExW(
-                WS_EX_NOACTIVATE | WS_EX_LAYERED,
-                class_name,
-                w!("Desktop Cover"),
-                WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN,
-                0,
-                0,
-                width,
-                height,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                h_instance,
-                std::ptr::null(),
-            )
-        };
-        if hwnd == std::ptr::null_mut() {
-            return Err(anyhow!("CreateWindowExW failed"));
-        }
-        unsafe {
-            let mut nid: NOTIFYICONDATAW = std::mem::zeroed();
-            nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
-            nid.hWnd = hwnd;
-            nid.uID = 1;
-            nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-            nid.uCallbackMessage = WM_USER_SHELLICON;
-            nid.hIcon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
-            let tip: Vec<u16> = "Desktop Cover"
-                .encode_utf16()
-                .chain(std::iter::once(0))
-                .collect();
-            let len = tip.len().min(nid.szTip.len());
-            nid.szTip[..len].copy_from_slice(&tip[..len]);
-            Shell_NotifyIconW(NIM_ADD, &nid);
-        }
-        unsafe {
-            SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
-        }
-        unsafe {
-            SetWindowPos(
-                hwnd,
-                HWND_BOTTOM,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-            );
-        }
-        Ok(Box::new(DesktopCover {
-            handle: WinHandle(hwnd),
-            fences: Vec::new(),
-            hit_type: None,
-            last_mouse_pos: POINT { x: 0, y: 0 },
-            context_target: None,
-        }))
+
+        Base::create_window(
+            WS_EX_NOACTIVATE | WS_EX_LAYERED,
+            register_classname(w!("BottomWindowClass")),
+            w!("Desktop Cover"),
+            WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN,
+            0,
+            0,
+            width,
+            height,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            h_instance,
+            |base| {
+                let hwnd = base.handle();
+                unsafe {
+                    let mut nid: NOTIFYICONDATAW = std::mem::zeroed();
+                    nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
+                    nid.hWnd = hwnd;
+                    nid.uID = 1;
+                    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+                    nid.uCallbackMessage = WM_USER_SHELLICON;
+                    nid.hIcon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
+                    let tip: Vec<u16> = "Desktop Cover"
+                        .encode_utf16()
+                        .chain(std::iter::once(0))
+                        .collect();
+                    let len = tip.len().min(nid.szTip.len());
+                    nid.szTip[..len].copy_from_slice(&tip[..len]);
+                    Shell_NotifyIconW(NIM_ADD, &nid);
+
+                    SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
+                    SetWindowPos(
+                        hwnd,
+                        HWND_BOTTOM,
+                        0,
+                        0,
+                        0,
+                        0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+                    );
+                }
+
+                Ok(Arc::new(Self {
+                    base,
+                    inner: Mutex::new(DesktopCoverInner {
+                        fences: Vec::new(),
+                        hit_type: None,
+                        last_mouse_pos: POINT { x: 0, y: 0 },
+                        context_target: None,
+                    }),
+                }))
+            },
+        )
     }
 }
 
 impl Window for DesktopCover {
-    fn handle(&self) -> WinHandle {
-        self.handle
+    fn base<'a>(&'a self) -> &'a BaseRef {
+        &self.base
     }
 
-    fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.handle.0;
+    fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().handle();
         match msg {
             WM_CLOSE => 0,
             WM_DESTROY => {
@@ -156,7 +135,8 @@ impl Window for DesktopCover {
                 unsafe { GetCursorPos(&mut pt) };
                 unsafe { ScreenToClient(hwnd, &mut pt) };
 
-                for fence in self.fences.iter().rev() {
+                let inner = self.inner.lock().unwrap();
+                for fence in inner.fences.iter().rev() {
                     if let Some(hit) = fence.hit_test(pt.x, pt.y) {
                         let cursor_id = match hit {
                             HitTest::TitleBar => IDC_SIZEALL,
@@ -179,7 +159,8 @@ impl Window for DesktopCover {
                 let x = (lparam & 0xFFFF) as i16 as i32;
                 let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
-                for fence in self.fences.iter().rev() {
+                let inner = self.inner.lock().unwrap();
+                for fence in inner.fences.iter().rev() {
                     if let Some(HitTest::Icon(_)) = fence.hit_test(x, y) {
                         unsafe {
                             MessageBoxW(
@@ -198,37 +179,36 @@ impl Window for DesktopCover {
                 let x = (lparam & 0xFFFF) as i16 as i32;
                 let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
+                let mut inner = self.inner.lock().unwrap();
                 let mut hit_idx = None;
-                for (i, fence) in self.fences.iter().enumerate().rev() {
+                for (i, fence) in inner.fences.iter().enumerate().rev() {
                     if let Some(hit) = fence.hit_test(x, y) {
                         hit_idx = Some((i, hit));
                         break;
                     }
                 }
 
-                for fence in &mut self.fences {
-                    for icon in &mut fence.icons {
-                        icon.set_selected(false);
-                    }
+                for fence in &inner.fences {
+                    fence.clear_selection();
                 }
 
                 if let Some((idx, hit)) = hit_idx {
-                    let mut fence = self.fences.remove(idx);
+                    let fence = inner.fences.remove(idx);
 
                     if let HitTest::Icon(icon_idx) = hit {
-                        fence.icons[icon_idx].set_selected(true);
+                        fence.select_icon(icon_idx);
                     }
 
                     fence.bring_to_front();
-                    self.fences.push(fence);
+                    inner.fences.push(fence);
 
                     match hit {
                         HitTest::Client | HitTest::Icon(_) => {
-                            self.hit_type = None;
+                            inner.hit_type = None;
                         }
                         _ => {
-                            self.hit_type = Some(hit);
-                            self.last_mouse_pos = POINT { x, y };
+                            inner.hit_type = Some(hit);
+                            inner.last_mouse_pos = POINT { x, y };
                             unsafe {
                                 SetCapture(hwnd);
                             };
@@ -238,56 +218,37 @@ impl Window for DesktopCover {
                 0
             }
             WM_MOUSEMOVE => {
-                if let Some(hit_type) = self.hit_type {
+                let mut inner = self.inner.lock().unwrap();
+                if let Some(hit_type) = inner.hit_type {
                     let x = (lparam & 0xFFFF) as i16 as i32;
                     let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
-                    let dx = x - self.last_mouse_pos.x;
-                    let dy = y - self.last_mouse_pos.y;
+                    let dx = x - inner.last_mouse_pos.x;
+                    let dy = y - inner.last_mouse_pos.y;
 
-                    if let Some(fence) = self.fences.last_mut() {
+                    if let Some(fence) = inner.fences.last() {
                         match hit_type {
                             HitTest::TitleBar => fence.move_by(dx, dy),
-                            HitTest::Left => {
-                                fence.rect.left += dx;
-                            }
-                            HitTest::Right => {
-                                fence.rect.right += dx;
-                            }
-                            HitTest::Top => {
-                                fence.rect.top += dy;
-                            }
-                            HitTest::Bottom => {
-                                fence.rect.bottom += dy;
-                            }
-                            HitTest::TopLeft => {
-                                fence.rect.left += dx;
-                                fence.rect.top += dy;
-                            }
-                            HitTest::TopRight => {
-                                fence.rect.right += dx;
-                                fence.rect.top += dy;
-                            }
-                            HitTest::BottomLeft => {
-                                fence.rect.left += dx;
-                                fence.rect.bottom += dy;
-                            }
-                            HitTest::BottomRight => {
-                                fence.rect.right += dx;
-                                fence.rect.bottom += dy;
-                            }
+                            HitTest::Left => fence.resize(-dx, 0, dx, 0),
+                            HitTest::Right => fence.resize(0, 0, dx, 0),
+                            HitTest::Top => fence.resize(0, -dy, 0, dy),
+                            HitTest::Bottom => fence.resize(0, 0, 0, dy),
+                            HitTest::TopLeft => fence.resize(-dx, -dy, dx, dy),
+                            HitTest::TopRight => fence.resize(0, -dy, dx, dy),
+                            HitTest::BottomLeft => fence.resize(-dx, 0, dx, dy),
+                            HitTest::BottomRight => fence.resize(0, 0, dx, dy),
                             _ => {}
                         }
-                        fence.update_layout();
                     }
 
-                    self.last_mouse_pos = POINT { x, y };
+                    inner.last_mouse_pos = POINT { x, y };
                 }
                 0
             }
             WM_LBUTTONUP => {
-                if self.hit_type.is_some() {
-                    self.hit_type = None;
+                let mut inner = self.inner.lock().unwrap();
+                if inner.hit_type.is_some() {
+                    inner.hit_type = None;
                     unsafe { ReleaseCapture() };
                 }
                 0
@@ -296,8 +257,9 @@ impl Window for DesktopCover {
                 let x = (lparam & 0xFFFF) as i16 as i32;
                 let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
+                let mut inner = self.inner.lock().unwrap();
                 let mut hit_idx = None;
-                for (i, fence) in self.fences.iter().enumerate().rev() {
+                for (i, fence) in inner.fences.iter().enumerate().rev() {
                     if let Some(hit) = fence.hit_test(x, y) {
                         hit_idx = Some((i, hit));
                         break;
@@ -305,23 +267,21 @@ impl Window for DesktopCover {
                 }
 
                 if let Some((idx, hit)) = hit_idx {
-                    let mut fence = self.fences.remove(idx);
+                    let fence = inner.fences.remove(idx);
 
+                    fence.clear_selection();
                     if let HitTest::Icon(icon_idx) = hit {
-                        for icon in &mut fence.icons {
-                            icon.set_selected(false);
-                        }
-                        fence.icons[icon_idx].set_selected(true);
+                        fence.select_icon(icon_idx);
                     }
 
                     fence.bring_to_front();
-                    self.fences.push(fence);
+                    inner.fences.push(fence);
 
                     let mut pt = POINT { x, y };
                     unsafe { ClientToScreen(hwnd, &mut pt) };
                     let h_menu = unsafe { CreatePopupMenu() };
 
-                    self.context_target = Some((self.fences.len() - 1, hit));
+                    inner.context_target = Some((inner.fences.len() - 1, hit));
 
                     unsafe {
                         if let HitTest::Icon(_) = hit {
@@ -370,6 +330,7 @@ impl Window for DesktopCover {
                 0
             }
             WM_COMMAND => {
+                let mut inner = self.inner.lock().unwrap();
                 match wparam & 0xFFFF {
                     IDM_EXIT => unsafe {
                         DestroyWindow(hwnd);
@@ -377,19 +338,20 @@ impl Window for DesktopCover {
                     IDM_ADD_FENCE => {
                         let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
                         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
-                        self.fences
-                            .push(Fence::new(hwnd, width / 2 - 150, height / 2 - 75));
+                        if let Ok(fence) = Fence::new(hwnd, width / 2 - 150, height / 2 - 75) {
+                            inner.fences.push(fence);
+                        }
                     }
                     IDM_ADD_ICON => {
-                        if let Some((fence_idx, _)) = self.context_target {
-                            if let Some(fence) = self.fences.get_mut(fence_idx) {
-                                let title = format!("Icon #{}", fence.icons.len());
+                        if let Some((fence_idx, _)) = inner.context_target {
+                            if let Some(fence) = inner.fences.get(fence_idx) {
+                                let title = format!("Icon #{}", fence.icon_count());
                                 fence.add_icon(&title);
                             }
                         }
                     }
                     IDM_DELETE_FENCE => {
-                        if let Some((fence_idx, _)) = self.context_target {
+                        if let Some((fence_idx, _)) = inner.context_target {
                             let result = unsafe {
                                 MessageBoxW(
                                     hwnd,
@@ -399,8 +361,8 @@ impl Window for DesktopCover {
                                 )
                             };
                             if result == IDYES {
-                                if fence_idx < self.fences.len() {
-                                    self.fences.remove(fence_idx);
+                                if fence_idx < inner.fences.len() {
+                                    inner.fences.remove(fence_idx);
                                 }
                             }
                         }
@@ -409,18 +371,15 @@ impl Window for DesktopCover {
                         MessageBoxW(hwnd, w!("Clicked"), w!("Test"), MB_OK | MB_ICONINFORMATION);
                     },
                     IDM_DELETE_ICON => {
-                        if let Some((fence_idx, HitTest::Icon(icon_idx))) = self.context_target {
-                            if fence_idx < self.fences.len() {
-                                let fence = &mut self.fences[fence_idx];
-                                if icon_idx < fence.icons.len() {
-                                    fence.icons.remove(icon_idx);
-                                }
+                        if let Some((fence_idx, HitTest::Icon(icon_idx))) = inner.context_target {
+                            if let Some(fence) = inner.fences.get(fence_idx) {
+                                fence.remove_icon(icon_idx);
                             }
                         }
                     }
                     _ => {}
                 }
-                self.context_target = None;
+                inner.context_target = None;
                 0
             }
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
