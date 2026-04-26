@@ -6,16 +6,19 @@ use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
+use crate::fence::Fence;
 use crate::window::{WinHandle, Window};
 
 // Menus
 pub const IDM_EXIT: usize = 101;
+pub const IDM_ADD_FENCE: usize = 102;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
 
 pub struct DesktopCover {
     handle: WinHandle,
+    fences: Vec<Fence>,
 }
 
 impl DesktopCover {
@@ -93,6 +96,7 @@ impl DesktopCover {
         }
         Ok(Box::new(DesktopCover {
             handle: WinHandle(hwnd),
+            fences: Vec::new(),
         }))
     }
 }
@@ -126,21 +130,20 @@ impl Window for DesktopCover {
             WM_PAINT => {
                 let mut ps: PAINTSTRUCT = unsafe { std::mem::zeroed() };
                 let hdc = unsafe { BeginPaint(hwnd, &mut ps) };
-                let mut rect: RECT = unsafe { std::mem::zeroed() };
-                unsafe { GetClientRect(hwnd, &mut rect) };
-                let center_x = (rect.right - rect.left) / 2;
-                let center_y = (rect.bottom - rect.top) / 2;
-                let radius = 100;
-                let h_brush = unsafe { CreateSolidBrush(0x000000FF) };
+
+                // ARGB #33000000 is 20% opaque black.
+                // Since we are using LWA_COLORKEY on black background,
+                // we use a solid brush of the desired color.
+                let h_brush = unsafe { CreateSolidBrush(0x00333333) };
                 let old_brush = unsafe { SelectObject(hdc, h_brush) };
+
+                for fence in &self.fences {
+                    unsafe {
+                        FillRect(hdc, &fence.rect, h_brush);
+                    }
+                }
+
                 unsafe {
-                    Ellipse(
-                        hdc,
-                        center_x - radius,
-                        center_y - radius,
-                        center_x + radius,
-                        center_y + radius,
-                    );
                     SelectObject(hdc, old_brush);
                     DeleteObject(h_brush);
                     EndPaint(hwnd, &ps);
@@ -159,6 +162,7 @@ impl Window for DesktopCover {
                     unsafe { GetCursorPos(&mut pt) };
                     let h_menu = unsafe { CreatePopupMenu() };
                     unsafe {
+                        AppendMenuW(h_menu, MF_STRING, IDM_ADD_FENCE, w!("&Add fence"));
                         AppendMenuW(h_menu, MF_STRING, IDM_EXIT, w!("&Exit"));
                         SetForegroundWindow(hwnd);
                         TrackPopupMenu(
@@ -176,8 +180,17 @@ impl Window for DesktopCover {
                 0
             }
             WM_COMMAND => {
-                if (wparam & 0xFFFF) == IDM_EXIT {
-                    unsafe { DestroyWindow(hwnd) };
+                match wparam & 0xFFFF {
+                    IDM_EXIT => unsafe {
+                        DestroyWindow(hwnd);
+                    },
+                    IDM_ADD_FENCE => {
+                        let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+                        let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+                        self.fences.push(Fence::new(width / 2 - 150, height / 2 - 75));
+                        unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
+                    }
+                    _ => {}
                 }
                 0
             }

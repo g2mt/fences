@@ -6,6 +6,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod app;
 mod desktop_cover;
+mod fence;
 mod window;
 
 use crate::app::APP;
