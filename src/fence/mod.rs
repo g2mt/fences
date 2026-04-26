@@ -256,16 +256,7 @@ impl Fence {
                     scroll_area,
                 });
 
-                {
-                    let mut inner = fence.inner.lock().unwrap();
-                    inner.icons.push(Icon::new(
-                        fence.scroll_area.base().handle(),
-                        "Test Icon",
-                        10,
-                        10,
-                    ));
-                }
-                fence.update_scroll_info();
+                fence.add_icon("Test Icon");
                 Ok(fence)
             },
         )
