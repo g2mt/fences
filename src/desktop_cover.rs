@@ -13,6 +13,7 @@ use crate::window::{WinHandle, Window};
 // Menus
 pub const IDM_EXIT: usize = 101;
 pub const IDM_ADD_FENCE: usize = 102;
+pub const IDM_DELETE_FENCE: usize = 103;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
@@ -256,6 +257,43 @@ impl Window for DesktopCover {
                 }
                 0
             }
+            WM_RBUTTONUP => {
+                let x = (lparam & 0xFFFF) as i16 as i32;
+                let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
+
+                let mut hit_idx = None;
+                for (i, fence) in self.fences.iter().enumerate().rev() {
+                    if fence.hit_test(x, y) != HitTest::None {
+                        hit_idx = Some(i);
+                        break;
+                    }
+                }
+
+                if let Some(idx) = hit_idx {
+                    let fence = self.fences.remove(idx);
+                    self.fences.push(fence);
+                    unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
+
+                    let mut pt = POINT { x, y };
+                    unsafe { ClientToScreen(hwnd, &mut pt) };
+                    let h_menu = unsafe { CreatePopupMenu() };
+                    unsafe {
+                        AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
+                        SetForegroundWindow(hwnd);
+                        TrackPopupMenu(
+                            h_menu,
+                            TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+                            pt.x,
+                            pt.y,
+                            0,
+                            hwnd,
+                            std::ptr::null(),
+                        );
+                        DestroyMenu(h_menu);
+                    }
+                }
+                0
+            }
             WM_USER_SHELLICON => {
                 if lparam as u32 == WM_RBUTTONUP || lparam as u32 == WM_LBUTTONUP {
                     let mut pt = POINT { x: 0, y: 0 };
@@ -290,6 +328,20 @@ impl Window for DesktopCover {
                         self.fences
                             .push(Fence::new(width / 2 - 150, height / 2 - 75));
                         unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
+                    }
+                    IDM_DELETE_FENCE => {
+                        let result = unsafe {
+                            MessageBoxW(
+                                hwnd,
+                                w!("Are you sure you want to delete this fence?"),
+                                w!("Confirm Deletion"),
+                                MB_YESNO | MB_ICONQUESTION,
+                            )
+                        };
+                        if result == IDYES {
+                            self.fences.pop();
+                            unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
+                        }
                     }
                     _ => {}
                 }
