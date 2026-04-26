@@ -1,6 +1,4 @@
-use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::ffi::c_void;
 use std::sync::{Mutex, OnceLock};
 
 use windows_sys::core::*;
@@ -13,109 +11,108 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 const WM_USER_SHELLICON: u32 = WM_USER + 1;
 const IDM_EXIT: usize = 101;
 
-trait Window {
-    fn hwnd(&self) -> HWND;
+trait Window: Send {
+    fn handle(&self) -> WinHandle;
     fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-struct Handle(usize);
-
-impl From<*const c_void> for Handle {
-    fn from(value: *const c_void) -> Self {
-        Self(value as _)
-    }
-}
-
-impl From<*mut c_void> for Handle {
-    fn from(value: *mut c_void) -> Self {
-        Self(value as _)
-    }
-}
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+struct WinHandle(pub HWND);
+unsafe impl Send for WinHandle {}
 
 struct App {
-    windows: BTreeMap<Handle, RefCell<Box<dyn Window>>>,
+    windows: BTreeMap<WinHandle, Mutex<Box<dyn Window>>>,
+}
+
+impl App {
+    fn add_window(&mut self, window: Box<dyn Window>) {
+        self.windows.insert(window.handle(), Mutex::new(window));
+    }
 }
 
 static APP: OnceLock<Mutex<App>> = OnceLock::new();
 
 struct DesktopCover {
-    hwnd: HWND,
+    win_handle: WinHandle,
 }
 
 impl DesktopCover {
     unsafe fn new(h_instance: HINSTANCE, class_name: PCWSTR) -> Box<DesktopCover> {
-        let width = GetSystemMetrics(SM_CXSCREEN);
-        let height = GetSystemMetrics(SM_CYSCREEN);
-
-        let mut dc = Box::new(DesktopCover {
-            hwnd: std::ptr::null_mut(),
-        });
+        let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+        let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
 
         // Create window with WS_EX_NOACTIVATE | WS_EX_LAYERED
-        let hwnd = CreateWindowExW(
-            WS_EX_NOACTIVATE | WS_EX_LAYERED,
-            class_name,
-            w!("Desktop Cover"),
-            WS_POPUP | WS_VISIBLE,
-            0,
-            0,
-            width,
-            height,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            h_instance,
-            std::ptr::null_mut(), // no lpCreateParams – we will use the global map
-        );
+        let hwnd = unsafe {
+            CreateWindowExW(
+                WS_EX_NOACTIVATE | WS_EX_LAYERED,
+                class_name,
+                w!("Desktop Cover"),
+                WS_POPUP | WS_VISIBLE,
+                0,
+                0,
+                width,
+                height,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                h_instance,
+                std::ptr::null_mut(), // no lpCreateParams – we will use the global map
+            )
+        };
 
         if hwnd == std::ptr::null_mut() {
             panic!("CreateWindowExW failed");
         }
 
-        dc.hwnd = hwnd;
-
         // Add system tray icon
-        let mut nid: NOTIFYICONDATAW = std::mem::zeroed();
-        nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
-        nid.hWnd = hwnd;
-        nid.uID = 1;
-        nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-        nid.uCallbackMessage = WM_USER_SHELLICON;
-        nid.hIcon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
-        let tip: Vec<u16> = "Desktop Cover"
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
-        let len = tip.len().min(nid.szTip.len());
-        nid.szTip[..len].copy_from_slice(&tip[..len]);
+        unsafe {
+            let mut nid: NOTIFYICONDATAW = std::mem::zeroed();
+            nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
+            nid.hWnd = hwnd;
+            nid.uID = 1;
+            nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+            nid.uCallbackMessage = WM_USER_SHELLICON;
+            nid.hIcon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
+            let tip: Vec<u16> = "Desktop Cover"
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
+            let len = tip.len().min(nid.szTip.len());
+            nid.szTip[..len].copy_from_slice(&tip[..len]);
 
-        Shell_NotifyIconW(NIM_ADD, &nid);
+            Shell_NotifyIconW(NIM_ADD, &nid);
+        }
 
         // Make the black background color transparent
-        SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
+        unsafe {
+            SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
+        }
 
         // Push the window to the bottom initially
-        SetWindowPos(
-            hwnd,
-            HWND_BOTTOM,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-        );
+        unsafe {
+            SetWindowPos(
+                hwnd,
+                HWND_BOTTOM,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            );
+        }
 
-        dc
+        Box::new(DesktopCover {
+            win_handle: WinHandle(hwnd),
+        })
     }
 }
 
 impl Window for DesktopCover {
-    fn hwnd(&self) -> HWND {
-        self.hwnd
+    fn handle(&self) -> WinHandle {
+        self.win_handle
     }
 
     fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.hwnd;
+        let hwnd = self.win_handle.0;
         match msg {
             WM_CLOSE => 0,
             WM_DESTROY => {
@@ -207,9 +204,8 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     // Look up the window object using the global map.
     {
         let app = APP.get().unwrap().lock().unwrap();
-        if let Some(window_refcell) = app.windows.get(&Handle::from(hwnd)) {
-            let mut window = window_refcell.borrow_mut();
-            return window.wndproc(msg, wparam, lparam);
+        if let Some(window) = app.windows.get(&WinHandle(hwnd)) {
+            return window.lock().unwrap().wndproc(msg, wparam, lparam);
         }
     }
 
@@ -244,14 +240,9 @@ fn main() {
             return;
         }
 
-        let dc = DesktopCover::new(h_instance, class_name);
-        let hwnd = dc.hwnd;
-
-        // Insert the window into the global map.
         {
-            let app = APP.get().unwrap();
-            let mut guard = app.lock().unwrap();
-            guard.windows.insert(Handle::from(hwnd), RefCell::new(dc));
+            let mut app = APP.get().unwrap().lock().unwrap();
+            app.add_window(DesktopCover::new(h_instance, class_name));
         }
 
         // Standard message loop
