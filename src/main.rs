@@ -22,7 +22,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             .unwrap()
             .try_lock()
             .expect("can only lock after initialization");
-        if let Some(window) = app.windows.get(&window::WinHandle(hwnd)) {
+        if let Some(window) = app.window(window::WinHandle(hwnd)) {
             return window.lock().unwrap().wndproc(msg, wparam, lparam);
         }
     }
@@ -31,9 +31,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 
 fn main() -> Result<()> {
     APP.get_or_init(|| {
-        Mutex::new(app::App {
-            windows: BTreeMap::new(),
-        })
+        Mutex::new(app::App::new())
     });
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
