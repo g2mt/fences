@@ -35,6 +35,8 @@ pub struct DesktopCover {
 
 impl DesktopCover {
     pub unsafe fn new(wndproc: WNDPROC) -> Result<Box<DesktopCover>> {
+        crate::fence::register_classes();
+
         let h_instance = unsafe { GetModuleHandleW(std::ptr::null()) };
         let class_name = w!("BottomWindowClass");
         unsafe {
@@ -144,15 +146,8 @@ impl Window for DesktopCover {
             WM_MOUSEACTIVATE => MA_NOACTIVATE as LRESULT,
             WM_PAINT => {
                 let mut ps: PAINTSTRUCT = unsafe { std::mem::zeroed() };
-                let hdc = unsafe { BeginPaint(hwnd, &mut ps) };
-
-                for fence in &self.fences {
-                    unsafe {
-                        fence.draw(hdc);
-                    }
-                }
-
                 unsafe {
+                    BeginPaint(hwnd, &mut ps);
                     EndPaint(hwnd, &ps);
                 }
                 0
@@ -214,7 +209,7 @@ impl Window for DesktopCover {
 
                 for fence in &mut self.fences {
                     for icon in &mut fence.icons {
-                        icon.selected = false;
+                        icon.set_selected(false);
                     }
                 }
 
@@ -222,9 +217,10 @@ impl Window for DesktopCover {
                     let mut fence = self.fences.remove(idx);
                     
                     if let HitTest::Icon(icon_idx) = hit {
-                        fence.icons[icon_idx].selected = true;
+                        fence.icons[icon_idx].set_selected(true);
                     }
 
+                    fence.bring_to_front();
                     self.fences.push(fence);
                     
                     match hit {
@@ -239,9 +235,6 @@ impl Window for DesktopCover {
                             };
                         }
                     }
-                    unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
-                } else {
-                    unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
                 }
                 0
             }
@@ -286,10 +279,10 @@ impl Window for DesktopCover {
                             }
                             _ => {}
                         }
+                        fence.update_layout();
                     }
 
                     self.last_mouse_pos = POINT { x, y };
-                    unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
                 }
                 0
             }
@@ -317,13 +310,13 @@ impl Window for DesktopCover {
                     
                     if let HitTest::Icon(icon_idx) = hit {
                         for icon in &mut fence.icons {
-                            icon.selected = false;
+                            icon.set_selected(false);
                         }
-                        fence.icons[icon_idx].selected = true;
+                        fence.icons[icon_idx].set_selected(true);
                     }
                     
+                    fence.bring_to_front();
                     self.fences.push(fence);
-                    unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
 
                     let mut pt = POINT { x, y };
                     unsafe { ClientToScreen(hwnd, &mut pt) };
@@ -385,8 +378,7 @@ impl Window for DesktopCover {
                         let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
                         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
                         self.fences
-                            .push(Fence::new(width / 2 - 150, height / 2 - 75));
-                        unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
+                            .push(Fence::new(hwnd, width / 2 - 150, height / 2 - 75));
                     }
                     IDM_DELETE_FENCE => {
                         if let Some((fence_idx, _)) = self.context_target {
@@ -401,7 +393,6 @@ impl Window for DesktopCover {
                             if result == IDYES {
                                 if fence_idx < self.fences.len() {
                                     self.fences.remove(fence_idx);
-                                    unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
                                 }
                             }
                         }
@@ -422,7 +413,6 @@ impl Window for DesktopCover {
                                 let fence = &mut self.fences[fence_idx];
                                 if icon_idx < fence.icons.len() {
                                     fence.icons.remove(icon_idx);
-                                    unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
                                 }
                             }
                         }

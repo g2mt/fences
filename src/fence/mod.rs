@@ -1,11 +1,109 @@
-use windows_sys::Win32::Foundation::RECT;
+use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::System::LibraryLoader::*;
+use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
 use icon::FenceIcon;
 
 pub const BORDER_THICKNESS: i32 = 3;
 pub const TITLE_BAR_HEIGHT: i32 = 24;
+
+pub fn register_classes() {
+    unsafe {
+        let h_instance = GetModuleHandleW(std::ptr::null());
+        
+        let mut wc: WNDCLASSW = std::mem::zeroed();
+        wc.hInstance = h_instance;
+        wc.hCursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
+        
+        wc.lpszClassName = w!("FenceTitleBar");
+        wc.lpfnWndProc = Some(title_bar_wndproc);
+        RegisterClassW(&wc);
+
+        wc.lpszClassName = w!("FenceScrollArea");
+        wc.lpfnWndProc = Some(scroll_area_wndproc);
+        RegisterClassW(&wc);
+        
+        icon::register_class();
+    }
+}
+
+pub unsafe extern "system" fn title_bar_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_NCHITTEST => HTTRANSPARENT as LRESULT,
+        WM_PAINT => {
+            let mut ps: PAINTSTRUCT = std::mem::zeroed();
+            let hdc = BeginPaint(hwnd, &mut ps);
+
+            let mut rect: RECT = std::mem::zeroed();
+            GetClientRect(hwnd, &mut rect);
+
+            let title_brush = CreateSolidBrush(0x00323232);
+            FillRect(hdc, &rect, title_brush);
+            DeleteObject(title_brush);
+
+            let mut edge_rect = rect;
+            edge_rect.bottom += 2;
+            DrawEdge(hdc, &mut edge_rect, EDGE_RAISED, BF_RECT);
+
+            SetBkMode(hdc, TRANSPARENT as _);
+            SetTextColor(hdc, 0x00FFFFFF);
+
+            let mut title = vec![0u16; 256];
+            let len = GetWindowTextW(hwnd, title.as_mut_ptr(), 256);
+
+            let mut text_rect = rect;
+            text_rect.left += 5;
+            DrawTextW(
+                hdc,
+                title.as_ptr(),
+                len,
+                &mut text_rect,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+            );
+
+            EndPaint(hwnd, &ps);
+            0
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
+
+pub unsafe extern "system" fn scroll_area_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_NCHITTEST => HTTRANSPARENT as LRESULT,
+        WM_PAINT => {
+            let mut ps: PAINTSTRUCT = std::mem::zeroed();
+            let hdc = BeginPaint(hwnd, &mut ps);
+
+            let mut rect: RECT = std::mem::zeroed();
+            GetClientRect(hwnd, &mut rect);
+
+            let scroll_brush = CreateSolidBrush(0x007D7D7D);
+            FillRect(hdc, &rect, scroll_brush);
+            DeleteObject(scroll_brush);
+
+            let mut edge_rect = rect;
+            edge_rect.top -= 2;
+            DrawEdge(hdc, &mut edge_rect, EDGE_RAISED, BF_RECT);
+
+            EndPaint(hwnd, &ps);
+            0
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum HitTest {
@@ -26,20 +124,66 @@ pub struct Fence {
     pub rect: RECT,
     pub title: String,
     pub icons: Vec<FenceIcon>,
+    pub hwnd_title: HWND,
+    pub hwnd_scroll: HWND,
 }
 
 impl Fence {
-    pub fn new(x: i32, y: i32) -> Self {
-        Self {
+    pub fn new(parent_hwnd: HWND, x: i32, y: i32) -> Self {
+        let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        
+        let title = "Untitled";
+        let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+        
+        let hwnd_title = unsafe {
+            CreateWindowExW(
+                0,
+                w!("FenceTitleBar"),
+                title_u16.as_ptr(),
+                WS_CHILD | WS_VISIBLE,
+                x,
+                y,
+                300,
+                TITLE_BAR_HEIGHT,
+                parent_hwnd,
+                std::ptr::null_mut(),
+                h_instance,
+                std::ptr::null(),
+            )
+        };
+        
+        let hwnd_scroll = unsafe {
+            CreateWindowExW(
+                0,
+                w!("FenceScrollArea"),
+                std::ptr::null(),
+                WS_CHILD | WS_VISIBLE,
+                x,
+                y + TITLE_BAR_HEIGHT,
+                300,
+                150 - TITLE_BAR_HEIGHT,
+                parent_hwnd,
+                std::ptr::null_mut(),
+                h_instance,
+                std::ptr::null(),
+            )
+        };
+
+        let mut fence = Self {
             rect: RECT {
                 left: x,
                 top: y,
                 right: x + 300,
                 bottom: y + 150,
             },
-            title: "Untitled".to_string(),
-            icons: vec![FenceIcon::new("Test Icon", 10, 10)],
-        }
+            title: title.to_string(),
+            icons: Vec::new(),
+            hwnd_title,
+            hwnd_scroll,
+        };
+        
+        fence.icons.push(FenceIcon::new(hwnd_scroll, "Test Icon", 10, 10));
+        fence
     }
 
     pub fn hit_test(&self, x: i32, y: i32) -> Option<HitTest> {
@@ -89,93 +233,60 @@ impl Fence {
         self.rect.bottom += dy;
     }
 
-    pub unsafe fn draw(&self, hdc: HDC) {
+    pub fn update_layout(&self) {
         let width = self.rect.right - self.rect.left;
         let height = self.rect.bottom - self.rect.top;
-
+        
         unsafe {
-            let mem_dc = CreateCompatibleDC(hdc);
-            let bitmap = CreateCompatibleBitmap(hdc, width, height);
-            let old_bitmap = SelectObject(mem_dc, bitmap);
-
-            // Draw title bar (dark grey)
-            let title_brush = CreateSolidBrush(0x00404040);
-            let title_rect = RECT {
-                left: 0,
-                top: 0,
-                right: width,
-                bottom: TITLE_BAR_HEIGHT,
-            };
-            FillRect(mem_dc, &title_rect, title_brush);
-            DeleteObject(title_brush);
-
-            // Draw scroll area (lighter grey)
-            let scroll_brush = CreateSolidBrush(0x00A0A0A0);
-            let scroll_rect = RECT {
-                left: 0,
-                top: TITLE_BAR_HEIGHT,
-                right: width,
-                bottom: height,
-            };
-            FillRect(mem_dc, &scroll_rect, scroll_brush);
-            DeleteObject(scroll_brush);
-
-            // Draw edge to make it look like a control
-            let mut edge_rect = RECT {
-                left: 0,
-                top: 0,
-                right: width,
-                bottom: height,
-            };
-            DrawEdge(mem_dc, &mut edge_rect, EDGE_RAISED, BF_RECT);
-
-            let blend = BLENDFUNCTION {
-                BlendOp: AC_SRC_OVER as u8,
-                BlendFlags: 0,
-                SourceConstantAlpha: 200, // ~78% transparent
-                AlphaFormat: 0,
-            };
-
-            AlphaBlend(
-                hdc,
+            SetWindowPos(
+                self.hwnd_title,
+                std::ptr::null_mut(),
                 self.rect.left,
                 self.rect.top,
                 width,
-                height,
-                mem_dc,
-                0,
-                0,
+                TITLE_BAR_HEIGHT,
+                SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+            
+            SetWindowPos(
+                self.hwnd_scroll,
+                std::ptr::null_mut(),
+                self.rect.left,
+                self.rect.top + TITLE_BAR_HEIGHT,
                 width,
-                height,
-                blend,
+                height - TITLE_BAR_HEIGHT,
+                SWP_NOZORDER | SWP_NOACTIVATE,
             );
+        }
+    }
 
-            // Draw title text
-            SetBkMode(hdc, TRANSPARENT as _);
-            SetTextColor(hdc, 0x00FFFFFF); // White
-            let title_u16: Vec<u16> = self.title.encode_utf16().collect();
-            let mut rect = RECT {
-                left: self.rect.left + 5,
-                top: self.rect.top,
-                right: self.rect.right,
-                bottom: self.rect.top + TITLE_BAR_HEIGHT,
-            };
-            DrawTextW(
-                hdc,
-                title_u16.as_ptr(),
-                title_u16.len() as i32,
-                &mut rect as *mut RECT,
-                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+    pub fn bring_to_front(&self) {
+        unsafe {
+            SetWindowPos(
+                self.hwnd_title,
+                HWND_TOP,
+                0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE,
             );
+            SetWindowPos(
+                self.hwnd_scroll,
+                HWND_TOP,
+                0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE,
+            );
+        }
+    }
+}
 
-            // Draw icons in the scroll area
-            for icon in &self.icons {
-                icon.draw(hdc, self.rect.left, self.rect.top + TITLE_BAR_HEIGHT);
+impl Drop for Fence {
+    fn drop(&mut self) {
+        unsafe {
+            if self.hwnd_title != std::ptr::null_mut() {
+                DestroyWindow(self.hwnd_title);
             }
-
-            SelectObject(mem_dc, old_bitmap);
-            DeleteObject(bitmap);
-            DeleteDC(mem_dc);
+            if self.hwnd_scroll != std::ptr::null_mut() {
+                DestroyWindow(self.hwnd_scroll);
+            }
         }
     }
 }

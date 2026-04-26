@@ -1,21 +1,127 @@
-use windows_sys::Win32::Foundation::RECT;
+use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+
+pub fn register_class() {
+    unsafe {
+        let h_instance = GetModuleHandleW(std::ptr::null());
+        let mut wc: WNDCLASSW = std::mem::zeroed();
+        wc.hInstance = h_instance;
+        wc.lpszClassName = w!("FenceIcon");
+        wc.lpfnWndProc = Some(icon_wndproc);
+        wc.hCursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
+        RegisterClassW(&wc);
+    }
+}
+
+pub unsafe extern "system" fn icon_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_NCHITTEST => HTTRANSPARENT as LRESULT,
+        WM_PAINT => {
+            let mut ps: PAINTSTRUCT = std::mem::zeroed();
+            let hdc = BeginPaint(hwnd, &mut ps);
+
+            let mut rect: RECT = std::mem::zeroed();
+            GetClientRect(hwnd, &mut rect);
+
+            let selected = GetWindowLongPtrW(hwnd, GWLP_USERDATA) != 0;
+
+            if selected {
+                let brush = CreateSolidBrush(0x00FFAA44); // Light blue
+                FillRect(hdc, &rect, brush);
+                DeleteObject(brush);
+            }
+
+            let icon_width = 32;
+            let icon_height = 32;
+            let width = rect.right - rect.left;
+
+            let hicon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
+            DrawIconEx(
+                hdc,
+                (width - icon_width) / 2,
+                0,
+                hicon,
+                icon_width,
+                icon_height,
+                0,
+                std::ptr::null_mut(),
+                DI_NORMAL,
+            );
+
+            SetBkMode(hdc, TRANSPARENT as _);
+            SetTextColor(hdc, 0x00FFFFFF); // White text
+
+            let mut title = vec![0u16; 256];
+            let len = GetWindowTextW(hwnd, title.as_mut_ptr(), 256);
+
+            let mut text_rect = rect;
+            text_rect.top += icon_height;
+            DrawTextW(
+                hdc,
+                title.as_ptr(),
+                len,
+                &mut text_rect,
+                DT_CENTER | DT_WORDBREAK | DT_NOPREFIX,
+            );
+
+            EndPaint(hwnd, &ps);
+            0
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
 
 pub struct FenceIcon {
     pub title: String,
     pub x: i32,
     pub y: i32,
     pub selected: bool,
+    pub hwnd: HWND,
 }
 
 impl FenceIcon {
-    pub fn new(title: &str, x: i32, y: i32) -> Self {
+    pub fn new(parent_hwnd: HWND, title: &str, x: i32, y: i32) -> Self {
+        let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+        
+        let hwnd = unsafe {
+            CreateWindowExW(
+                0,
+                w!("FenceIcon"),
+                title_u16.as_ptr(),
+                WS_CHILD | WS_VISIBLE,
+                x,
+                y,
+                64,
+                64,
+                parent_hwnd,
+                std::ptr::null_mut(),
+                h_instance,
+                std::ptr::null(),
+            )
+        };
+        
         Self {
             title: title.to_string(),
             x,
             y,
             selected: false,
+            hwnd,
+        }
+    }
+
+    pub fn set_selected(&mut self, selected: bool) {
+        self.selected = selected;
+        unsafe {
+            SetWindowLongPtrW(self.hwnd, GWLP_USERDATA, if selected { 1 } else { 0 });
+            InvalidateRect(self.hwnd, std::ptr::null(), TRUE);
         }
     }
 
@@ -24,59 +130,14 @@ impl FenceIcon {
         let height = 64;
         rel_x >= self.x && rel_x < self.x + width && rel_y >= self.y && rel_y < self.y + height
     }
+}
 
-    pub unsafe fn draw(&self, hdc: HDC, parent_x: i32, parent_y: i32) {
-        let icon_width = 32;
-        let icon_height = 32;
-        let text_height = 32;
-        let width = 64;
-        let height = icon_height + text_height;
-
-        let abs_x = parent_x + self.x;
-        let abs_y = parent_y + self.y;
-
-        if self.selected {
-            let brush = CreateSolidBrush(0x00FFAA44); // Light blue
-            let rect = RECT {
-                left: abs_x,
-                top: abs_y,
-                right: abs_x + width,
-                bottom: abs_y + height,
-            };
-            FillRect(hdc, &rect, brush);
-            DeleteObject(brush);
+impl Drop for FenceIcon {
+    fn drop(&mut self) {
+        unsafe {
+            if self.hwnd != std::ptr::null_mut() {
+                DestroyWindow(self.hwnd);
+            }
         }
-
-        // Draw icon
-        let hicon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
-        DrawIconEx(
-            hdc,
-            abs_x + (width - icon_width) / 2,
-            abs_y,
-            hicon,
-            icon_width,
-            icon_height,
-            0,
-            std::ptr::null_mut(),
-            DI_NORMAL,
-        );
-
-        // Draw text
-        SetBkMode(hdc, TRANSPARENT as _);
-        SetTextColor(hdc, 0x00FFFFFF); // White text
-        let title_u16: Vec<u16> = self.title.encode_utf16().collect();
-        let mut rect = RECT {
-            left: abs_x,
-            top: abs_y + icon_height,
-            right: abs_x + width,
-            bottom: abs_y + height,
-        };
-        DrawTextW(
-            hdc,
-            title_u16.as_ptr(),
-            title_u16.len() as i32,
-            &mut rect as *mut RECT,
-            DT_CENTER | DT_WORDBREAK | DT_NOPREFIX,
-        );
     }
 }
