@@ -8,7 +8,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 mod icon;
 use icon::Icon;
 
-use crate::window::{WinHandle, Window};
+use crate::window::{Base, WinHandle, Window};
 
 pub const BORDER_THICKNESS: i32 = 3;
 pub const TITLE_BAR_HEIGHT: i32 = 24;
@@ -47,7 +47,7 @@ impl Window for TitleBar {
     }
 
     fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.handle.0;
+        let hwnd = self.base().handle();
         match msg {
             WM_NCHITTEST => HTTRANSPARENT as LRESULT,
             WM_PAINT => unsafe {
@@ -95,21 +95,23 @@ pub unsafe extern "system" fn title_bar_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    let mut title_bar = std::mem::ManuallyDrop::new(TitleBar { handle: WinHandle(hwnd) });
+    let mut title_bar = std::mem::ManuallyDrop::new(TitleBar {
+        handle: WinHandle(hwnd),
+    });
     title_bar.wndproc(msg, wparam, lparam)
 }
 
 pub struct ScrollArea {
-    pub handle: WinHandle,
+    base: Base,
 }
 
 impl Window for ScrollArea {
-    fn handle(&self) -> WinHandle {
-        self.handle
+    fn base(&self) -> &Base {
+        &self.base
     }
 
     fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.handle.0;
+        let hwnd = self.base().handle();
         match msg {
             WM_NCHITTEST => unsafe {
                 let res = DefWindowProcW(hwnd, msg, wparam, lparam);
@@ -194,7 +196,9 @@ pub unsafe extern "system" fn scroll_area_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    let mut scroll_area = std::mem::ManuallyDrop::new(ScrollArea { handle: WinHandle(hwnd) });
+    let mut scroll_area = std::mem::ManuallyDrop::new(ScrollArea {
+        handle: WinHandle(hwnd),
+    });
     scroll_area.wndproc(msg, wparam, lparam)
 }
 
@@ -214,7 +218,7 @@ pub enum HitTest {
 }
 
 pub struct Fence {
-    pub handle: WinHandle,
+    base: Base,
     pub rect: RECT,
     pub title: String,
     pub icons: Vec<Icon>,
@@ -223,12 +227,12 @@ pub struct Fence {
 }
 
 impl Window for Fence {
-    fn handle(&self) -> WinHandle {
-        self.handle
+    fn base(&self) -> &Base {
+        &self.base
     }
 
     fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.handle.0;
+        let hwnd = self.base().handle();
         match msg {
             WM_NCHITTEST => HTTRANSPARENT as LRESULT,
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
@@ -247,8 +251,12 @@ pub unsafe extern "system" fn fence_wndproc(
         rect: unsafe { std::mem::zeroed() },
         title: String::new(),
         icons: Vec::new(),
-        title_bar: TitleBar { handle: WinHandle(std::ptr::null_mut()) },
-        scroll_area: ScrollArea { handle: WinHandle(std::ptr::null_mut()) },
+        title_bar: TitleBar {
+            handle: WinHandle(std::ptr::null_mut()),
+        },
+        scroll_area: ScrollArea {
+            handle: WinHandle(std::ptr::null_mut()),
+        },
     });
     fence.wndproc(msg, wparam, lparam)
 }
@@ -321,8 +329,12 @@ impl Fence {
             },
             title: title.to_string(),
             icons: Vec::new(),
-            title_bar: TitleBar { handle: WinHandle(hwnd_title) },
-            scroll_area: ScrollArea { handle: WinHandle(hwnd_scroll) },
+            title_bar: TitleBar {
+                handle: WinHandle(hwnd_title),
+            },
+            scroll_area: ScrollArea {
+                handle: WinHandle(hwnd_scroll),
+            },
         };
 
         fence
@@ -360,7 +372,7 @@ impl Fence {
                     let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
                     si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
                     si.fMask = SIF_POS;
-                    unsafe { GetScrollInfo(self.scroll_area.handle.0, SB_VERT, &mut si) };
+                    unsafe { GetScrollInfo(self.scroll_area.base().handle(), SB_VERT, &mut si) };
 
                     let rel_x = x - self.rect.left;
                     let rel_y = y - (self.rect.top + TITLE_BAR_HEIGHT) + si.nPos;
@@ -382,7 +394,7 @@ impl Fence {
         let x = 10;
         let y = 10 + (self.icons.len() as i32 * 70);
         self.icons
-            .push(Icon::new(self.scroll_area.handle.0, title, x, y));
+            .push(Icon::new(self.scroll_area.base().handle(), title, x, y));
         self.update_scroll_info();
     }
 
@@ -395,13 +407,13 @@ impl Fence {
 
     pub fn invalidate(&self) {
         unsafe {
-            let parent = GetParent(self.handle.0);
+            let parent = GetParent(self.base().handle());
             if parent != std::ptr::null_mut() {
                 InvalidateRect(parent, std::ptr::null(), TRUE);
             }
-            InvalidateRect(self.handle.0, std::ptr::null(), TRUE);
-            InvalidateRect(self.title_bar.handle.0, std::ptr::null(), TRUE);
-            InvalidateRect(self.scroll_area.handle.0, std::ptr::null(), TRUE);
+            InvalidateRect(self.base().handle(), std::ptr::null(), TRUE);
+            InvalidateRect(self.title_bar.base().handle(), std::ptr::null(), TRUE);
+            InvalidateRect(self.scroll_area.base().handle(), std::ptr::null(), TRUE);
         }
     }
 
@@ -411,7 +423,7 @@ impl Fence {
 
         unsafe {
             SetWindowPos(
-                self.handle.0,
+                self.base().handle(),
                 std::ptr::null_mut(),
                 self.rect.left,
                 self.rect.top,
@@ -421,7 +433,7 @@ impl Fence {
             );
 
             SetWindowPos(
-                self.title_bar.handle.0,
+                self.title_bar.base().handle(),
                 std::ptr::null_mut(),
                 0,
                 0,
@@ -431,7 +443,7 @@ impl Fence {
             );
 
             SetWindowPos(
-                self.scroll_area.handle.0,
+                self.scroll_area.base().handle(),
                 std::ptr::null_mut(),
                 0,
                 TITLE_BAR_HEIGHT,
@@ -445,7 +457,7 @@ impl Fence {
 
     pub fn update_scroll_info(&self) {
         let mut rect: RECT = unsafe { std::mem::zeroed() };
-        unsafe { GetClientRect(self.scroll_area.handle.0, &mut rect) };
+        unsafe { GetClientRect(self.scroll_area.base().handle(), &mut rect) };
         let view_height = rect.bottom - rect.top;
 
         let mut max_y = 0;
@@ -462,14 +474,14 @@ impl Fence {
         si.nMin = 0;
         si.nMax = content_height;
         si.nPage = view_height as u32;
-        unsafe { SetScrollInfo(self.scroll_area.handle.0, SB_VERT, &si, TRUE) };
+        unsafe { SetScrollInfo(self.scroll_area.base().handle(), SB_VERT, &si, TRUE) };
         self.invalidate();
     }
 
     pub fn bring_to_front(&self) {
         unsafe {
             SetWindowPos(
-                self.handle.0,
+                self.base().handle(),
                 HWND_TOP,
                 0,
                 0,
@@ -479,15 +491,5 @@ impl Fence {
             );
         }
         self.invalidate();
-    }
-}
-
-impl Drop for Fence {
-    fn drop(&mut self) {
-        unsafe {
-            if self.handle.0 != std::ptr::null_mut() {
-                DestroyWindow(self.handle.0);
-            }
-        }
     }
 }
