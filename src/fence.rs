@@ -108,14 +108,15 @@ impl Fence {
             );
 
             // Draw title text
-            SetBkMode(hdc, TRANSPARENT);
+            SetBkMode(hdc, TRANSPARENT as _);
             SetTextColor(hdc, 0x00FFFFFF); // White
             let title_u16: Vec<u16> = self.title.encode_utf16().collect();
+            let mut rect = self.rect;
             DrawTextW(
                 hdc,
                 title_u16.as_ptr(),
                 title_u16.len() as i32,
-                &mut self.rect as *mut RECT,
+                &mut rect as *mut RECT,
                 DT_CENTER | DT_VCENTER | DT_SINGLELINE,
             );
 
