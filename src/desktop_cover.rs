@@ -29,10 +29,12 @@ pub struct DesktopCover {
 }
 
 struct DesktopCoverInner {
+    /// List of fences currently managed by the desktop cover.
     fences: Vec<Arc<Fence>>,
+    /// The type of hit test result from the last interaction, used for dragging or context menus.
     hit_type: Option<HitTest>,
+    /// The last recorded mouse position in client coordinates.
     last_mouse_pos: POINT,
-    context_target: Option<(usize, HitTest)>,
 }
 
 impl DesktopCover {
@@ -89,7 +91,6 @@ impl DesktopCover {
                         fences: Vec::new(),
                         hit_type: None,
                         last_mouse_pos: POINT { x: 0, y: 0 },
-                        context_target: None,
                     }),
                 }))
             },
@@ -219,7 +220,7 @@ impl DesktopCover {
 
             match hit {
                 HitTest::Client | HitTest::Icon(_) => {
-                    inner.hit_type = None;
+                    inner.hit_type = Some(hit);
                 }
                 _ => {
                     inner.hit_type = Some(hit);
@@ -300,7 +301,7 @@ impl DesktopCover {
                 fence.bring_to_front();
                 inner.fences.push(fence);
 
-                inner.context_target = Some((inner.fences.len() - 1, hit));
+                inner.hit_type = Some(hit);
             }
 
             let mut pt = POINT { x, y };
@@ -359,10 +360,10 @@ impl DesktopCover {
     fn on_command(&self, wparam: WPARAM) -> LRESULT {
         let hwnd = self.base().handle();
         let command = wparam & 0xFFFF;
-        let context_target;
+        let hit_type;
         {
             let mut inner = self.inner.lock().unwrap();
-            context_target = inner.context_target.take();
+            hit_type = inner.hit_type.take();
         }
 
         match command {
@@ -378,39 +379,33 @@ impl DesktopCover {
                 }
             }
             IDM_ADD_ICON => {
-                if let Some((fence_idx, _)) = context_target {
-                    let inner = self.inner.lock().unwrap();
-                    if let Some(fence) = inner.fences.get(fence_idx) {
-                        let title = format!("Icon #{}", fence.icon_count());
-                        fence.add_icon(&title);
-                    }
+                let inner = self.inner.lock().unwrap();
+                if let Some(fence) = inner.fences.last() {
+                    let title = format!("Icon #{}", fence.icon_count());
+                    fence.add_icon(&title);
                 }
             }
             IDM_DELETE_FENCE => {
-                if let Some((fence_idx, _)) = context_target {
-                    let result = unsafe {
-                        MessageBoxW(
-                            hwnd,
-                            w!("Are you sure you want to delete this fence?"),
-                            w!("Confirm Deletion"),
-                            MB_YESNO | MB_ICONQUESTION,
-                        )
-                    };
-                    if result == IDYES {
-                        let mut inner = self.inner.lock().unwrap();
-                        if fence_idx < inner.fences.len() {
-                            inner.fences.remove(fence_idx);
-                        }
-                    }
+                let result = unsafe {
+                    MessageBoxW(
+                        hwnd,
+                        w!("Are you sure you want to delete this fence?"),
+                        w!("Confirm Deletion"),
+                        MB_YESNO | MB_ICONQUESTION,
+                    )
+                };
+                if result == IDYES {
+                    let mut inner = self.inner.lock().unwrap();
+                    inner.fences.pop();
                 }
             }
             IDM_RUN_ICON => unsafe {
                 MessageBoxW(hwnd, w!("Clicked"), w!("Test"), MB_OK | MB_ICONINFORMATION);
             },
             IDM_DELETE_ICON => {
-                if let Some((fence_idx, HitTest::Icon(icon_idx))) = context_target {
+                if let Some(HitTest::Icon(icon_idx)) = hit_type {
                     let inner = self.inner.lock().unwrap();
-                    if let Some(fence) = inner.fences.get(fence_idx) {
+                    if let Some(fence) = inner.fences.last() {
                         fence.remove_icon(icon_idx);
                     }
                 }
