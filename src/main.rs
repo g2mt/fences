@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::collections::BTreeMap;
+
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -11,6 +14,10 @@ const IDM_EXIT: usize = 101;
 trait Window {
     fn hwnd(&self) -> HWND;
     fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
+}
+
+struct App {
+    windows: BTreeMap<HWND, RefCell<Box<dyn Window>>>,
 }
 
 struct DesktopCover {
