@@ -350,7 +350,7 @@ impl Fence {
         let padding = 10;
         let icon_size = 64;
         let spacing = 10;
-        
+
         let available_width = width - (padding * 2);
         let cols = (available_width / (icon_size + spacing)).max(1);
 
@@ -358,10 +358,10 @@ impl Fence {
         for (i, icon) in inner.icons.iter().enumerate() {
             let col = i as i32 % cols;
             let row = i as i32 / cols;
-            
+
             let x = padding + col * (icon_size + spacing);
             let y = padding + row * (icon_size + spacing);
-            
+
             icon.set_pos(x, y);
         }
         drop(inner);
@@ -370,27 +370,7 @@ impl Fence {
 
     pub fn set_rect(&self, dl: i32, dt: i32, dr: i32, db: i32) {
         self.base.set_rect(dl, dt, dr, db);
-        self.update_layout();
-    }
 
-    pub fn invalidate(&self) {
-        unsafe {
-            let parent = GetParent(self.base().handle());
-            if parent != std::ptr::null_mut() {
-                InvalidateRect(parent, std::ptr::null(), TRUE);
-            }
-            InvalidateRect(self.base().handle(), std::ptr::null(), TRUE);
-            InvalidateRect(self.title_bar.base().handle(), std::ptr::null(), TRUE);
-            InvalidateRect(self.scroll_area.base().handle(), std::ptr::null(), TRUE);
-
-            let inner = self.inner.lock().unwrap();
-            for icon in &inner.icons {
-                InvalidateRect(icon.base().handle(), std::ptr::null(), TRUE);
-            }
-        }
-    }
-
-    pub fn update_layout(&self) {
         let rect = self.base.rect();
         let width = rect.right - rect.left;
         let height = rect.bottom - rect.top;
@@ -418,6 +398,23 @@ impl Fence {
             );
         }
         self.reflow_icons();
+    }
+
+    pub fn invalidate(&self) {
+        unsafe {
+            let parent = GetParent(self.base().handle());
+            if parent != std::ptr::null_mut() {
+                InvalidateRect(parent, std::ptr::null(), TRUE);
+            }
+            InvalidateRect(self.base().handle(), std::ptr::null(), TRUE);
+            InvalidateRect(self.title_bar.base().handle(), std::ptr::null(), TRUE);
+            InvalidateRect(self.scroll_area.base().handle(), std::ptr::null(), TRUE);
+
+            let inner = self.inner.lock().unwrap();
+            for icon in &inner.icons {
+                InvalidateRect(icon.base().handle(), std::ptr::null(), TRUE);
+            }
+        }
     }
 
     pub fn update_scroll_info(&self) {
