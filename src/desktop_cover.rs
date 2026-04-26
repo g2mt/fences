@@ -64,7 +64,7 @@ impl DesktopCover {
                 WS_EX_NOACTIVATE | WS_EX_LAYERED,
                 class_name,
                 w!("Desktop Cover"),
-                WS_POPUP | WS_VISIBLE,
+                WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN,
                 0,
                 0,
                 width,

@@ -142,7 +142,7 @@ impl Fence {
                 0,
                 w!("FenceTitleBar"),
                 title_u16.as_ptr(),
-                WS_CHILD | WS_VISIBLE,
+                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
                 x,
                 y,
                 300,
@@ -159,7 +159,7 @@ impl Fence {
                 0,
                 w!("FenceScrollArea"),
                 std::ptr::null(),
-                WS_CHILD | WS_VISIBLE,
+                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
                 x,
                 y + TITLE_BAR_HEIGHT,
                 300,
@@ -270,7 +270,7 @@ impl Fence {
     pub fn bring_to_front(&self) {
         unsafe {
             SetWindowPos(
-                self.title_handle.0,
+                self.scroll_handle.0,
                 HWND_TOP,
                 0,
                 0,
@@ -279,7 +279,7 @@ impl Fence {
                 SWP_NOMOVE | SWP_NOSIZE,
             );
             SetWindowPos(
-                self.scroll_handle.0,
+                self.title_handle.0,
                 HWND_TOP,
                 0,
                 0,

@@ -99,7 +99,7 @@ impl FenceIcon {
                 0,
                 w!("FenceIcon"),
                 title_u16.as_ptr(),
-                WS_CHILD | WS_VISIBLE,
+                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
                 x,
                 y,
                 64,
