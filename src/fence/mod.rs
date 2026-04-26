@@ -10,10 +10,13 @@ use std::sync::{Arc, Mutex};
 
 use icon::Icon;
 
+use crate::fence::icon::ICON_SIZE;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub const BORDER_THICKNESS: i32 = 3;
 pub const TITLE_BAR_HEIGHT: i32 = 24;
+pub const FENCE_PADDING: i32 = 10;
+pub const FENCE_SPACING: i32 = 10;
 
 pub struct TitleBar {
     base: BaseRef,
@@ -347,22 +350,19 @@ impl Fence {
     pub fn reflow_icons(&self) {
         let rect = self.base.rect();
         let width = rect.right - rect.left;
-        let padding = 10;
-        let icon_size = 64;
-        let spacing = 10;
 
-        let available_width = width - (padding * 2);
-        let cols = (available_width / (icon_size + spacing)).max(1);
+        let available_width = width - (FENCE_PADDING * 2);
+        let cols = (available_width / (ICON_SIZE + FENCE_SPACING)).max(1);
 
         let inner = self.inner.lock().unwrap();
         for (i, icon) in inner.icons.iter().enumerate() {
             let col = i as i32 % cols;
             let row = i as i32 / cols;
 
-            let x = padding + col * (icon_size + spacing);
-            let y = padding + row * (icon_size + spacing);
+            let x = FENCE_PADDING + col * (ICON_SIZE + FENCE_SPACING);
+            let y = FENCE_PADDING + row * (ICON_SIZE + FENCE_SPACING);
 
-            icon.base().resize_to(x, y, icon_size, icon_size);
+            icon.base().resize_to(x, y, x + ICON_SIZE, y + ICON_SIZE);
         }
         drop(inner);
         self.update_scroll_info();
@@ -409,8 +409,9 @@ impl Fence {
         let inner = self.inner.lock().unwrap();
         let mut max_y = 0;
         for icon in &inner.icons {
-            if icon.y + 64 > max_y {
-                max_y = icon.y + 64;
+            let irect = icon.base().rect();
+            if irect.bottom > max_y {
+                max_y = irect.bottom;
             }
         }
         let content_height = max_y + 10;

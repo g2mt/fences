@@ -187,12 +187,14 @@ impl Base {
     }
 
     pub fn resize_to(&self, left: i32, top: i32, right: i32, bottom: i32) {
-        *self.rect.lock().unwrap() = RECT {
-            left,
-            top,
-            right,
-            bottom,
-        };
+        {
+            *self.rect.lock().unwrap() = RECT {
+                left,
+                top,
+                right,
+                bottom,
+            };
+        }
         self.set_window_pos();
     }
 
