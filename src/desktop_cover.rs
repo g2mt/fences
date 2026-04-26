@@ -126,7 +126,12 @@ impl Window for DesktopCover {
             WM_PAINT => {
                 let mut ps: PAINTSTRUCT = unsafe { std::mem::zeroed() };
                 unsafe {
-                    BeginPaint(hwnd, &mut ps);
+                    let hdc = BeginPaint(hwnd, &mut ps);
+                    let mut rect: RECT = std::mem::zeroed();
+                    GetClientRect(hwnd, &mut rect);
+                    let brush = CreateSolidBrush(0x00000000);
+                    FillRect(hdc, &rect, brush);
+                    DeleteObject(brush);
                     EndPaint(hwnd, &ps);
                 }
                 0
