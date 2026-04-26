@@ -219,7 +219,6 @@ pub struct Fence {
 }
 
 struct FenceInner {
-    rect: RECT,
     title: String,
     icons: Vec<Arc<Icon>>,
 }
@@ -250,12 +249,6 @@ impl Fence {
                 let fence = Arc::new(Self {
                     base,
                     inner: Mutex::new(FenceInner {
-                        rect: RECT {
-                            left: x,
-                            top: y,
-                            right: x + 300,
-                            bottom: y + 150,
-                        },
                         title: title.to_string(),
                         icons: Vec::new(),
                     }),
@@ -279,19 +272,19 @@ impl Fence {
     }
 
     pub fn hit_test(&self, x: i32, y: i32) -> Option<HitTest> {
-        let inner = self.inner.lock().unwrap();
-        if x < inner.rect.left
-            || x >= inner.rect.right
-            || y < inner.rect.top
-            || y >= inner.rect.bottom
+        let rect = self.base.rect();
+        if x < rect.left
+            || x >= rect.right
+            || y < rect.top
+            || y >= rect.bottom
         {
             return None;
         }
 
-        let on_left = x < inner.rect.left + BORDER_THICKNESS;
-        let on_right = x >= inner.rect.right - BORDER_THICKNESS;
-        let on_top = y < inner.rect.top + BORDER_THICKNESS;
-        let on_bottom = y >= inner.rect.bottom - BORDER_THICKNESS;
+        let on_left = x < rect.left + BORDER_THICKNESS;
+        let on_right = x >= rect.right - BORDER_THICKNESS;
+        let on_top = y < rect.top + BORDER_THICKNESS;
+        let on_bottom = y >= rect.bottom - BORDER_THICKNESS;
 
         let hit = match (on_left, on_right, on_top, on_bottom) {
             (true, _, true, _) => HitTest::TopLeft,
@@ -303,7 +296,7 @@ impl Fence {
             (_, _, true, _) => HitTest::Top,
             (_, _, _, true) => HitTest::Bottom,
             _ => {
-                if y < inner.rect.top + TITLE_BAR_HEIGHT {
+                if y < rect.top + TITLE_BAR_HEIGHT {
                     HitTest::TitleBar
                 } else {
                     let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
@@ -311,9 +304,10 @@ impl Fence {
                     si.fMask = SIF_POS;
                     unsafe { GetScrollInfo(self.scroll_area.base().handle(), SB_VERT, &mut si) };
 
-                    let rel_x = x - inner.rect.left;
-                    let rel_y = y - (inner.rect.top + TITLE_BAR_HEIGHT) + si.nPos;
+                    let rel_x = x - rect.left;
+                    let rel_y = y - (rect.top + TITLE_BAR_HEIGHT) + si.nPos;
                     let mut icon_hit = None;
+                    let inner = self.inner.lock().unwrap();
                     for (i, icon) in inner.icons.iter().enumerate() {
                         if icon.hit_test(rel_x, rel_y) {
                             icon_hit = Some(HitTest::Icon(i));
@@ -366,24 +360,12 @@ impl Fence {
     }
 
     pub fn move_by(&self, dx: i32, dy: i32) {
-        {
-            let mut inner = self.inner.lock().unwrap();
-            inner.rect.left += dx;
-            inner.rect.right += dx;
-            inner.rect.top += dy;
-            inner.rect.bottom += dy;
-        }
+        self.base.resize(dx, dy, dx, dy);
         self.update_layout();
     }
 
     pub fn resize(&self, dl: i32, dt: i32, dr: i32, db: i32) {
-        {
-            let mut inner = self.inner.lock().unwrap();
-            inner.rect.left += dl;
-            inner.rect.top += dt;
-            inner.rect.right += dr;
-            inner.rect.bottom += db;
-        }
+        self.base.resize(dl, dt, dr, db);
         self.update_layout();
     }
 
@@ -405,21 +387,12 @@ impl Fence {
     }
 
     pub fn update_layout(&self) {
-        let inner = self.inner.lock().unwrap();
-        let width = inner.rect.right - inner.rect.left;
-        let height = inner.rect.bottom - inner.rect.top;
+        let rect = self.base.rect();
+        let width = rect.right - rect.left;
+        let height = rect.bottom - rect.top;
 
+        self.title_bar.base().resize(0, 0, 0, 0); // Sync internal rect if needed, but here we just use SetWindowPos for children
         unsafe {
-            SetWindowPos(
-                self.base().handle(),
-                std::ptr::null_mut(),
-                inner.rect.left,
-                inner.rect.top,
-                width,
-                height,
-                SWP_NOZORDER | SWP_NOACTIVATE,
-            );
-
             SetWindowPos(
                 self.title_bar.base().handle(),
                 std::ptr::null_mut(),
@@ -440,7 +413,6 @@ impl Fence {
                 SWP_NOZORDER | SWP_NOACTIVATE,
             );
         }
-        drop(inner);
         self.update_scroll_info();
     }
 

@@ -65,6 +65,7 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
 pub struct Base {
     hwnd: HWND,
     window: OnceLock<Weak<dyn Window>>,
+    rect: Mutex<RECT>,
 }
 
 unsafe impl Sync for Base {}
@@ -127,6 +128,12 @@ impl Base {
         let mut self_ref = Box::into_pin(Box::new(Self {
             hwnd: std::ptr::null_mut(),
             window: OnceLock::new(),
+            rect: Mutex::new(RECT {
+                left: x,
+                top: y,
+                right: x + nwidth,
+                bottom: y + nheight,
+            }),
         }));
         let hwnd = unsafe {
             CreateWindowExW(
@@ -156,6 +163,33 @@ impl Base {
 
     pub fn handle(&self) -> HWND {
         self.hwnd
+    }
+
+    pub fn rect(&self) -> RECT {
+        *self.rect.lock().unwrap()
+    }
+
+    pub fn resize(&self, dl: i32, dt: i32, dr: i32, db: i32) {
+        let mut rect = self.rect.lock().unwrap();
+        rect.left += dl;
+        rect.top += dt;
+        rect.right += dr;
+        rect.bottom += db;
+
+        let width = rect.right - rect.left;
+        let height = rect.bottom - rect.top;
+
+        unsafe {
+            SetWindowPos(
+                self.hwnd,
+                std::ptr::null_mut(),
+                rect.left,
+                rect.top,
+                width,
+                height,
+                SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
     }
 }
 
