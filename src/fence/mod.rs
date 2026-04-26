@@ -273,11 +273,7 @@ impl Fence {
 
     pub fn hit_test(&self, x: i32, y: i32) -> Option<HitTest> {
         let rect = self.base.rect();
-        if x < rect.left
-            || x >= rect.right
-            || y < rect.top
-            || y >= rect.bottom
-        {
+        if x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom {
             return None;
         }
 
@@ -357,11 +353,6 @@ impl Fence {
         if let Some(icon) = inner.icons.get(index) {
             icon.set_selected(true);
         }
-    }
-
-    pub fn move_by(&self, dx: i32, dy: i32) {
-        self.base.resize(dx, dy, dx, dy);
-        self.update_layout();
     }
 
     pub fn resize(&self, dl: i32, dt: i32, dr: i32, db: i32) {

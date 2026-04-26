@@ -1,16 +1,16 @@
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 use crate::fence::{Fence, HitTest};
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Menus
 pub const IDM_EXIT: usize = 101;
@@ -179,12 +179,7 @@ impl DesktopCover {
 
         if hit_icon {
             unsafe {
-                MessageBoxW(
-                    hwnd,
-                    w!("Clicked"),
-                    w!("Test"),
-                    MB_OK | MB_ICONINFORMATION,
-                );
+                MessageBoxW(hwnd, w!("Clicked"), w!("Test"), MB_OK | MB_ICONINFORMATION);
             }
         }
         0
@@ -245,7 +240,7 @@ impl DesktopCover {
 
             if let Some(fence) = inner.fences.last() {
                 match hit_type {
-                    HitTest::TitleBar => fence.move_by(dx, dy),
+                    HitTest::TitleBar => fence.resize(dx, dy, dx, dy),
                     HitTest::Left => fence.resize(-dx, 0, dx, 0),
                     HitTest::Right => fence.resize(0, 0, dx, 0),
                     HitTest::Top => fence.resize(0, -dy, 0, dy),
