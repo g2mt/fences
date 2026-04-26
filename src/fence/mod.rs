@@ -9,7 +9,9 @@ pub const TITLE_BAR_HEIGHT: i32 = 24;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum HitTest {
-    Inside,
+    TitleBar,
+    Client,
+    Icon(usize),
     Left,
     Right,
     Top,
@@ -60,7 +62,22 @@ impl Fence {
             (_, true, _, _) => HitTest::Right,
             (_, _, true, _) => HitTest::Top,
             (_, _, _, true) => HitTest::Bottom,
-            _ => HitTest::Inside,
+            _ => {
+                if y < self.rect.top + TITLE_BAR_HEIGHT {
+                    HitTest::TitleBar
+                } else {
+                    let rel_x = x - self.rect.left;
+                    let rel_y = y - (self.rect.top + TITLE_BAR_HEIGHT);
+                    let mut icon_hit = None;
+                    for (i, icon) in self.icons.iter().enumerate() {
+                        if icon.hit_test(rel_x, rel_y) {
+                            icon_hit = Some(HitTest::Icon(i));
+                            break;
+                        }
+                    }
+                    icon_hit.unwrap_or(HitTest::Client)
+                }
+            }
         };
         Some(hit)
     }

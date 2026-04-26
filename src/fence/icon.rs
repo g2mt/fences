@@ -6,6 +6,7 @@ pub struct FenceIcon {
     pub title: String,
     pub x: i32,
     pub y: i32,
+    pub selected: bool,
 }
 
 impl FenceIcon {
@@ -14,7 +15,14 @@ impl FenceIcon {
             title: title.to_string(),
             x,
             y,
+            selected: false,
         }
+    }
+
+    pub fn hit_test(&self, rel_x: i32, rel_y: i32) -> bool {
+        let width = 64;
+        let height = 64;
+        rel_x >= self.x && rel_x < self.x + width && rel_y >= self.y && rel_y < self.y + height
     }
 
     pub unsafe fn draw(&self, hdc: HDC, parent_x: i32, parent_y: i32) {
@@ -26,6 +34,18 @@ impl FenceIcon {
 
         let abs_x = parent_x + self.x;
         let abs_y = parent_y + self.y;
+
+        if self.selected {
+            let brush = CreateSolidBrush(0x00FFAA44); // Light blue
+            let rect = RECT {
+                left: abs_x,
+                top: abs_y,
+                right: abs_x + width,
+                bottom: abs_y + height,
+            };
+            FillRect(hdc, &rect, brush);
+            DeleteObject(brush);
+        }
 
         // Draw icon
         let hicon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
