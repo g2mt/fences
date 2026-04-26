@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
@@ -18,7 +19,27 @@ pub struct DesktopCover {
 }
 
 impl DesktopCover {
-    pub unsafe fn new(h_instance: HINSTANCE, class_name: PCWSTR) -> Result<Box<DesktopCover>> {
+    pub unsafe fn new(wndproc: WNDPROC) -> Result<Box<DesktopCover>> {
+        let h_instance = unsafe { GetModuleHandleW(std::ptr::null()) };
+        let class_name = w!("BottomWindowClass");
+        unsafe {
+            let wc = WNDCLASSW {
+                style: CS_HREDRAW | CS_VREDRAW,
+                lpfnWndProc: wndproc,
+                cbClsExtra: 0,
+                cbWndExtra: 0,
+                hInstance: h_instance,
+                hIcon: std::ptr::null_mut(),
+                hCursor: LoadCursorW(std::ptr::null_mut(), IDC_ARROW),
+                hbrBackground: GetStockObject(BLACK_BRUSH) as HBRUSH,
+                lpszMenuName: std::ptr::null(),
+                lpszClassName: class_name,
+            };
+            if RegisterClassW(&wc) == 0 {
+                return Err(anyhow!("RegisterClassW failed"));
+            }
+        }
+
         let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
         let hwnd = unsafe {
