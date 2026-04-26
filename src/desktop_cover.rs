@@ -16,7 +16,7 @@ pub const IDM_ADD_FENCE: usize = 102;
 pub const IDM_DELETE_FENCE: usize = 103;
 pub const IDM_ADD_ICON: usize = 104;
 pub const IDM_RUN_ICON: usize = 105;
-pub const IDM_DELETE_ICON: usize = 105;
+pub const IDM_DELETE_ICON: usize = 106;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
