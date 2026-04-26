@@ -1,16 +1,16 @@
 use anyhow::Result;
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 mod icon;
 use std::sync::{Arc, Mutex};
 
 use icon::Icon;
 
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub const BORDER_THICKNESS: i32 = 3;
 pub const TITLE_BAR_HEIGHT: i32 = 24;
