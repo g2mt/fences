@@ -20,7 +20,28 @@ pub struct TitleBar {
 }
 
 impl TitleBar {
-    pub fn new() -> Result<Arc<Self>> {}
+    pub fn new(parent_hwnd: HWND, title: *const u16, width: i32) -> Result<Arc<Self>> {
+        let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        Base::create_window(
+            0,
+            register_classname(w!("FenceTitleBar")),
+            title,
+            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+            0,
+            0,
+            width,
+            TITLE_BAR_HEIGHT,
+            parent_hwnd,
+            std::ptr::null_mut(),
+            h_instance,
+            |base| {
+                Arc::new_cyclic(|weak| Self {
+                    base: unsafe { std::mem::transmute(base) },
+                })
+                .map_err(|_| anyhow::anyhow!("Failed to create TitleBar"))
+            },
+        )
+    }
 }
 
 impl Window for TitleBar {
@@ -224,26 +245,7 @@ impl Fence {
                 .unwrap()
             };
 
-            let title_bar = Arc::new_cyclic(|tb_weak| {
-                let tb_base = unsafe {
-                    Base::create_window(
-                        tb_weak.clone(),
-                        0,
-                        register_classname(w!("FenceTitleBar")),
-                        title_u16.as_ptr(),
-                        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
-                        0,
-                        0,
-                        300,
-                        TITLE_BAR_HEIGHT,
-                        base.handle(),
-                        std::ptr::null_mut(),
-                        h_instance,
-                    )
-                    .unwrap()
-                };
-                TitleBar { base: tb_base }
-            });
+            let title_bar = TitleBar::new(base.handle(), title_u16.as_ptr(), 300).unwrap();
 
             let scroll_area = Arc::new_cyclic(|sa_weak| {
                 let sa_base = unsafe {

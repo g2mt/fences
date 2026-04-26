@@ -88,7 +88,7 @@ impl Base {
         f: F,
     ) -> Result<Arc<W>>
     where
-        F: FnOnce(HWND) -> Result<Arc<W>>,
+        F: FnOnce(BaseRef) -> Result<Arc<W>>,
         W: Window,
     {
         let base = unsafe {
@@ -106,7 +106,7 @@ impl Base {
                 hinstance,
             )?
         };
-        let window = f(base.hwnd)?;
+        let window = f(base)?;
         base.window
             .get_or_init(|| Arc::downgrade(&(window as Arc<dyn Window>)));
         Ok(window)
