@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::ffi::c_void;
 use std::sync::{Mutex, OnceLock};
 
 use windows_sys::core::*;
@@ -17,8 +18,23 @@ trait Window {
     fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+struct Handle(usize);
+
+impl From<*const c_void> for Handle {
+    fn from(value: *const c_void) -> Self {
+        Self(value as _)
+    }
+}
+
+impl From<*mut c_void> for Handle {
+    fn from(value: *mut c_void) -> Self {
+        Self(value as _)
+    }
+}
+
 struct App {
-    windows: BTreeMap<HWND, RefCell<Box<dyn Window>>>,
+    windows: BTreeMap<Handle, RefCell<Box<dyn Window>>>,
 }
 
 static APP: OnceLock<Mutex<App>> = OnceLock::new();
@@ -189,18 +205,24 @@ impl Window for DesktopCover {
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     // Look up the window object using the global map.
-    if let Some(app) = APP.get() {
-        if let Ok(mut guard) = app.lock() {
-            if let Some(window_refcell) = guard.windows.get(&hwnd) {
-                let mut window = window_refcell.borrow_mut();
-                return window.wndproc(msg, wparam, lparam);
-            }
+    {
+        let app = APP.get().unwrap().lock().unwrap();
+        if let Some(window_refcell) = app.windows.get(&Handle::from(hwnd)) {
+            let mut window = window_refcell.borrow_mut();
+            return window.wndproc(msg, wparam, lparam);
         }
     }
-    DefWindowProcW(hwnd, msg, wparam, lparam)
+
+    // Fallback event
+    unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
 
 fn main() {
+    APP.get_or_init(|| {
+        Mutex::new(App {
+            windows: BTreeMap::new(),
+        })
+    });
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
         let class_name = w!("BottomWindowClass");
@@ -222,9 +244,6 @@ fn main() {
             return;
         }
 
-        // Initialise the global map before creating any windows.
-        APP.get_or_init(|| Mutex::new(App { windows: BTreeMap::new() }));
-
         let dc = DesktopCover::new(h_instance, class_name);
         let hwnd = dc.hwnd;
 
@@ -232,7 +251,7 @@ fn main() {
         {
             let app = APP.get().unwrap();
             let mut guard = app.lock().unwrap();
-            guard.windows.insert(hwnd, RefCell::new(dc));
+            guard.windows.insert(Handle::from(hwnd), RefCell::new(dc));
         }
 
         // Standard message loop
