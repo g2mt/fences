@@ -36,8 +36,6 @@ pub struct DesktopCover {
 
 impl DesktopCover {
     pub unsafe fn new(wndproc: WNDPROC) -> Result<Box<DesktopCover>> {
-        crate::fence::register_classes();
-
         let h_instance = unsafe { GetModuleHandleW(std::ptr::null()) };
         let class_name = w!("BottomWindowClass");
         unsafe {
