@@ -7,7 +7,7 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-use crate::fence::Fence;
+use crate::fence::{Fence, HitTest};
 use crate::window::{WinHandle, Window};
 
 // Menus
@@ -21,6 +21,7 @@ pub struct DesktopCover {
     handle: WinHandle,
     fences: Vec<Fence>,
     dragging_idx: Option<usize>,
+    hit_type: HitTest,
     last_mouse_pos: POINT,
 }
 
@@ -101,6 +102,7 @@ impl DesktopCover {
             handle: WinHandle(hwnd),
             fences: Vec::new(),
             dragging_idx: None,
+            hit_type: HitTest::None,
             last_mouse_pos: POINT { x: 0, y: 0 },
         }))
     }
@@ -152,13 +154,23 @@ impl Window for DesktopCover {
                 unsafe { GetCursorPos(&mut pt) };
                 unsafe { ScreenToClient(hwnd, &mut pt) };
 
-                let over_fence = self.fences.iter().any(|f| f.contains(pt.x, pt.y));
-                if over_fence {
-                    unsafe {
-                        let cursor = LoadCursorW(std::ptr::null_mut(), IDC_SIZEALL);
-                        SetCursor(cursor);
+                for fence in self.fences.iter().rev() {
+                    let hit = fence.hit_test(pt.x, pt.y);
+                    if hit != HitTest::None {
+                        let cursor_id = match hit {
+                            HitTest::Inside => IDC_SIZEALL,
+                            HitTest::Left | HitTest::Right => IDC_SIZEWE,
+                            HitTest::Top | HitTest::Bottom => IDC_SIZENS,
+                            HitTest::TopLeft | HitTest::BottomRight => IDC_SIZENWSE,
+                            HitTest::TopRight | HitTest::BottomLeft => IDC_SIZENESW,
+                            HitTest::None => IDC_ARROW,
+                        };
+                        unsafe {
+                            let cursor = LoadCursorW(std::ptr::null_mut(), cursor_id);
+                            SetCursor(cursor);
+                        }
+                        return TRUE as LRESULT;
                     }
-                    return TRUE as LRESULT;
                 }
                 unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
@@ -167,8 +179,10 @@ impl Window for DesktopCover {
                 let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
                 for (i, fence) in self.fences.iter().enumerate().rev() {
-                    if fence.contains(x, y) {
+                    let hit = fence.hit_test(x, y);
+                    if hit != HitTest::None {
                         self.dragging_idx = Some(i);
+                        self.hit_type = hit;
                         self.last_mouse_pos = POINT { x, y };
                         unsafe { SetCapture(hwnd) };
                         break;
@@ -184,9 +198,21 @@ impl Window for DesktopCover {
                     let dx = x - self.last_mouse_pos.x;
                     let dy = y - self.last_mouse_pos.y;
 
-                    self.fences[idx].move_by(dx, dy);
-                    self.last_mouse_pos = POINT { x, y };
+                    let fence = &mut self.fences[idx];
+                    match self.hit_type {
+                        HitTest::Inside => fence.move_by(dx, dy),
+                        HitTest::Left => { fence.rect.left += dx; }
+                        HitTest::Right => { fence.rect.right += dx; }
+                        HitTest::Top => { fence.rect.top += dy; }
+                        HitTest::Bottom => { fence.rect.bottom += dy; }
+                        HitTest::TopLeft => { fence.rect.left += dx; fence.rect.top += dy; }
+                        HitTest::TopRight => { fence.rect.right += dx; fence.rect.top += dy; }
+                        HitTest::BottomLeft => { fence.rect.left += dx; fence.rect.bottom += dy; }
+                        HitTest::BottomRight => { fence.rect.right += dx; fence.rect.bottom += dy; }
+                        HitTest::None => {}
+                    }
 
+                    self.last_mouse_pos = POINT { x, y };
                     unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
                 }
                 0
@@ -194,6 +220,7 @@ impl Window for DesktopCover {
             WM_LBUTTONUP => {
                 if self.dragging_idx.is_some() {
                     self.dragging_idx = None;
+                    self.hit_type = HitTest::None;
                     unsafe { ReleaseCapture() };
                 }
                 0

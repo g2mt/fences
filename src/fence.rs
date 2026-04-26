@@ -1,6 +1,22 @@
 use windows_sys::Win32::Foundation::RECT;
 use windows_sys::Win32::Graphics::Gdi::*;
 
+pub const BORDER_THICKNESS: i32 = 3;
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum HitTest {
+    None,
+    Inside,
+    Left,
+    Right,
+    Top,
+    Bottom,
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
 pub struct Fence {
     pub rect: RECT,
 }
@@ -17,8 +33,31 @@ impl Fence {
         }
     }
 
+    pub fn hit_test(&self, x: i32, y: i32) -> HitTest {
+        if x < self.rect.left || x >= self.rect.right || y < self.rect.top || y >= self.rect.bottom {
+            return HitTest::None;
+        }
+
+        let on_left = x < self.rect.left + BORDER_THICKNESS;
+        let on_right = x >= self.rect.right - BORDER_THICKNESS;
+        let on_top = y < self.rect.top + BORDER_THICKNESS;
+        let on_bottom = y >= self.rect.bottom - BORDER_THICKNESS;
+
+        match (on_left, on_right, on_top, on_bottom) {
+            (true, _, true, _) => HitTest::TopLeft,
+            (_, true, true, _) => HitTest::TopRight,
+            (true, _, _, true) => HitTest::BottomLeft,
+            (_, true, _, true) => HitTest::BottomRight,
+            (true, _, _, _) => HitTest::Left,
+            (_, true, _, _) => HitTest::Right,
+            (_, _, true, _) => HitTest::Top,
+            (_, _, _, true) => HitTest::Bottom,
+            _ => HitTest::Inside,
+        }
+    }
+
     pub fn contains(&self, x: i32, y: i32) -> bool {
-        x >= self.rect.left && x < self.rect.right && y >= self.rect.top && y < self.rect.bottom
+        self.hit_test(x, y) != HitTest::None
     }
 
     pub fn move_by(&mut self, dx: i32, dy: i32) {
