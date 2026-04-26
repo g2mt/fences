@@ -343,7 +343,6 @@ impl Fence {
                 SWP_NOZORDER | SWP_NOACTIVATE,
             );
         }
-        self.invalidate();
         self.update_scroll_info();
     }
 
@@ -367,6 +366,7 @@ impl Fence {
         si.nMax = content_height;
         si.nPage = view_height as u32;
         unsafe { SetScrollInfo(self.scroll_handle.0, SB_VERT, &si, TRUE) };
+        self.invalidate();
     }
 
     pub fn bring_to_front(&self) {
