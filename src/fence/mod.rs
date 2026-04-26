@@ -5,6 +5,7 @@ use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
+use crate::window::WinHandle;
 use icon::FenceIcon;
 
 pub const BORDER_THICKNESS: i32 = 3;
@@ -125,8 +126,8 @@ pub struct Fence {
     pub rect: RECT,
     pub title: String,
     pub icons: Vec<FenceIcon>,
-    pub hwnd_title: HWND,
-    pub hwnd_scroll: HWND,
+    pub title_handle: WinHandle,
+    pub scroll_handle: WinHandle,
 }
 
 impl Fence {
@@ -179,8 +180,8 @@ impl Fence {
             },
             title: title.to_string(),
             icons: Vec::new(),
-            hwnd_title,
-            hwnd_scroll,
+            title_handle: WinHandle(hwnd_title),
+            scroll_handle: WinHandle(hwnd_scroll),
         };
 
         fence
@@ -242,7 +243,7 @@ impl Fence {
 
         unsafe {
             SetWindowPos(
-                self.hwnd_title,
+                self.title_handle.0,
                 std::ptr::null_mut(),
                 self.rect.left,
                 self.rect.top,
@@ -252,7 +253,7 @@ impl Fence {
             );
 
             SetWindowPos(
-                self.hwnd_scroll,
+                self.scroll_handle.0,
                 std::ptr::null_mut(),
                 self.rect.left,
                 self.rect.top + TITLE_BAR_HEIGHT,
@@ -266,7 +267,7 @@ impl Fence {
     pub fn bring_to_front(&self) {
         unsafe {
             SetWindowPos(
-                self.hwnd_title,
+                self.title_handle.0,
                 HWND_TOP,
                 0,
                 0,
@@ -275,7 +276,7 @@ impl Fence {
                 SWP_NOMOVE | SWP_NOSIZE,
             );
             SetWindowPos(
-                self.hwnd_scroll,
+                self.scroll_handle.0,
                 HWND_TOP,
                 0,
                 0,
@@ -290,11 +291,11 @@ impl Fence {
 impl Drop for Fence {
     fn drop(&mut self) {
         unsafe {
-            if self.hwnd_title != std::ptr::null_mut() {
-                DestroyWindow(self.hwnd_title);
+            if self.title_handle.0 != std::ptr::null_mut() {
+                DestroyWindow(self.title_handle.0);
             }
-            if self.hwnd_scroll != std::ptr::null_mut() {
-                DestroyWindow(self.hwnd_scroll);
+            if self.scroll_handle.0 != std::ptr::null_mut() {
+                DestroyWindow(self.scroll_handle.0);
             }
         }
     }
