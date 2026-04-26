@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
-use anyhow::{anyhow, Context, Result};
 
+use anyhow::{anyhow, Result};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
