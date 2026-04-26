@@ -34,15 +34,9 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
             if userdata == 0 {
                 return DefWindowProcW(hwnd, msg, wparam, lparam);
             }
-            let ptr = userdata as *const dyn Window;
-            let arc = Arc::from_raw(ptr);
-            let result = {
-                // We don't want to drop the Arc here as it's owned by Base
-                let mut window = Arc::as_ptr(&arc) as *mut dyn Window;
-                (*window).wndproc(msg, wparam, lparam)
-            };
-            let _ = Arc::into_raw(arc);
-            result
+            let base = &*(userdata as *const Base);
+            let mut window = Arc::as_ptr(&base.window) as *mut dyn Window;
+            (*window).wndproc(msg, wparam, lparam)
         }
     }
     let mut registered = REGISTERED_CLASSNAMES.lock().unwrap();
