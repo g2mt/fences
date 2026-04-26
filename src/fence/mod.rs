@@ -310,13 +310,11 @@ impl Fence {
 
     pub fn add_icon(&self, title: &str) {
         let mut inner = self.inner.lock().unwrap();
-        let x = 10;
-        let y = 10 + (inner.icons.len() as i32 * 70);
         inner
             .icons
-            .push(Icon::new(self.scroll_area.base().handle(), title, x, y));
+            .push(Icon::new(self.scroll_area.base().handle(), title, 0, 0));
         drop(inner);
-        self.update_scroll_info();
+        self.reflow_icons();
     }
 
     pub fn remove_icon(&self, index: usize) {
@@ -325,7 +323,7 @@ impl Fence {
             inner.icons.remove(index);
         }
         drop(inner);
-        self.update_scroll_info();
+        self.reflow_icons();
     }
 
     pub fn icon_count(&self) -> usize {
@@ -344,6 +342,30 @@ impl Fence {
         if let Some(icon) = inner.icons.get(index) {
             icon.set_selected(true);
         }
+    }
+
+    pub fn reflow_icons(&self) {
+        let rect = self.base.rect();
+        let width = rect.right - rect.left;
+        let padding = 10;
+        let icon_size = 64;
+        let spacing = 10;
+        
+        let available_width = width - (padding * 2);
+        let cols = (available_width / (icon_size + spacing)).max(1);
+
+        let inner = self.inner.lock().unwrap();
+        for (i, icon) in inner.icons.iter().enumerate() {
+            let col = i as i32 % cols;
+            let row = i as i32 / cols;
+            
+            let x = padding + col * (icon_size + spacing);
+            let y = padding + row * (icon_size + spacing);
+            
+            icon.set_pos(x, y);
+        }
+        drop(inner);
+        self.update_scroll_info();
     }
 
     pub fn set_rect(&self, dl: i32, dt: i32, dr: i32, db: i32) {
@@ -395,7 +417,7 @@ impl Fence {
                 SWP_NOZORDER | SWP_NOACTIVATE,
             );
         }
-        self.update_scroll_info();
+        self.reflow_icons();
     }
 
     pub fn update_scroll_info(&self) {
