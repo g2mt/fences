@@ -1,8 +1,8 @@
 use windows_sys::Win32::Foundation::RECT;
 use windows_sys::Win32::Graphics::Gdi::*;
-use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-use crate::fence_icon::FenceIcon;
+mod icon;
+use icon::FenceIcon;
 
 pub const BORDER_THICKNESS: i32 = 3;
 pub const TITLE_BAR_HEIGHT: i32 = 24;
@@ -41,7 +41,8 @@ impl Fence {
     }
 
     pub fn hit_test(&self, x: i32, y: i32) -> Option<HitTest> {
-        if x < self.rect.left || x >= self.rect.right || y < self.rect.top || y >= self.rect.bottom {
+        if x < self.rect.left || x >= self.rect.right || y < self.rect.top || y >= self.rect.bottom
+        {
             return None;
         }
 
