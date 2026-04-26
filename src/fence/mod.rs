@@ -8,7 +8,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 mod icon;
 use icon::Icon;
 
-use crate::window::WinHandle;
+use crate::window::{WinHandle, Window};
 
 pub const BORDER_THICKNESS: i32 = 3;
 pub const TITLE_BAR_HEIGHT: i32 = 24;
@@ -20,6 +20,10 @@ pub fn register_classes() {
         let mut wc: WNDCLASSW = std::mem::zeroed();
         wc.hInstance = h_instance;
         wc.hCursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
+
+        wc.lpszClassName = w!("Fence");
+        wc.lpfnWndProc = Some(fence_wndproc);
+        RegisterClassW(&wc);
 
         wc.lpszClassName = w!("FenceTitleBar");
         wc.lpfnWndProc = Some(title_bar_wndproc);
@@ -33,49 +37,154 @@ pub fn register_classes() {
     }
 }
 
+pub struct TitleBar {
+    pub handle: WinHandle,
+}
+
+impl Window for TitleBar {
+    fn handle(&self) -> WinHandle {
+        self.handle
+    }
+
+    fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.handle.0;
+        match msg {
+            WM_NCHITTEST => HTTRANSPARENT as LRESULT,
+            WM_PAINT => unsafe {
+                let mut ps: PAINTSTRUCT = std::mem::zeroed();
+                let hdc = BeginPaint(hwnd, &mut ps);
+
+                let mut rect: RECT = std::mem::zeroed();
+                GetClientRect(hwnd, &mut rect);
+
+                let title_brush = CreateSolidBrush(0x00323232);
+                FillRect(hdc, &rect, title_brush);
+                DeleteObject(title_brush);
+
+                let mut edge_rect = rect;
+                edge_rect.bottom += 2;
+                DrawEdge(hdc, &mut edge_rect, EDGE_RAISED, BF_RECT);
+
+                SetBkMode(hdc, TRANSPARENT as _);
+                SetTextColor(hdc, 0x00FFFFFF);
+
+                let mut title = vec![0u16; 256];
+                let len = GetWindowTextW(hwnd, title.as_mut_ptr(), 256);
+
+                let mut text_rect = rect;
+                text_rect.left += 5;
+                DrawTextW(
+                    hdc,
+                    title.as_ptr(),
+                    len,
+                    &mut text_rect,
+                    DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+                );
+
+                EndPaint(hwnd, &ps);
+                0
+            },
+            _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        }
+    }
+}
+
 pub unsafe extern "system" fn title_bar_wndproc(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    match msg {
-        WM_NCHITTEST => HTTRANSPARENT as LRESULT,
-        WM_PAINT => {
-            let mut ps: PAINTSTRUCT = std::mem::zeroed();
-            let hdc = BeginPaint(hwnd, &mut ps);
+    let mut title_bar = TitleBar { handle: WinHandle(hwnd) };
+    title_bar.wndproc(msg, wparam, lparam)
+}
 
-            let mut rect: RECT = std::mem::zeroed();
-            GetClientRect(hwnd, &mut rect);
+pub struct ScrollArea {
+    pub handle: WinHandle,
+}
 
-            let title_brush = CreateSolidBrush(0x00323232);
-            FillRect(hdc, &rect, title_brush);
-            DeleteObject(title_brush);
+impl Window for ScrollArea {
+    fn handle(&self) -> WinHandle {
+        self.handle
+    }
 
-            let mut edge_rect = rect;
-            edge_rect.bottom += 2;
-            DrawEdge(hdc, &mut edge_rect, EDGE_RAISED, BF_RECT);
+    fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.handle.0;
+        match msg {
+            WM_NCHITTEST => unsafe {
+                let res = DefWindowProcW(hwnd, msg, wparam, lparam);
+                if res == HTCLIENT as LRESULT {
+                    HTTRANSPARENT as LRESULT
+                } else {
+                    res
+                }
+            },
+            WM_VSCROLL => unsafe {
+                let mut si: SCROLLINFO = std::mem::zeroed();
+                si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
+                si.fMask = SIF_ALL;
+                GetScrollInfo(hwnd, SB_VERT, &mut si);
 
-            SetBkMode(hdc, TRANSPARENT as _);
-            SetTextColor(hdc, 0x00FFFFFF);
+                let cur_pos = si.nPos;
+                match (wparam & 0xFFFF) as i32 {
+                    SB_TOP => si.nPos = si.nMin,
+                    SB_BOTTOM => si.nPos = si.nMax,
+                    SB_LINEUP => si.nPos -= 10,
+                    SB_LINEDOWN => si.nPos += 10,
+                    SB_PAGEUP => si.nPos -= si.nPage as i32,
+                    SB_PAGEDOWN => si.nPos += si.nPage as i32,
+                    SB_THUMBTRACK => si.nPos = (wparam >> 16) as i16 as i32,
+                    _ => {}
+                }
 
-            let mut title = vec![0u16; 256];
-            let len = GetWindowTextW(hwnd, title.as_mut_ptr(), 256);
+                si.fMask = SIF_POS;
+                SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
+                GetScrollInfo(hwnd, SB_VERT, &mut si);
 
-            let mut text_rect = rect;
-            text_rect.left += 5;
-            DrawTextW(
-                hdc,
-                title.as_ptr(),
-                len,
-                &mut text_rect,
-                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
-            );
+                if si.nPos != cur_pos {
+                    ScrollWindowEx(
+                        hwnd,
+                        0,
+                        cur_pos - si.nPos,
+                        std::ptr::null(),
+                        std::ptr::null(),
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        SW_ERASE | SW_INVALIDATE | SW_SCROLLCHILDREN,
+                    );
+                    let parent = GetParent(hwnd);
+                    if parent != std::ptr::null_mut() {
+                        InvalidateRect(parent, std::ptr::null(), TRUE);
+                    }
+                }
+                0
+            },
+            WM_MOUSEWHEEL => unsafe {
+                let delta = (wparam >> 16) as i16 as i32;
+                let msg = if delta > 0 { SB_LINEUP } else { SB_LINEDOWN };
+                SendMessageW(hwnd, WM_VSCROLL, msg as WPARAM, 0);
+                0
+            },
+            WM_PAINT => unsafe {
+                let mut ps: PAINTSTRUCT = std::mem::zeroed();
+                let hdc = BeginPaint(hwnd, &mut ps);
 
-            EndPaint(hwnd, &ps);
-            0
+                let mut rect: RECT = std::mem::zeroed();
+                GetClientRect(hwnd, &mut rect);
+
+                let scroll_brush = CreateSolidBrush(0x007D7D7D);
+                FillRect(hdc, &rect, scroll_brush);
+                DeleteObject(scroll_brush);
+
+                let mut edge_rect = rect;
+                edge_rect.top -= 2;
+                DrawEdge(hdc, &mut edge_rect, EDGE_RAISED, BF_RECT);
+
+                EndPaint(hwnd, &ps);
+                0
+            },
+            _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 
@@ -85,81 +194,8 @@ pub unsafe extern "system" fn scroll_area_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    match msg {
-        WM_NCHITTEST => {
-            let res = DefWindowProcW(hwnd, msg, wparam, lparam);
-            if res == HTCLIENT as LRESULT {
-                HTTRANSPARENT as LRESULT
-            } else {
-                res
-            }
-        }
-        WM_VSCROLL => {
-            let mut si: SCROLLINFO = std::mem::zeroed();
-            si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
-            si.fMask = SIF_ALL;
-            GetScrollInfo(hwnd, SB_VERT, &mut si);
-
-            let cur_pos = si.nPos;
-            match (wparam & 0xFFFF) as i32 {
-                SB_TOP => si.nPos = si.nMin,
-                SB_BOTTOM => si.nPos = si.nMax,
-                SB_LINEUP => si.nPos -= 10,
-                SB_LINEDOWN => si.nPos += 10,
-                SB_PAGEUP => si.nPos -= si.nPage as i32,
-                SB_PAGEDOWN => si.nPos += si.nPage as i32,
-                SB_THUMBTRACK => si.nPos = (wparam >> 16) as i16 as i32,
-                _ => {}
-            }
-
-            si.fMask = SIF_POS;
-            SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
-            GetScrollInfo(hwnd, SB_VERT, &mut si);
-
-            if si.nPos != cur_pos {
-                ScrollWindowEx(
-                    hwnd,
-                    0,
-                    cur_pos - si.nPos,
-                    std::ptr::null(),
-                    std::ptr::null(),
-                    std::ptr::null_mut(),
-                    std::ptr::null_mut(),
-                    SW_ERASE | SW_INVALIDATE | SW_SCROLLCHILDREN,
-                );
-                let parent = GetParent(hwnd);
-                if parent != std::ptr::null_mut() {
-                    InvalidateRect(parent, std::ptr::null(), TRUE);
-                }
-            }
-            0
-        }
-        WM_MOUSEWHEEL => {
-            let delta = (wparam >> 16) as i16 as i32;
-            let msg = if delta > 0 { SB_LINEUP } else { SB_LINEDOWN };
-            SendMessageW(hwnd, WM_VSCROLL, msg as WPARAM, 0);
-            0
-        }
-        WM_PAINT => {
-            let mut ps: PAINTSTRUCT = std::mem::zeroed();
-            let hdc = BeginPaint(hwnd, &mut ps);
-
-            let mut rect: RECT = std::mem::zeroed();
-            GetClientRect(hwnd, &mut rect);
-
-            let scroll_brush = CreateSolidBrush(0x007D7D7D);
-            FillRect(hdc, &rect, scroll_brush);
-            DeleteObject(scroll_brush);
-
-            let mut edge_rect = rect;
-            edge_rect.top -= 2;
-            DrawEdge(hdc, &mut edge_rect, EDGE_RAISED, BF_RECT);
-
-            EndPaint(hwnd, &ps);
-            0
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-    }
+    let mut scroll_area = ScrollArea { handle: WinHandle(hwnd) };
+    scroll_area.wndproc(msg, wparam, lparam)
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -178,16 +214,65 @@ pub enum HitTest {
 }
 
 pub struct Fence {
+    pub handle: WinHandle,
     pub rect: RECT,
     pub title: String,
     pub icons: Vec<Icon>,
-    pub title_handle: WinHandle,
-    pub scroll_handle: WinHandle,
+    pub title_bar: TitleBar,
+    pub scroll_area: ScrollArea,
+}
+
+impl Window for Fence {
+    fn handle(&self) -> WinHandle {
+        self.handle
+    }
+
+    fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.handle.0;
+        match msg {
+            WM_NCHITTEST => HTTRANSPARENT as LRESULT,
+            _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        }
+    }
+}
+
+pub unsafe extern "system" fn fence_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    let mut fence = Fence {
+        handle: WinHandle(hwnd),
+        rect: unsafe { std::mem::zeroed() },
+        title: String::new(),
+        icons: Vec::new(),
+        title_bar: TitleBar { handle: WinHandle(std::ptr::null_mut()) },
+        scroll_area: ScrollArea { handle: WinHandle(std::ptr::null_mut()) },
+    };
+    fence.wndproc(msg, wparam, lparam)
 }
 
 impl Fence {
     pub fn new(parent_hwnd: HWND, x: i32, y: i32) -> Self {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+
+        let hwnd_fence = unsafe {
+            CreateWindowExW(
+                0,
+                w!("Fence"),
+                std::ptr::null(),
+                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+                x,
+                y,
+                300,
+                150,
+                parent_hwnd,
+                std::ptr::null_mut(),
+                h_instance,
+                std::ptr::null(),
+            )
+        };
 
         let title = "Untitled";
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
@@ -198,11 +283,11 @@ impl Fence {
                 w!("FenceTitleBar"),
                 title_u16.as_ptr(),
                 WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
-                x,
-                y,
+                0,
+                0,
                 300,
                 TITLE_BAR_HEIGHT,
-                parent_hwnd,
+                hwnd_fence,
                 std::ptr::null_mut(),
                 h_instance,
                 std::ptr::null(),
@@ -215,11 +300,11 @@ impl Fence {
                 w!("FenceScrollArea"),
                 std::ptr::null(),
                 WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_VSCROLL,
-                x,
-                y + TITLE_BAR_HEIGHT,
+                0,
+                TITLE_BAR_HEIGHT,
                 300,
                 150 - TITLE_BAR_HEIGHT,
-                parent_hwnd,
+                hwnd_fence,
                 std::ptr::null_mut(),
                 h_instance,
                 std::ptr::null(),
@@ -227,6 +312,7 @@ impl Fence {
         };
 
         let mut fence = Self {
+            handle: WinHandle(hwnd_fence),
             rect: RECT {
                 left: x,
                 top: y,
@@ -235,8 +321,8 @@ impl Fence {
             },
             title: title.to_string(),
             icons: Vec::new(),
-            title_handle: WinHandle(hwnd_title),
-            scroll_handle: WinHandle(hwnd_scroll),
+            title_bar: TitleBar { handle: WinHandle(hwnd_title) },
+            scroll_area: ScrollArea { handle: WinHandle(hwnd_scroll) },
         };
 
         fence
@@ -274,7 +360,7 @@ impl Fence {
                     let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
                     si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
                     si.fMask = SIF_POS;
-                    unsafe { GetScrollInfo(self.scroll_handle.0, SB_VERT, &mut si) };
+                    unsafe { GetScrollInfo(self.scroll_area.handle.0, SB_VERT, &mut si) };
 
                     let rel_x = x - self.rect.left;
                     let rel_y = y - (self.rect.top + TITLE_BAR_HEIGHT) + si.nPos;
@@ -296,7 +382,7 @@ impl Fence {
         let x = 10;
         let y = 10 + (self.icons.len() as i32 * 70);
         self.icons
-            .push(Icon::new(self.scroll_handle.0, title, x, y));
+            .push(Icon::new(self.scroll_area.handle.0, title, x, y));
         self.update_scroll_info();
     }
 
@@ -309,12 +395,13 @@ impl Fence {
 
     pub fn invalidate(&self) {
         unsafe {
-            let parent = GetParent(self.title_handle.0);
+            let parent = GetParent(self.handle.0);
             if parent != std::ptr::null_mut() {
                 InvalidateRect(parent, std::ptr::null(), TRUE);
             }
-            InvalidateRect(self.title_handle.0, std::ptr::null(), TRUE);
-            InvalidateRect(self.scroll_handle.0, std::ptr::null(), TRUE);
+            InvalidateRect(self.handle.0, std::ptr::null(), TRUE);
+            InvalidateRect(self.title_bar.handle.0, std::ptr::null(), TRUE);
+            InvalidateRect(self.scroll_area.handle.0, std::ptr::null(), TRUE);
         }
     }
 
@@ -324,20 +411,30 @@ impl Fence {
 
         unsafe {
             SetWindowPos(
-                self.title_handle.0,
+                self.handle.0,
                 std::ptr::null_mut(),
                 self.rect.left,
                 self.rect.top,
+                width,
+                height,
+                SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+
+            SetWindowPos(
+                self.title_bar.handle.0,
+                std::ptr::null_mut(),
+                0,
+                0,
                 width,
                 TITLE_BAR_HEIGHT,
                 SWP_NOZORDER | SWP_NOACTIVATE,
             );
 
             SetWindowPos(
-                self.scroll_handle.0,
+                self.scroll_area.handle.0,
                 std::ptr::null_mut(),
-                self.rect.left,
-                self.rect.top + TITLE_BAR_HEIGHT,
+                0,
+                TITLE_BAR_HEIGHT,
                 width,
                 height - TITLE_BAR_HEIGHT,
                 SWP_NOZORDER | SWP_NOACTIVATE,
@@ -348,7 +445,7 @@ impl Fence {
 
     pub fn update_scroll_info(&self) {
         let mut rect: RECT = unsafe { std::mem::zeroed() };
-        unsafe { GetClientRect(self.scroll_handle.0, &mut rect) };
+        unsafe { GetClientRect(self.scroll_area.handle.0, &mut rect) };
         let view_height = rect.bottom - rect.top;
 
         let mut max_y = 0;
@@ -365,23 +462,14 @@ impl Fence {
         si.nMin = 0;
         si.nMax = content_height;
         si.nPage = view_height as u32;
-        unsafe { SetScrollInfo(self.scroll_handle.0, SB_VERT, &si, TRUE) };
+        unsafe { SetScrollInfo(self.scroll_area.handle.0, SB_VERT, &si, TRUE) };
         self.invalidate();
     }
 
     pub fn bring_to_front(&self) {
         unsafe {
             SetWindowPos(
-                self.scroll_handle.0,
-                HWND_TOP,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE,
-            );
-            SetWindowPos(
-                self.title_handle.0,
+                self.handle.0,
                 HWND_TOP,
                 0,
                 0,
@@ -397,11 +485,8 @@ impl Fence {
 impl Drop for Fence {
     fn drop(&mut self) {
         unsafe {
-            if self.title_handle.0 != std::ptr::null_mut() {
-                DestroyWindow(self.title_handle.0);
-            }
-            if self.scroll_handle.0 != std::ptr::null_mut() {
-                DestroyWindow(self.scroll_handle.0);
+            if self.handle.0 != std::ptr::null_mut() {
+                DestroyWindow(self.handle.0);
             }
         }
     }

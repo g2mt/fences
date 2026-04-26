@@ -4,7 +4,7 @@ use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-use crate::window::WinHandle;
+use crate::window::{WinHandle, Window};
 
 pub fn register_class() {
     unsafe {
@@ -18,75 +18,93 @@ pub fn register_class() {
     }
 }
 
-pub unsafe extern "system" fn icon_wndproc(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    match msg {
-        WM_NCHITTEST => HTTRANSPARENT as LRESULT,
-        WM_PAINT => {
-            let mut ps: PAINTSTRUCT = std::mem::zeroed();
-            let hdc = BeginPaint(hwnd, &mut ps);
-
-            let mut rect: RECT = std::mem::zeroed();
-            GetClientRect(hwnd, &mut rect);
-
-            let selected = GetWindowLongPtrW(hwnd, GWLP_USERDATA) != 0;
-
-            if selected {
-                let brush = CreateSolidBrush(0x00FFAA44); // Light blue
-                FillRect(hdc, &rect, brush);
-                DeleteObject(brush);
-            }
-
-            let icon_width = 32;
-            let icon_height = 32;
-            let width = rect.right - rect.left;
-
-            let hicon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
-            DrawIconEx(
-                hdc,
-                (width - icon_width) / 2,
-                0,
-                hicon,
-                icon_width,
-                icon_height,
-                0,
-                std::ptr::null_mut(),
-                DI_NORMAL,
-            );
-
-            SetBkMode(hdc, TRANSPARENT as _);
-            SetTextColor(hdc, 0x00FFFFFF); // White text
-
-            let mut title = vec![0u16; 256];
-            let len = GetWindowTextW(hwnd, title.as_mut_ptr(), 256);
-
-            let mut text_rect = rect;
-            text_rect.top += icon_height;
-            DrawTextW(
-                hdc,
-                title.as_ptr(),
-                len,
-                &mut text_rect,
-                DT_CENTER | DT_WORDBREAK | DT_NOPREFIX,
-            );
-
-            EndPaint(hwnd, &ps);
-            0
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-    }
-}
-
 pub struct Icon {
     pub title: String,
     pub x: i32,
     pub y: i32,
     pub selected: bool,
     pub handle: WinHandle,
+}
+
+impl Window for Icon {
+    fn handle(&self) -> WinHandle {
+        self.handle
+    }
+
+    fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.handle.0;
+        match msg {
+            WM_NCHITTEST => HTTRANSPARENT as LRESULT,
+            WM_PAINT => unsafe {
+                let mut ps: PAINTSTRUCT = std::mem::zeroed();
+                let hdc = BeginPaint(hwnd, &mut ps);
+
+                let mut rect: RECT = std::mem::zeroed();
+                GetClientRect(hwnd, &mut rect);
+
+                let selected = GetWindowLongPtrW(hwnd, GWLP_USERDATA) != 0;
+
+                if selected {
+                    let brush = CreateSolidBrush(0x00FFAA44); // Light blue
+                    FillRect(hdc, &rect, brush);
+                    DeleteObject(brush);
+                }
+
+                let icon_width = 32;
+                let icon_height = 32;
+                let width = rect.right - rect.left;
+
+                let hicon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
+                DrawIconEx(
+                    hdc,
+                    (width - icon_width) / 2,
+                    0,
+                    hicon,
+                    icon_width,
+                    icon_height,
+                    0,
+                    std::ptr::null_mut(),
+                    DI_NORMAL,
+                );
+
+                SetBkMode(hdc, TRANSPARENT as _);
+                SetTextColor(hdc, 0x00FFFFFF); // White text
+
+                let mut title = vec![0u16; 256];
+                let len = GetWindowTextW(hwnd, title.as_mut_ptr(), 256);
+
+                let mut text_rect = rect;
+                text_rect.top += icon_height;
+                DrawTextW(
+                    hdc,
+                    title.as_ptr(),
+                    len,
+                    &mut text_rect,
+                    DT_CENTER | DT_WORDBREAK | DT_NOPREFIX,
+                );
+
+                EndPaint(hwnd, &ps);
+                0
+            },
+            _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        }
+    }
+}
+
+pub unsafe extern "system" fn icon_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    let mut icon = Icon {
+        title: String::new(),
+        x: 0,
+        y: 0,
+        selected: false,
+        handle: WinHandle(hwnd),
+    };
+    icon.wndproc(msg, wparam, lparam)
 }
 
 impl Icon {
