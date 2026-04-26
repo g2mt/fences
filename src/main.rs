@@ -18,6 +18,13 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
         }
+        WM_MOUSEACTIVATE => MA_NOACTIVATE as LRESULT,
+        WM_LBUTTONDOWN => {
+            let x = (lparam & 0xFFFF) as i16;
+            let y = ((lparam >> 16) & 0xFFFF) as i16;
+            println!("Mouse click at: x={}, y={}", x, y);
+            0
+        }
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }
