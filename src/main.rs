@@ -32,17 +32,17 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         WM_PAINT => {
             let mut ps: PAINTSTRUCT = unsafe { std::mem::zeroed() };
             let hdc = unsafe { BeginPaint(hwnd, &mut ps) };
-            
+
             let mut rect: RECT = unsafe { std::mem::zeroed() };
             unsafe { GetClientRect(hwnd, &mut rect) };
-            
+
             let center_x = (rect.right - rect.left) / 2;
             let center_y = (rect.bottom - rect.top) / 2;
             let radius = 100;
 
             let h_brush = unsafe { CreateSolidBrush(0x000000FF) }; // Red in BGR
             let old_brush = unsafe { SelectObject(hdc, h_brush) };
-            
+
             unsafe {
                 Ellipse(
                     hdc,
