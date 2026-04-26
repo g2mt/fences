@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::sync::{Mutex, OnceLock};
 
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
@@ -20,6 +21,8 @@ struct App {
     windows: BTreeMap<HWND, RefCell<Box<dyn Window>>>,
 }
 
+static APP: OnceLock<Mutex<App>> = OnceLock::new();
+
 struct DesktopCover {
     hwnd: HWND,
 }
@@ -32,7 +35,6 @@ impl DesktopCover {
         let mut dc = Box::new(DesktopCover {
             hwnd: std::ptr::null_mut(),
         });
-        let dc_ptr = &mut *dc as *mut DesktopCover;
 
         // Create window with WS_EX_NOACTIVATE | WS_EX_LAYERED
         let hwnd = CreateWindowExW(
@@ -47,7 +49,7 @@ impl DesktopCover {
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             h_instance,
-            dc_ptr as *const _,
+            std::ptr::null_mut(), // no lpCreateParams – we will use the global map
         );
 
         if hwnd == std::ptr::null_mut() {
@@ -186,20 +188,15 @@ impl Window for DesktopCover {
 }
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    if msg == WM_NCCREATE {
-        let cs = lparam as *const CREATESTRUCTW;
-        let this = (*cs).lpCreateParams as *mut DesktopCover;
-        if !this.is_null() {
-            (*this).hwnd = hwnd;
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, this as isize);
+    // Look up the window object using the global map.
+    if let Some(app) = APP.get() {
+        if let Ok(mut guard) = app.lock() {
+            if let Some(window_refcell) = guard.windows.get(&hwnd) {
+                let mut window = window_refcell.borrow_mut();
+                return window.wndproc(msg, wparam, lparam);
+            }
         }
     }
-
-    let this = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DesktopCover;
-    if !this.is_null() {
-        return (*this).wndproc(msg, wparam, lparam);
-    }
-
     DefWindowProcW(hwnd, msg, wparam, lparam)
 }
 
@@ -225,7 +222,18 @@ fn main() {
             return;
         }
 
-        let _dc = DesktopCover::new(h_instance, class_name);
+        // Initialise the global map before creating any windows.
+        APP.get_or_init(|| Mutex::new(App { windows: BTreeMap::new() }));
+
+        let dc = DesktopCover::new(h_instance, class_name);
+        let hwnd = dc.hwnd;
+
+        // Insert the window into the global map.
+        {
+            let app = APP.get().unwrap();
+            let mut guard = app.lock().unwrap();
+            guard.windows.insert(hwnd, RefCell::new(dc));
+        }
 
         // Standard message loop
         let mut msg = std::mem::zeroed();
