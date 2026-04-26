@@ -81,7 +81,7 @@ pub unsafe extern "system" fn icon_wndproc(
     }
 }
 
-pub struct FenceIcon {
+pub struct Icon {
     pub title: String,
     pub x: i32,
     pub y: i32,
@@ -89,7 +89,7 @@ pub struct FenceIcon {
     pub handle: WinHandle,
 }
 
-impl FenceIcon {
+impl Icon {
     pub fn new(parent_hwnd: HWND, title: &str, x: i32, y: i32) -> Self {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
@@ -135,7 +135,7 @@ impl FenceIcon {
     }
 }
 
-impl Drop for FenceIcon {
+impl Drop for Icon {
     fn drop(&mut self) {
         unsafe {
             if self.handle.0 != std::ptr::null_mut() {

@@ -6,7 +6,7 @@ use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
-use icon::FenceIcon;
+use icon::Icon;
 
 use crate::window::WinHandle;
 
@@ -180,7 +180,7 @@ pub enum HitTest {
 pub struct Fence {
     pub rect: RECT,
     pub title: String,
-    pub icons: Vec<FenceIcon>,
+    pub icons: Vec<Icon>,
     pub title_handle: WinHandle,
     pub scroll_handle: WinHandle,
 }
@@ -241,7 +241,7 @@ impl Fence {
 
         fence
             .icons
-            .push(FenceIcon::new(hwnd_scroll, "Test Icon", 10, 10));
+            .push(Icon::new(hwnd_scroll, "Test Icon", 10, 10));
 
         fence.update_scroll_info();
         fence
@@ -296,7 +296,7 @@ impl Fence {
         let x = 10;
         let y = 10 + (self.icons.len() as i32 * 70);
         self.icons
-            .push(FenceIcon::new(self.scroll_handle.0, title, x, y));
+            .push(Icon::new(self.scroll_handle.0, title, x, y));
         self.update_scroll_info();
     }
 
