@@ -1,7 +1,11 @@
 use windows_sys::Win32::Foundation::RECT;
 use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::UI::WindowsAndMessaging::*;
+
+use crate::fence_icon::FenceIcon;
 
 pub const BORDER_THICKNESS: i32 = 3;
+pub const TITLE_BAR_HEIGHT: i32 = 24;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum HitTest {
@@ -19,6 +23,7 @@ pub enum HitTest {
 pub struct Fence {
     pub rect: RECT,
     pub title: String,
+    pub icons: Vec<FenceIcon>,
 }
 
 impl Fence {
@@ -31,6 +36,7 @@ impl Fence {
                 bottom: y + 150,
             },
             title: "Untitled".to_string(),
+            icons: vec![FenceIcon::new("Test Icon", 10, 10)],
         }
     }
 
@@ -74,21 +80,41 @@ impl Fence {
             let bitmap = CreateCompatibleBitmap(hdc, width, height);
             let old_bitmap = SelectObject(mem_dc, bitmap);
 
-            // Fill with gray (0x808080)
-            let brush = CreateSolidBrush(0x00808080);
-            let rect = RECT {
+            // Draw title bar (dark grey)
+            let title_brush = CreateSolidBrush(0x00404040);
+            let title_rect = RECT {
+                left: 0,
+                top: 0,
+                right: width,
+                bottom: TITLE_BAR_HEIGHT,
+            };
+            FillRect(mem_dc, &title_rect, title_brush);
+            DeleteObject(title_brush);
+
+            // Draw scroll area (lighter grey)
+            let scroll_brush = CreateSolidBrush(0x00A0A0A0);
+            let scroll_rect = RECT {
+                left: 0,
+                top: TITLE_BAR_HEIGHT,
+                right: width,
+                bottom: height,
+            };
+            FillRect(mem_dc, &scroll_rect, scroll_brush);
+            DeleteObject(scroll_brush);
+
+            // Draw edge to make it look like a control
+            let mut edge_rect = RECT {
                 left: 0,
                 top: 0,
                 right: width,
                 bottom: height,
             };
-            FillRect(mem_dc, &rect, brush);
-            DeleteObject(brush);
+            DrawEdge(mem_dc, &mut edge_rect, EDGE_RAISED, BF_RECT);
 
             let blend = BLENDFUNCTION {
                 BlendOp: AC_SRC_OVER as u8,
                 BlendFlags: 0,
-                SourceConstantAlpha: 128, // ~50% transparent
+                SourceConstantAlpha: 200, // ~78% transparent
                 AlphaFormat: 0,
             };
 
@@ -110,14 +136,24 @@ impl Fence {
             SetBkMode(hdc, TRANSPARENT as _);
             SetTextColor(hdc, 0x00FFFFFF); // White
             let title_u16: Vec<u16> = self.title.encode_utf16().collect();
-            let mut rect = self.rect;
+            let mut rect = RECT {
+                left: self.rect.left + 5,
+                top: self.rect.top,
+                right: self.rect.right,
+                bottom: self.rect.top + TITLE_BAR_HEIGHT,
+            };
             DrawTextW(
                 hdc,
                 title_u16.as_ptr(),
                 title_u16.len() as i32,
                 &mut rect as *mut RECT,
-                DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
             );
+
+            // Draw icons in the scroll area
+            for icon in &self.icons {
+                icon.draw(hdc, self.rect.left, self.rect.top + TITLE_BAR_HEIGHT);
+            }
 
             SelectObject(mem_dc, old_bitmap);
             DeleteObject(bitmap);
