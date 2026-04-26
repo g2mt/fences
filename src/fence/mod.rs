@@ -127,6 +127,10 @@ pub unsafe extern "system" fn scroll_area_wndproc(
                     std::ptr::null_mut(),
                     SW_ERASE | SW_INVALIDATE | SW_SCROLLCHILDREN,
                 );
+                let parent = GetParent(hwnd);
+                if parent != std::ptr::null_mut() {
+                    InvalidateRect(parent, std::ptr::null(), TRUE);
+                }
             }
             0
         }
@@ -303,14 +307,22 @@ impl Fence {
         self.rect.bottom += dy;
     }
 
+    pub fn invalidate(&self) {
+        unsafe {
+            let parent = GetParent(self.title_handle.0);
+            if parent != std::ptr::null_mut() {
+                InvalidateRect(parent, std::ptr::null(), TRUE);
+            }
+            InvalidateRect(self.title_handle.0, std::ptr::null(), TRUE);
+            InvalidateRect(self.scroll_handle.0, std::ptr::null(), TRUE);
+        }
+    }
+
     pub fn update_layout(&self) {
         let width = self.rect.right - self.rect.left;
         let height = self.rect.bottom - self.rect.top;
 
         unsafe {
-            let parent = GetParent(self.title_handle.0);
-            InvalidateRect(parent, std::ptr::null(), TRUE);
-
             SetWindowPos(
                 self.title_handle.0,
                 std::ptr::null_mut(),
@@ -331,6 +343,7 @@ impl Fence {
                 SWP_NOZORDER | SWP_NOACTIVATE,
             );
         }
+        self.invalidate();
         self.update_scroll_info();
     }
 
@@ -377,6 +390,7 @@ impl Fence {
                 SWP_NOMOVE | SWP_NOSIZE,
             );
         }
+        self.invalidate();
     }
 }
 
