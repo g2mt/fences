@@ -19,6 +19,8 @@ pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
 pub struct DesktopCover {
     handle: WinHandle,
     fences: Vec<Fence>,
+    dragging_idx: Option<usize>,
+    last_mouse_pos: POINT,
 }
 
 impl DesktopCover {
@@ -97,6 +99,8 @@ impl DesktopCover {
         Ok(Box::new(DesktopCover {
             handle: WinHandle(hwnd),
             fences: Vec::new(),
+            dragging_idx: None,
+            last_mouse_pos: POINT { x: 0, y: 0 },
         }))
     }
 }
@@ -142,10 +146,55 @@ impl Window for DesktopCover {
                 }
                 0
             }
+            WM_SETCURSOR => {
+                let mut pt = POINT { x: 0, y: 0 };
+                unsafe { GetCursorPos(&mut pt) };
+                unsafe { ScreenToClient(hwnd, &mut pt) };
+                
+                let over_fence = self.fences.iter().any(|f| f.contains(pt.x, pt.y));
+                if over_fence {
+                    unsafe {
+                        let cursor = LoadCursorW(std::ptr::null_mut(), IDC_SIZEALL);
+                        SetCursor(cursor);
+                    }
+                    return TRUE as LRESULT;
+                }
+                unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+            }
             WM_LBUTTONDOWN => {
-                let x = (lparam & 0xFFFF) as i16;
-                let y = ((lparam >> 16) & 0xFFFF) as i16;
-                println!("Mouse click at: x={}, y={}", x, y);
+                let x = (lparam & 0xFFFF) as i16 as i32;
+                let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
+                
+                for (i, fence) in self.fences.iter().enumerate().rev() {
+                    if fence.contains(x, y) {
+                        self.dragging_idx = Some(i);
+                        self.last_mouse_pos = POINT { x, y };
+                        unsafe { SetCapture(hwnd) };
+                        break;
+                    }
+                }
+                0
+            }
+            WM_MOUSEMOVE => {
+                if let Some(idx) = self.dragging_idx {
+                    let x = (lparam & 0xFFFF) as i16 as i32;
+                    let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
+                    
+                    let dx = x - self.last_mouse_pos.x;
+                    let dy = y - self.last_mouse_pos.y;
+                    
+                    self.fences[idx].move_by(dx, dy);
+                    self.last_mouse_pos = POINT { x, y };
+                    
+                    unsafe { InvalidateRect(hwnd, std::ptr::null(), TRUE) };
+                }
+                0
+            }
+            WM_LBUTTONUP => {
+                if self.dragging_idx.is_some() {
+                    self.dragging_idx = None;
+                    unsafe { ReleaseCapture() };
+                }
                 0
             }
             WM_USER_SHELLICON => {

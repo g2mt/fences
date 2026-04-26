@@ -17,6 +17,17 @@ impl Fence {
         }
     }
 
+    pub fn contains(&self, x: i32, y: i32) -> bool {
+        x >= self.rect.left && x < self.rect.right && y >= self.rect.top && y < self.rect.bottom
+    }
+
+    pub fn move_by(&mut self, dx: i32, dy: i32) {
+        self.rect.left += dx;
+        self.rect.right += dx;
+        self.rect.top += dy;
+        self.rect.bottom += dy;
+    }
+
     pub unsafe fn draw(&self, hdc: HDC) {
         let width = self.rect.right - self.rect.left;
         let height = self.rect.bottom - self.rect.top;
