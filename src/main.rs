@@ -150,9 +150,12 @@ fn main() {
         nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
         nid.uCallbackMessage = WM_USER_SHELLICON;
         nid.hIcon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
-        let tip = w!("Desktop Cover");
-        let len = tip.len().min(nid.szTip.len() - 1);
-        std::ptr::copy_nonoverlapping(tip, nid.szTip.as_mut_ptr(), len);
+        let tip = [
+            'D' as u16, 'e' as u16, 's' as u16, 'k' as u16, 't' as u16, 'o' as u16, 'p' as u16,
+            ' ' as u16, 'C' as u16, 'o' as u16, 'v' as u16, 'e' as u16, 'r' as u16, 0,
+        ];
+        let len = tip.len().min(nid.szTip.len());
+        nid.szTip[..len].copy_from_slice(&tip[..len]);
 
         Shell_NotifyIconW(NIM_ADD, &nid);
 
