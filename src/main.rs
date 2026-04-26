@@ -13,91 +13,120 @@ trait Window {
     fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
 }
 
-unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CLOSE => 0,
-        WM_DESTROY => {
-            let mut nid: NOTIFYICONDATAW = unsafe { std::mem::zeroed() };
-            nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
-            nid.hWnd = hwnd;
-            nid.uID = 1;
-            unsafe { Shell_NotifyIconW(NIM_DELETE, &nid) };
-            unsafe { PostQuitMessage(0) };
-            0
-        }
-        WM_WINDOWPOSCHANGING => {
-            // Force the window to stay at the bottom of the Z-order
-            let pos = lparam as *mut WINDOWPOS;
-            unsafe {
-                (*pos).hwndInsertAfter = HWND_BOTTOM;
-                DefWindowProcW(hwnd, msg, wparam, lparam)
+struct DesktopCover {
+    hwnd: HWND,
+}
+
+impl Window for DesktopCover {
+    fn hwnd(&self) -> HWND {
+        self.hwnd
+    }
+
+    fn wndproc(&mut self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.hwnd;
+        match msg {
+            WM_CLOSE => 0,
+            WM_DESTROY => {
+                let mut nid: NOTIFYICONDATAW = unsafe { std::mem::zeroed() };
+                nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
+                nid.hWnd = hwnd;
+                nid.uID = 1;
+                unsafe { Shell_NotifyIconW(NIM_DELETE, &nid) };
+                unsafe { PostQuitMessage(0) };
+                0
             }
-        }
-        WM_MOUSEACTIVATE => MA_NOACTIVATE as LRESULT,
-        WM_PAINT => {
-            let mut ps: PAINTSTRUCT = unsafe { std::mem::zeroed() };
-            let hdc = unsafe { BeginPaint(hwnd, &mut ps) };
-
-            let mut rect: RECT = unsafe { std::mem::zeroed() };
-            unsafe { GetClientRect(hwnd, &mut rect) };
-
-            let center_x = (rect.right - rect.left) / 2;
-            let center_y = (rect.bottom - rect.top) / 2;
-            let radius = 100;
-
-            let h_brush = unsafe { CreateSolidBrush(0x000000FF) }; // Red in BGR
-            let old_brush = unsafe { SelectObject(hdc, h_brush) };
-
-            unsafe {
-                Ellipse(
-                    hdc,
-                    center_x - radius,
-                    center_y - radius,
-                    center_x + radius,
-                    center_y + radius,
-                );
-                SelectObject(hdc, old_brush);
-                DeleteObject(h_brush);
-                EndPaint(hwnd, &ps);
-            }
-            0
-        }
-        WM_LBUTTONDOWN => {
-            let x = (lparam & 0xFFFF) as i16;
-            let y = ((lparam >> 16) & 0xFFFF) as i16;
-            println!("Mouse click at: x={}, y={}", x, y);
-            0
-        }
-        WM_USER_SHELLICON => {
-            if lparam as u32 == WM_RBUTTONUP || lparam as u32 == WM_LBUTTONUP {
-                let mut pt = POINT { x: 0, y: 0 };
-                unsafe { GetCursorPos(&mut pt) };
-                let h_menu = unsafe { CreatePopupMenu() };
+            WM_WINDOWPOSCHANGING => {
+                // Force the window to stay at the bottom of the Z-order
+                let pos = lparam as *mut WINDOWPOS;
                 unsafe {
-                    AppendMenuW(h_menu, MF_STRING, IDM_EXIT, w!("&Exit"));
-                    SetForegroundWindow(hwnd);
-                    TrackPopupMenu(
-                        h_menu,
-                        TPM_LEFTALIGN | TPM_RIGHTBUTTON,
-                        pt.x,
-                        pt.y,
-                        0,
-                        hwnd,
-                        std::ptr::null(),
-                    );
-                    DestroyMenu(h_menu);
+                    (*pos).hwndInsertAfter = HWND_BOTTOM;
+                    DefWindowProcW(hwnd, msg, wparam, lparam)
                 }
             }
-            0
-        }
-        WM_COMMAND => {
-            if (wparam & 0xFFFF) == IDM_EXIT {
-                unsafe { DestroyWindow(hwnd) };
+            WM_MOUSEACTIVATE => MA_NOACTIVATE as LRESULT,
+            WM_PAINT => {
+                let mut ps: PAINTSTRUCT = unsafe { std::mem::zeroed() };
+                let hdc = unsafe { BeginPaint(hwnd, &mut ps) };
+
+                let mut rect: RECT = unsafe { std::mem::zeroed() };
+                unsafe { GetClientRect(hwnd, &mut rect) };
+
+                let center_x = (rect.right - rect.left) / 2;
+                let center_y = (rect.bottom - rect.top) / 2;
+                let radius = 100;
+
+                let h_brush = unsafe { CreateSolidBrush(0x000000FF) }; // Red in BGR
+                let old_brush = unsafe { SelectObject(hdc, h_brush) };
+
+                unsafe {
+                    Ellipse(
+                        hdc,
+                        center_x - radius,
+                        center_y - radius,
+                        center_x + radius,
+                        center_y + radius,
+                    );
+                    SelectObject(hdc, old_brush);
+                    DeleteObject(h_brush);
+                    EndPaint(hwnd, &ps);
+                }
+                0
             }
-            0
+            WM_LBUTTONDOWN => {
+                let x = (lparam & 0xFFFF) as i16;
+                let y = ((lparam >> 16) & 0xFFFF) as i16;
+                println!("Mouse click at: x={}, y={}", x, y);
+                0
+            }
+            WM_USER_SHELLICON => {
+                if lparam as u32 == WM_RBUTTONUP || lparam as u32 == WM_LBUTTONUP {
+                    let mut pt = POINT { x: 0, y: 0 };
+                    unsafe { GetCursorPos(&mut pt) };
+                    let h_menu = unsafe { CreatePopupMenu() };
+                    unsafe {
+                        AppendMenuW(h_menu, MF_STRING, IDM_EXIT, w!("&Exit"));
+                        SetForegroundWindow(hwnd);
+                        TrackPopupMenu(
+                            h_menu,
+                            TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+                            pt.x,
+                            pt.y,
+                            0,
+                            hwnd,
+                            std::ptr::null(),
+                        );
+                        DestroyMenu(h_menu);
+                    }
+                }
+                0
+            }
+            WM_COMMAND => {
+                if (wparam & 0xFFFF) == IDM_EXIT {
+                    unsafe { DestroyWindow(hwnd) };
+                }
+                0
+            }
+            _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
-        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
+}
+
+unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    if msg == WM_NCCREATE {
+        let cs = lparam as *const CREATESTRUCTW;
+        let this = (*cs).lpCreateParams as *mut DesktopCover;
+        if !this.is_null() {
+            (*this).hwnd = hwnd;
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, this as isize);
+        }
+    }
+
+    let this = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DesktopCover;
+    if !this.is_null() {
+        return (*this).wndproc(msg, wparam, lparam);
+    }
+
+    DefWindowProcW(hwnd, msg, wparam, lparam)
 }
 
 fn main() {
@@ -126,6 +155,10 @@ fn main() {
         let width = GetSystemMetrics(SM_CXSCREEN);
         let height = GetSystemMetrics(SM_CYSCREEN);
 
+        let mut desktop_cover = DesktopCover {
+            hwnd: std::ptr::null_mut(),
+        };
+
         // Create a borderless window (WS_POPUP) that doesn't steal focus (WS_EX_NOACTIVATE)
         // and supports transparency (WS_EX_LAYERED)
         let hwnd = CreateWindowExW(
@@ -140,7 +173,7 @@ fn main() {
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             h_instance,
-            std::ptr::null(),
+            &mut desktop_cover as *mut _ as *const _,
         );
 
         if hwnd == std::ptr::null_mut() {
