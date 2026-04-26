@@ -95,6 +95,330 @@ impl DesktopCover {
             },
         )
     }
+
+    fn on_destroy(&self) -> LRESULT {
+        let hwnd = self.base().handle();
+        let mut nid: NOTIFYICONDATAW = unsafe { std::mem::zeroed() };
+        nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
+        nid.hWnd = hwnd;
+        nid.uID = 1;
+        unsafe {
+            Shell_NotifyIconW(NIM_DELETE, &nid);
+            PostQuitMessage(0);
+        }
+        0
+    }
+
+    fn on_window_pos_changing(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().handle();
+        let pos = lparam as *mut WINDOWPOS;
+        unsafe {
+            (*pos).hwndInsertAfter = HWND_BOTTOM;
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+    }
+
+    fn on_paint(&self) -> LRESULT {
+        let hwnd = self.base().handle();
+        let mut ps: PAINTSTRUCT = unsafe { std::mem::zeroed() };
+        unsafe {
+            let hdc = BeginPaint(hwnd, &mut ps);
+            let mut rect: RECT = std::mem::zeroed();
+            GetClientRect(hwnd, &mut rect);
+            let brush = CreateSolidBrush(0x00000000);
+            FillRect(hdc, &rect, brush);
+            DeleteObject(brush);
+            EndPaint(hwnd, &ps);
+        }
+        0
+    }
+
+    fn on_set_cursor(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().handle();
+        let mut pt = POINT { x: 0, y: 0 };
+        unsafe { GetCursorPos(&mut pt) };
+        unsafe { ScreenToClient(hwnd, &mut pt) };
+
+        let inner = self.inner.lock().unwrap();
+        for fence in inner.fences.iter().rev() {
+            if let Some(hit) = fence.hit_test(pt.x, pt.y) {
+                let cursor_id = match hit {
+                    HitTest::TitleBar => IDC_SIZEALL,
+                    HitTest::Client | HitTest::Icon(_) => IDC_ARROW,
+                    HitTest::Left | HitTest::Right => IDC_SIZEWE,
+                    HitTest::Top | HitTest::Bottom => IDC_SIZENS,
+                    HitTest::TopLeft | HitTest::BottomRight => IDC_SIZENWSE,
+                    HitTest::TopRight | HitTest::BottomLeft => IDC_SIZENESW,
+                };
+                unsafe {
+                    let cursor = LoadCursorW(std::ptr::null_mut(), cursor_id);
+                    SetCursor(cursor);
+                }
+                return TRUE as LRESULT;
+            }
+        }
+        unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+    }
+
+    fn on_lbutton_dblclk(&self, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().handle();
+        let x = (lparam & 0xFFFF) as i16 as i32;
+        let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
+
+        let mut hit_icon = false;
+        {
+            let inner = self.inner.lock().unwrap();
+            for fence in inner.fences.iter().rev() {
+                if let Some(HitTest::Icon(_)) = fence.hit_test(x, y) {
+                    hit_icon = true;
+                    break;
+                }
+            }
+        }
+
+        if hit_icon {
+            unsafe {
+                MessageBoxW(
+                    hwnd,
+                    w!("Clicked"),
+                    w!("Test"),
+                    MB_OK | MB_ICONINFORMATION,
+                );
+            }
+        }
+        0
+    }
+
+    fn on_lbutton_down(&self, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().handle();
+        let x = (lparam & 0xFFFF) as i16 as i32;
+        let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
+
+        let mut inner = self.inner.lock().unwrap();
+        let mut hit_idx = None;
+        for (i, fence) in inner.fences.iter().enumerate().rev() {
+            if let Some(hit) = fence.hit_test(x, y) {
+                hit_idx = Some((i, hit));
+                break;
+            }
+        }
+
+        for fence in &inner.fences {
+            fence.clear_selection();
+        }
+
+        if let Some((idx, hit)) = hit_idx {
+            let fence = inner.fences.remove(idx);
+
+            if let HitTest::Icon(icon_idx) = hit {
+                fence.select_icon(icon_idx);
+            }
+
+            fence.bring_to_front();
+            inner.fences.push(fence);
+
+            match hit {
+                HitTest::Client | HitTest::Icon(_) => {
+                    inner.hit_type = None;
+                }
+                _ => {
+                    inner.hit_type = Some(hit);
+                    inner.last_mouse_pos = POINT { x, y };
+                    unsafe {
+                        SetCapture(hwnd);
+                    };
+                }
+            }
+        }
+        0
+    }
+
+    fn on_mouse_move(&self, lparam: LPARAM) -> LRESULT {
+        let mut inner = self.inner.lock().unwrap();
+        if let Some(hit_type) = inner.hit_type {
+            let x = (lparam & 0xFFFF) as i16 as i32;
+            let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
+
+            let dx = x - inner.last_mouse_pos.x;
+            let dy = y - inner.last_mouse_pos.y;
+
+            if let Some(fence) = inner.fences.last() {
+                match hit_type {
+                    HitTest::TitleBar => fence.move_by(dx, dy),
+                    HitTest::Left => fence.resize(-dx, 0, dx, 0),
+                    HitTest::Right => fence.resize(0, 0, dx, 0),
+                    HitTest::Top => fence.resize(0, -dy, 0, dy),
+                    HitTest::Bottom => fence.resize(0, 0, 0, dy),
+                    HitTest::TopLeft => fence.resize(-dx, -dy, dx, dy),
+                    HitTest::TopRight => fence.resize(0, -dy, dx, dy),
+                    HitTest::BottomLeft => fence.resize(-dx, 0, dx, dy),
+                    HitTest::BottomRight => fence.resize(0, 0, dx, dy),
+                    _ => {}
+                }
+            }
+
+            inner.last_mouse_pos = POINT { x, y };
+        }
+        0
+    }
+
+    fn on_lbutton_up(&self) -> LRESULT {
+        let mut inner = self.inner.lock().unwrap();
+        if inner.hit_type.is_some() {
+            inner.hit_type = None;
+            unsafe { ReleaseCapture() };
+        }
+        0
+    }
+
+    fn on_rbutton_up(&self, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().handle();
+        let x = (lparam & 0xFFFF) as i16 as i32;
+        let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
+
+        let mut hit_idx = None;
+        {
+            let inner = self.inner.lock().unwrap();
+            for (i, fence) in inner.fences.iter().enumerate().rev() {
+                if let Some(hit) = fence.hit_test(x, y) {
+                    hit_idx = Some((i, hit));
+                    break;
+                }
+            }
+        }
+
+        if let Some((idx, hit)) = hit_idx {
+            {
+                let mut inner = self.inner.lock().unwrap();
+                let fence = inner.fences.remove(idx);
+
+                fence.clear_selection();
+                if let HitTest::Icon(icon_idx) = hit {
+                    fence.select_icon(icon_idx);
+                }
+
+                fence.bring_to_front();
+                inner.fences.push(fence);
+
+                inner.context_target = Some((inner.fences.len() - 1, hit));
+            }
+
+            let mut pt = POINT { x, y };
+            unsafe { ClientToScreen(hwnd, &mut pt) };
+            let h_menu = unsafe { CreatePopupMenu() };
+
+            unsafe {
+                if let HitTest::Icon(_) = hit {
+                    AppendMenuW(h_menu, MF_STRING, IDM_RUN_ICON, w!("&Run"));
+                    AppendMenuW(h_menu, MF_STRING, IDM_DELETE_ICON, w!("&Delete"));
+                } else {
+                    AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
+                    AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
+                }
+                SetForegroundWindow(hwnd);
+                TrackPopupMenu(
+                    h_menu,
+                    TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+                    pt.x,
+                    pt.y,
+                    0,
+                    hwnd,
+                    std::ptr::null(),
+                );
+                DestroyMenu(h_menu);
+            }
+        }
+        0
+    }
+
+    fn on_shell_icon(&self, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().handle();
+        if lparam as u32 == WM_RBUTTONUP || lparam as u32 == WM_LBUTTONUP {
+            let mut pt = POINT { x: 0, y: 0 };
+            unsafe { GetCursorPos(&mut pt) };
+            let h_menu = unsafe { CreatePopupMenu() };
+            unsafe {
+                AppendMenuW(h_menu, MF_STRING, IDM_ADD_FENCE, w!("&Add fence"));
+                AppendMenuW(h_menu, MF_STRING, IDM_EXIT, w!("&Exit"));
+                SetForegroundWindow(hwnd);
+                TrackPopupMenu(
+                    h_menu,
+                    TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+                    pt.x,
+                    pt.y,
+                    0,
+                    hwnd,
+                    std::ptr::null(),
+                );
+                DestroyMenu(h_menu);
+            }
+        }
+        0
+    }
+
+    fn on_command(&self, wparam: WPARAM) -> LRESULT {
+        let hwnd = self.base().handle();
+        let command = wparam & 0xFFFF;
+        let context_target;
+        {
+            let mut inner = self.inner.lock().unwrap();
+            context_target = inner.context_target.take();
+        }
+
+        match command {
+            IDM_EXIT => unsafe {
+                DestroyWindow(hwnd);
+            },
+            IDM_ADD_FENCE => {
+                let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+                let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+                if let Ok(fence) = Fence::new(hwnd, width / 2 - 150, height / 2 - 75) {
+                    let mut inner = self.inner.lock().unwrap();
+                    inner.fences.push(fence);
+                }
+            }
+            IDM_ADD_ICON => {
+                if let Some((fence_idx, _)) = context_target {
+                    let inner = self.inner.lock().unwrap();
+                    if let Some(fence) = inner.fences.get(fence_idx) {
+                        let title = format!("Icon #{}", fence.icon_count());
+                        fence.add_icon(&title);
+                    }
+                }
+            }
+            IDM_DELETE_FENCE => {
+                if let Some((fence_idx, _)) = context_target {
+                    let result = unsafe {
+                        MessageBoxW(
+                            hwnd,
+                            w!("Are you sure you want to delete this fence?"),
+                            w!("Confirm Deletion"),
+                            MB_YESNO | MB_ICONQUESTION,
+                        )
+                    };
+                    if result == IDYES {
+                        let mut inner = self.inner.lock().unwrap();
+                        if fence_idx < inner.fences.len() {
+                            inner.fences.remove(fence_idx);
+                        }
+                    }
+                }
+            }
+            IDM_RUN_ICON => unsafe {
+                MessageBoxW(hwnd, w!("Clicked"), w!("Test"), MB_OK | MB_ICONINFORMATION);
+            },
+            IDM_DELETE_ICON => {
+                if let Some((fence_idx, HitTest::Icon(icon_idx))) = context_target {
+                    let inner = self.inner.lock().unwrap();
+                    if let Some(fence) = inner.fences.get(fence_idx) {
+                        fence.remove_icon(icon_idx);
+                    }
+                }
+            }
+            _ => {}
+        }
+        0
+    }
 }
 
 impl Window for DesktopCover {
@@ -106,309 +430,18 @@ impl Window for DesktopCover {
         let hwnd = self.base().handle();
         match msg {
             WM_CLOSE => 0,
-            WM_DESTROY => {
-                let mut nid: NOTIFYICONDATAW = unsafe { std::mem::zeroed() };
-                nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
-                nid.hWnd = hwnd;
-                nid.uID = 1;
-                unsafe { Shell_NotifyIconW(NIM_DELETE, &nid) };
-                unsafe { PostQuitMessage(0) };
-                0
-            }
-            WM_WINDOWPOSCHANGING => {
-                let pos = lparam as *mut WINDOWPOS;
-                unsafe {
-                    (*pos).hwndInsertAfter = HWND_BOTTOM;
-                    DefWindowProcW(hwnd, msg, wparam, lparam)
-                }
-            }
+            WM_DESTROY => self.on_destroy(),
+            WM_WINDOWPOSCHANGING => self.on_window_pos_changing(msg, wparam, lparam),
             WM_MOUSEACTIVATE => MA_NOACTIVATE as LRESULT,
-            WM_PAINT => {
-                let mut ps: PAINTSTRUCT = unsafe { std::mem::zeroed() };
-                unsafe {
-                    let hdc = BeginPaint(hwnd, &mut ps);
-                    let mut rect: RECT = std::mem::zeroed();
-                    GetClientRect(hwnd, &mut rect);
-                    let brush = CreateSolidBrush(0x00000000);
-                    FillRect(hdc, &rect, brush);
-                    DeleteObject(brush);
-                    EndPaint(hwnd, &ps);
-                }
-                0
-            }
-            WM_SETCURSOR => {
-                let mut pt = POINT { x: 0, y: 0 };
-                unsafe { GetCursorPos(&mut pt) };
-                unsafe { ScreenToClient(hwnd, &mut pt) };
-
-                let inner = self.inner.lock().unwrap();
-                for fence in inner.fences.iter().rev() {
-                    if let Some(hit) = fence.hit_test(pt.x, pt.y) {
-                        let cursor_id = match hit {
-                            HitTest::TitleBar => IDC_SIZEALL,
-                            HitTest::Client | HitTest::Icon(_) => IDC_ARROW,
-                            HitTest::Left | HitTest::Right => IDC_SIZEWE,
-                            HitTest::Top | HitTest::Bottom => IDC_SIZENS,
-                            HitTest::TopLeft | HitTest::BottomRight => IDC_SIZENWSE,
-                            HitTest::TopRight | HitTest::BottomLeft => IDC_SIZENESW,
-                        };
-                        unsafe {
-                            let cursor = LoadCursorW(std::ptr::null_mut(), cursor_id);
-                            SetCursor(cursor);
-                        }
-                        return TRUE as LRESULT;
-                    }
-                }
-                unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
-            }
-            WM_LBUTTONDBLCLK => {
-                let x = (lparam & 0xFFFF) as i16 as i32;
-                let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
-
-                let mut hit_icon = false;
-                {
-                    let inner = self.inner.lock().unwrap();
-                    for fence in inner.fences.iter().rev() {
-                        if let Some(HitTest::Icon(_)) = fence.hit_test(x, y) {
-                            hit_icon = true;
-                            break;
-                        }
-                    }
-                }
-
-                if hit_icon {
-                    unsafe {
-                        MessageBoxW(
-                            hwnd,
-                            w!("Clicked"),
-                            w!("Test"),
-                            MB_OK | MB_ICONINFORMATION,
-                        );
-                    }
-                }
-                0
-            }
-            WM_LBUTTONDOWN => {
-                let x = (lparam & 0xFFFF) as i16 as i32;
-                let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
-
-                let mut inner = self.inner.lock().unwrap();
-                let mut hit_idx = None;
-                for (i, fence) in inner.fences.iter().enumerate().rev() {
-                    if let Some(hit) = fence.hit_test(x, y) {
-                        hit_idx = Some((i, hit));
-                        break;
-                    }
-                }
-
-                for fence in &inner.fences {
-                    fence.clear_selection();
-                }
-
-                if let Some((idx, hit)) = hit_idx {
-                    let fence = inner.fences.remove(idx);
-
-                    if let HitTest::Icon(icon_idx) = hit {
-                        fence.select_icon(icon_idx);
-                    }
-
-                    fence.bring_to_front();
-                    inner.fences.push(fence);
-
-                    match hit {
-                        HitTest::Client | HitTest::Icon(_) => {
-                            inner.hit_type = None;
-                        }
-                        _ => {
-                            inner.hit_type = Some(hit);
-                            inner.last_mouse_pos = POINT { x, y };
-                            unsafe {
-                                SetCapture(hwnd);
-                            };
-                        }
-                    }
-                }
-                0
-            }
-            WM_MOUSEMOVE => {
-                let mut inner = self.inner.lock().unwrap();
-                if let Some(hit_type) = inner.hit_type {
-                    let x = (lparam & 0xFFFF) as i16 as i32;
-                    let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
-
-                    let dx = x - inner.last_mouse_pos.x;
-                    let dy = y - inner.last_mouse_pos.y;
-
-                    if let Some(fence) = inner.fences.last() {
-                        match hit_type {
-                            HitTest::TitleBar => fence.move_by(dx, dy),
-                            HitTest::Left => fence.resize(-dx, 0, dx, 0),
-                            HitTest::Right => fence.resize(0, 0, dx, 0),
-                            HitTest::Top => fence.resize(0, -dy, 0, dy),
-                            HitTest::Bottom => fence.resize(0, 0, 0, dy),
-                            HitTest::TopLeft => fence.resize(-dx, -dy, dx, dy),
-                            HitTest::TopRight => fence.resize(0, -dy, dx, dy),
-                            HitTest::BottomLeft => fence.resize(-dx, 0, dx, dy),
-                            HitTest::BottomRight => fence.resize(0, 0, dx, dy),
-                            _ => {}
-                        }
-                    }
-
-                    inner.last_mouse_pos = POINT { x, y };
-                }
-                0
-            }
-            WM_LBUTTONUP => {
-                let mut inner = self.inner.lock().unwrap();
-                if inner.hit_type.is_some() {
-                    inner.hit_type = None;
-                    unsafe { ReleaseCapture() };
-                }
-                0
-            }
-            WM_RBUTTONUP => {
-                let x = (lparam & 0xFFFF) as i16 as i32;
-                let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
-
-                let mut hit_idx = None;
-                {
-                    let inner = self.inner.lock().unwrap();
-                    for (i, fence) in inner.fences.iter().enumerate().rev() {
-                        if let Some(hit) = fence.hit_test(x, y) {
-                            hit_idx = Some((i, hit));
-                            break;
-                        }
-                    }
-                }
-
-                if let Some((idx, hit)) = hit_idx {
-                    {
-                        let mut inner = self.inner.lock().unwrap();
-                        let fence = inner.fences.remove(idx);
-
-                        fence.clear_selection();
-                        if let HitTest::Icon(icon_idx) = hit {
-                            fence.select_icon(icon_idx);
-                        }
-
-                        fence.bring_to_front();
-                        inner.fences.push(fence);
-
-                        inner.context_target = Some((inner.fences.len() - 1, hit));
-                    }
-
-                    let mut pt = POINT { x, y };
-                    unsafe { ClientToScreen(hwnd, &mut pt) };
-                    let h_menu = unsafe { CreatePopupMenu() };
-
-                    unsafe {
-                        if let HitTest::Icon(_) = hit {
-                            AppendMenuW(h_menu, MF_STRING, IDM_RUN_ICON, w!("&Run"));
-                            AppendMenuW(h_menu, MF_STRING, IDM_DELETE_ICON, w!("&Delete"));
-                        } else {
-                            AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
-                            AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
-                        }
-                        SetForegroundWindow(hwnd);
-                        TrackPopupMenu(
-                            h_menu,
-                            TPM_LEFTALIGN | TPM_RIGHTBUTTON,
-                            pt.x,
-                            pt.y,
-                            0,
-                            hwnd,
-                            std::ptr::null(),
-                        );
-                        DestroyMenu(h_menu);
-                    }
-                }
-                0
-            }
-            WM_USER_SHELLICON => {
-                if lparam as u32 == WM_RBUTTONUP || lparam as u32 == WM_LBUTTONUP {
-                    let mut pt = POINT { x: 0, y: 0 };
-                    unsafe { GetCursorPos(&mut pt) };
-                    let h_menu = unsafe { CreatePopupMenu() };
-                    unsafe {
-                        AppendMenuW(h_menu, MF_STRING, IDM_ADD_FENCE, w!("&Add fence"));
-                        AppendMenuW(h_menu, MF_STRING, IDM_EXIT, w!("&Exit"));
-                        SetForegroundWindow(hwnd);
-                        TrackPopupMenu(
-                            h_menu,
-                            TPM_LEFTALIGN | TPM_RIGHTBUTTON,
-                            pt.x,
-                            pt.y,
-                            0,
-                            hwnd,
-                            std::ptr::null(),
-                        );
-                        DestroyMenu(h_menu);
-                    }
-                }
-                0
-            }
-            WM_COMMAND => {
-                let command = wparam & 0xFFFF;
-                let context_target;
-                {
-                    let mut inner = self.inner.lock().unwrap();
-                    context_target = inner.context_target.take();
-                }
-
-                match command {
-                    IDM_EXIT => unsafe {
-                        DestroyWindow(hwnd);
-                    },
-                    IDM_ADD_FENCE => {
-                        let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
-                        let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
-                        if let Ok(fence) = Fence::new(hwnd, width / 2 - 150, height / 2 - 75) {
-                            let mut inner = self.inner.lock().unwrap();
-                            inner.fences.push(fence);
-                        }
-                    }
-                    IDM_ADD_ICON => {
-                        if let Some((fence_idx, _)) = context_target {
-                            let inner = self.inner.lock().unwrap();
-                            if let Some(fence) = inner.fences.get(fence_idx) {
-                                let title = format!("Icon #{}", fence.icon_count());
-                                fence.add_icon(&title);
-                            }
-                        }
-                    }
-                    IDM_DELETE_FENCE => {
-                        if let Some((fence_idx, _)) = context_target {
-                            let result = unsafe {
-                                MessageBoxW(
-                                    hwnd,
-                                    w!("Are you sure you want to delete this fence?"),
-                                    w!("Confirm Deletion"),
-                                    MB_YESNO | MB_ICONQUESTION,
-                                )
-                            };
-                            if result == IDYES {
-                                let mut inner = self.inner.lock().unwrap();
-                                if fence_idx < inner.fences.len() {
-                                    inner.fences.remove(fence_idx);
-                                }
-                            }
-                        }
-                    }
-                    IDM_RUN_ICON => unsafe {
-                        MessageBoxW(hwnd, w!("Clicked"), w!("Test"), MB_OK | MB_ICONINFORMATION);
-                    },
-                    IDM_DELETE_ICON => {
-                        if let Some((fence_idx, HitTest::Icon(icon_idx))) = context_target {
-                            let inner = self.inner.lock().unwrap();
-                            if let Some(fence) = inner.fences.get(fence_idx) {
-                                fence.remove_icon(icon_idx);
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-                0
-            }
+            WM_PAINT => self.on_paint(),
+            WM_SETCURSOR => self.on_set_cursor(msg, wparam, lparam),
+            WM_LBUTTONDBLCLK => self.on_lbutton_dblclk(lparam),
+            WM_LBUTTONDOWN => self.on_lbutton_down(lparam),
+            WM_MOUSEMOVE => self.on_mouse_move(lparam),
+            WM_LBUTTONUP => self.on_lbutton_up(),
+            WM_RBUTTONUP => self.on_rbutton_up(lparam),
+            WM_USER_SHELLICON => self.on_shell_icon(lparam),
+            WM_COMMAND => self.on_command(wparam),
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
     }
