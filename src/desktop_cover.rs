@@ -165,18 +165,25 @@ impl Window for DesktopCover {
                 let x = (lparam & 0xFFFF) as i16 as i32;
                 let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
-                let inner = self.inner.lock().unwrap();
-                for fence in inner.fences.iter().rev() {
-                    if let Some(HitTest::Icon(_)) = fence.hit_test(x, y) {
-                        unsafe {
-                            MessageBoxW(
-                                hwnd,
-                                w!("Clicked"),
-                                w!("Test"),
-                                MB_OK | MB_ICONINFORMATION,
-                            );
+                let mut hit_icon = false;
+                {
+                    let inner = self.inner.lock().unwrap();
+                    for fence in inner.fences.iter().rev() {
+                        if let Some(HitTest::Icon(_)) = fence.hit_test(x, y) {
+                            hit_icon = true;
+                            break;
                         }
-                        break;
+                    }
+                }
+
+                if hit_icon {
+                    unsafe {
+                        MessageBoxW(
+                            hwnd,
+                            w!("Clicked"),
+                            w!("Test"),
+                            MB_OK | MB_ICONINFORMATION,
+                        );
                     }
                 }
                 0
@@ -263,31 +270,36 @@ impl Window for DesktopCover {
                 let x = (lparam & 0xFFFF) as i16 as i32;
                 let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
-                let mut inner = self.inner.lock().unwrap();
                 let mut hit_idx = None;
-                for (i, fence) in inner.fences.iter().enumerate().rev() {
-                    if let Some(hit) = fence.hit_test(x, y) {
-                        hit_idx = Some((i, hit));
-                        break;
+                {
+                    let inner = self.inner.lock().unwrap();
+                    for (i, fence) in inner.fences.iter().enumerate().rev() {
+                        if let Some(hit) = fence.hit_test(x, y) {
+                            hit_idx = Some((i, hit));
+                            break;
+                        }
                     }
                 }
 
                 if let Some((idx, hit)) = hit_idx {
-                    let fence = inner.fences.remove(idx);
+                    {
+                        let mut inner = self.inner.lock().unwrap();
+                        let fence = inner.fences.remove(idx);
 
-                    fence.clear_selection();
-                    if let HitTest::Icon(icon_idx) = hit {
-                        fence.select_icon(icon_idx);
+                        fence.clear_selection();
+                        if let HitTest::Icon(icon_idx) = hit {
+                            fence.select_icon(icon_idx);
+                        }
+
+                        fence.bring_to_front();
+                        inner.fences.push(fence);
+
+                        inner.context_target = Some((inner.fences.len() - 1, hit));
                     }
-
-                    fence.bring_to_front();
-                    inner.fences.push(fence);
 
                     let mut pt = POINT { x, y };
                     unsafe { ClientToScreen(hwnd, &mut pt) };
                     let h_menu = unsafe { CreatePopupMenu() };
-
-                    inner.context_target = Some((inner.fences.len() - 1, hit));
 
                     unsafe {
                         if let HitTest::Icon(_) = hit {
@@ -336,8 +348,14 @@ impl Window for DesktopCover {
                 0
             }
             WM_COMMAND => {
-                let mut inner = self.inner.lock().unwrap();
-                match wparam & 0xFFFF {
+                let command = wparam & 0xFFFF;
+                let context_target;
+                {
+                    let mut inner = self.inner.lock().unwrap();
+                    context_target = inner.context_target.take();
+                }
+
+                match command {
                     IDM_EXIT => unsafe {
                         DestroyWindow(hwnd);
                     },
@@ -345,11 +363,13 @@ impl Window for DesktopCover {
                         let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
                         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
                         if let Ok(fence) = Fence::new(hwnd, width / 2 - 150, height / 2 - 75) {
+                            let mut inner = self.inner.lock().unwrap();
                             inner.fences.push(fence);
                         }
                     }
                     IDM_ADD_ICON => {
-                        if let Some((fence_idx, _)) = inner.context_target {
+                        if let Some((fence_idx, _)) = context_target {
+                            let inner = self.inner.lock().unwrap();
                             if let Some(fence) = inner.fences.get(fence_idx) {
                                 let title = format!("Icon #{}", fence.icon_count());
                                 fence.add_icon(&title);
@@ -357,7 +377,7 @@ impl Window for DesktopCover {
                         }
                     }
                     IDM_DELETE_FENCE => {
-                        if let Some((fence_idx, _)) = inner.context_target {
+                        if let Some((fence_idx, _)) = context_target {
                             let result = unsafe {
                                 MessageBoxW(
                                     hwnd,
@@ -367,6 +387,7 @@ impl Window for DesktopCover {
                                 )
                             };
                             if result == IDYES {
+                                let mut inner = self.inner.lock().unwrap();
                                 if fence_idx < inner.fences.len() {
                                     inner.fences.remove(fence_idx);
                                 }
@@ -377,7 +398,8 @@ impl Window for DesktopCover {
                         MessageBoxW(hwnd, w!("Clicked"), w!("Test"), MB_OK | MB_ICONINFORMATION);
                     },
                     IDM_DELETE_ICON => {
-                        if let Some((fence_idx, HitTest::Icon(icon_idx))) = inner.context_target {
+                        if let Some((fence_idx, HitTest::Icon(icon_idx))) = context_target {
+                            let inner = self.inner.lock().unwrap();
                             if let Some(fence) = inner.fences.get(fence_idx) {
                                 fence.remove_icon(icon_idx);
                             }
@@ -385,7 +407,6 @@ impl Window for DesktopCover {
                     }
                     _ => {}
                 }
-                inner.context_target = None;
                 0
             }
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
