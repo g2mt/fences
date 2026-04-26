@@ -362,41 +362,25 @@ impl Fence {
             let x = padding + col * (icon_size + spacing);
             let y = padding + row * (icon_size + spacing);
 
-            icon.set_pos(x, y);
+            icon.base().resize_to(x, y, icon_size, icon_size);
         }
         drop(inner);
         self.update_scroll_info();
     }
 
-    pub fn set_rect(&self, dl: i32, dt: i32, dr: i32, db: i32) {
-        self.base.set_rect(dl, dt, dr, db);
+    pub fn resize(&self, dl: i32, dt: i32, dr: i32, db: i32) {
+        self.base.resize_by(dl, dt, dr, db);
 
         let rect = self.base.rect();
         let width = rect.right - rect.left;
         let height = rect.bottom - rect.top;
 
-        self.title_bar.base().set_rect(0, 0, 0, 0); // Sync internal rect if needed, but here we just use SetWindowPos for children
-        unsafe {
-            SetWindowPos(
-                self.title_bar.base().handle(),
-                std::ptr::null_mut(),
-                0,
-                0,
-                width,
-                TITLE_BAR_HEIGHT,
-                SWP_NOZORDER | SWP_NOACTIVATE,
-            );
-
-            SetWindowPos(
-                self.scroll_area.base().handle(),
-                std::ptr::null_mut(),
-                0,
-                TITLE_BAR_HEIGHT,
-                width,
-                height - TITLE_BAR_HEIGHT,
-                SWP_NOZORDER | SWP_NOACTIVATE,
-            );
-        }
+        self.title_bar
+            .base()
+            .resize_to(0, 0, width, TITLE_BAR_HEIGHT);
+        self.scroll_area
+            .base()
+            .resize_to(0, TITLE_BAR_HEIGHT, width, height - TITLE_BAR_HEIGHT);
         self.reflow_icons();
     }
 

@@ -169,16 +169,10 @@ impl Base {
         *self.rect.lock().unwrap()
     }
 
-    pub fn set_rect(&self, dl: i32, dt: i32, dr: i32, db: i32) {
-        let mut rect = self.rect.lock().unwrap();
-        rect.left += dl;
-        rect.top += dt;
-        rect.right += dr;
-        rect.bottom += db;
-
+    fn set_window_pos(&self) {
+        let rect = self.rect.lock().unwrap();
         let width = rect.right - rect.left;
         let height = rect.bottom - rect.top;
-
         unsafe {
             SetWindowPos(
                 self.hwnd,
@@ -190,6 +184,27 @@ impl Base {
                 SWP_NOZORDER | SWP_NOACTIVATE,
             );
         }
+    }
+
+    pub fn resize_to(&self, left: i32, top: i32, right: i32, bottom: i32) {
+        *self.rect.lock().unwrap() = RECT {
+            left,
+            top,
+            right,
+            bottom,
+        };
+        self.set_window_pos();
+    }
+
+    pub fn resize_by(&self, dl: i32, dt: i32, dr: i32, db: i32) {
+        {
+            let mut rect = self.rect.lock().unwrap();
+            rect.left += dl;
+            rect.top += dt;
+            rect.right += dr;
+            rect.bottom += db;
+        }
+        self.set_window_pos();
     }
 }
 
