@@ -28,7 +28,7 @@ fn main() -> Result<()> {
         )
         .init();
 
-    let r: Result<()> = {
+    let r: Result<()> = (|| {
         info!("Starting Desktop Cover");
 
         unsafe {
@@ -39,12 +39,12 @@ fn main() -> Result<()> {
                 DispatchMessageW(&msg);
             }
             info!("Message loop stopped");
-            cover.save_state()?;
+            cover.save_state();
             std::mem::drop(cover); // dropped at the end of program
         }
 
         Ok(())
-    };
+    })();
     if let Err(e) = r {
         error!("{}", e.to_string());
         Err(e)

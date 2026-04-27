@@ -1,9 +1,9 @@
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use tracing::{info, warn, error};
+use serde::{Deserialize, Serialize};
+use tracing::{error, info, warn};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -107,12 +107,7 @@ impl DesktopCover {
                     let msg = format!("Failed to load state: {}", e);
                     let msg_u16: Vec<u16> = msg.encode_utf16().chain(std::iter::once(0)).collect();
                     unsafe {
-                        MessageBoxW(
-                            hwnd,
-                            msg_u16.as_ptr(),
-                            w!("Error"),
-                            MB_OK | MB_ICONERROR,
-                        );
+                        MessageBoxW(hwnd, msg_u16.as_ptr(), w!("Error"), MB_OK | MB_ICONERROR);
                     }
                 }
 
@@ -121,16 +116,25 @@ impl DesktopCover {
         )
     }
 
-    pub fn save_state(&self) -> Result<()> {
-        let inner = self.inner.lock().unwrap();
-        let state = AppState {
-            fences: inner.fences.iter().map(|f| f.get_state()).collect(),
-        };
-        let path = paths::get_state_path()?;
-        let json = serde_json::to_string_pretty(&state)?;
-        std::fs::write(&path, json)?;
-        info!("State saved to {:?}", path);
-        Ok(())
+    pub fn save_state(&self) {
+        let r: Result<PathBuf> = (|| {
+            let inner = self.inner.lock().unwrap();
+            let state = AppState {
+                fences: inner.fences.iter().map(|f| f.get_state()).collect(),
+            };
+            let path = paths::get_state_path()?;
+            let json = serde_json::to_string_pretty(&state)?;
+            std::fs::write(&path, json)?;
+            Ok(path)
+        })();
+        match r {
+            Ok(path) => {
+                info!("State saved to {:?}", path);
+            }
+            Err(e) => {
+                error!("{}", e.to_string());
+            }
+        }
     }
 
     fn load_state(&self) -> Result<()> {
