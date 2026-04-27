@@ -269,7 +269,7 @@ impl DesktopCover {
                 fence.select_icon(icon_idx);
             }
 
-            fence.bring_to_front();
+            fence.base().bring_to_front();
             inner.fences.push(fence);
 
             match hit {
@@ -360,7 +360,7 @@ impl DesktopCover {
                     fence.select_icon(icon_idx);
                 }
 
-                fence.bring_to_front();
+                fence.base().bring_to_front();
                 inner.fences.push(fence);
 
                 inner.hit_type = Some(hit);

@@ -367,6 +367,11 @@ impl Fence {
         Some(hit)
     }
 
+    pub fn set_title(&self, title: &str) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.title = title.to_string();
+    }
+
     pub fn add_icon(&self, title: &str) {
         self.add_icon_with_path(title, None);
     }
@@ -546,20 +551,6 @@ impl Fence {
         si.nPage = view_height as u32;
         unsafe { SetScrollInfo(self.scroll_area.base().handle(), SB_VERT, &si, TRUE) };
         drop(inner);
-    }
-
-    pub fn bring_to_front(&self) {
-        unsafe {
-            SetWindowPos(
-                self.base().handle(),
-                HWND_TOP,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE,
-            );
-        }
     }
 }
 

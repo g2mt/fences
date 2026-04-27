@@ -237,6 +237,12 @@ impl Base {
             )
         }
     }
+
+    pub fn bring_to_front(&self) {
+        unsafe {
+            SetWindowPos(self.hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        }
+    }
 }
 
 impl Drop for Base {
