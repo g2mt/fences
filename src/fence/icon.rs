@@ -69,15 +69,14 @@ impl Icon {
         rel_x >= rect.left && rel_x < rect.right && rel_y >= rect.top && rel_y < rect.bottom
     }
 
-    pub fn title(&self) -> String {
-        self.state.lock().unwrap().title.to_string()
+    pub fn title(&self) -> Arc<str> {
+        self.state.lock().unwrap().title.clone()
     }
 
-    pub fn set_title(&self, title: String) {
-        let title_clone = title.clone();
+    pub fn set_title(&self, title: Arc<str>) {
         {
             let mut s = self.state.lock().unwrap();
-            s.title = Arc::from(title_clone);
+            s.title = title.clone();
         }
         // Update window text
         let hwnd = self.base.hwnd();
@@ -88,13 +87,13 @@ impl Icon {
         self.base.redraw();
     }
 
-    pub fn path(&self) -> Option<String> {
+    pub fn path(&self) -> Option<Arc<str>> {
         self.state
             .lock()
             .unwrap()
             .path
             .as_ref()
-            .map(|arc| arc.to_string())
+            .map(|arc| arc.clone())
     }
 }
 
