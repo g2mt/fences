@@ -279,6 +279,9 @@ impl DesktopCover {
             }
 
             self.base.redraw();
+            for fence in &inner.fences {
+                fence.base().redraw();
+            }
             APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
             inner.last_mouse_pos = POINT { x, y };
         }
