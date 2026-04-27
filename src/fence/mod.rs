@@ -123,10 +123,10 @@ impl ScrollArea {
 
     pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
         Area::new(
-            0,
+            BORDER_THICKNESS,
             TITLE_BAR_HEIGHT,
-            fence_area.width,
-            fence_area.height - TITLE_BAR_HEIGHT,
+            fence_area.width - (BORDER_THICKNESS * 2),
+            fence_area.height - TITLE_BAR_HEIGHT - BORDER_THICKNESS,
         )
     }
 }
