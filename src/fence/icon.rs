@@ -100,6 +100,10 @@ impl Icon {
     pub fn run(&self) {
         #[cfg(windows)]
         use std::os::windows::process::CommandExt;
+
+        #[cfg(windows)]
+        use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
+
         if let Some(path) = self.path() {
             info!("Running {}", path);
             let mut command = Command::new("cmd");

@@ -4,7 +4,10 @@ use anyhow::Result;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::UI::Shell::*;
 
-pub fn get_config_dir() -> Result<PathBuf> {
+pub static LOG_PATH: &'static str = "log.txt";
+pub static STATE_PATH: &'static str = "state.json";
+
+pub fn app_dir() -> Result<PathBuf> {
     let mut path = vec![0u16; MAX_PATH as usize];
     unsafe {
         if SHGetSpecialFolderPathW(
@@ -32,14 +35,8 @@ pub fn get_config_dir() -> Result<PathBuf> {
     Ok(config_path)
 }
 
-pub fn get_log_path() -> Result<PathBuf> {
-    let mut path = get_config_dir()?;
-    path.push("log.txt");
-    Ok(path)
-}
-
-pub fn get_state_path() -> Result<PathBuf> {
-    let mut path = get_config_dir()?;
-    path.push("state.json");
+pub fn app_file(file: &str) -> Result<PathBuf> {
+    let mut path = app_dir()?;
+    path.push(file);
     Ok(path)
 }

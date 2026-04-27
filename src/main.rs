@@ -17,6 +17,7 @@ mod window;
 use crate::app::APP;
 use crate::config::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
+use crate::paths::{app_file, LOG_PATH};
 
 fn main() -> Result<()> {
     APP.get_or_init(|| app::App {
@@ -24,7 +25,7 @@ fn main() -> Result<()> {
         save_thread: OnceLock::new(),
     });
 
-    let log_path = paths::get_log_path()?;
+    let log_path = app_file(LOG_PATH)?;
     let file = std::fs::OpenOptions::new()
         .create(true)
         .write(true)

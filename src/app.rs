@@ -6,7 +6,7 @@ use tracing::{info, warn};
 use crate::config::save_thread::SaveThread;
 use crate::config::state::AppState;
 use crate::desktop_cover::DesktopCover;
-use crate::paths;
+use crate::paths::{app_file, STATE_PATH};
 
 pub struct App {
     pub cover: OnceLock<Arc<DesktopCover>>,
@@ -23,7 +23,7 @@ impl App {
     pub fn save_state(&self) -> Result<()> {
         let cover = self.cover.get().unwrap();
         let state = cover.state();
-        let path = paths::get_state_path()?;
+        let path = app_file(STATE_PATH)?;
         let json = serde_json::to_string_pretty(&state)?;
         std::fs::write(&path, json)?;
         info!("State saved to {:?}", path);
@@ -31,7 +31,7 @@ impl App {
     }
 
     pub fn load_state(&self) -> Result<()> {
-        let path = paths::get_state_path()?;
+        let path = app_file(STATE_PATH)?;
         if !path.exists() {
             warn!("No state file found at {:?}", path);
             return Ok(());
