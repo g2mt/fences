@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use icon::Icon;
 
 use crate::fence::icon::ICON_SIZE;
+use crate::geo::Area;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub const BORDER_THICKNESS: i32 = 3;
@@ -24,17 +25,22 @@ pub struct TitleBar {
 }
 
 impl TitleBar {
-    pub fn new(parent_hwnd: HWND, title: *const u16, width: i32) -> Result<Arc<Self>> {
+    pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
+        Area::new(0, 0, fence_area.width, TITLE_BAR_HEIGHT)
+    }
+
+    pub fn new(parent_hwnd: HWND, title: *const u16, fence_area: &Area<i32>) -> Result<Arc<Self>> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        let area = Self::area_from_fence_area(fence_area);
         Base::create_window(
             0,
             register_classname(w!("FenceTitleBar")),
             title,
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-            0,
-            0,
-            width,
-            TITLE_BAR_HEIGHT,
+            area.x,
+            area.y,
+            area.width,
+            area.height,
             parent_hwnd,
             std::ptr::null_mut(),
             h_instance,
@@ -96,17 +102,27 @@ pub struct ScrollArea {
 }
 
 impl ScrollArea {
-    pub fn new(parent_hwnd: HWND, width: i32, height: i32) -> Result<Arc<Self>> {
+    pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
+        Area::new(
+            0,
+            TITLE_BAR_HEIGHT,
+            fence_area.width,
+            fence_area.height - TITLE_BAR_HEIGHT,
+        )
+    }
+
+    pub fn new(parent_hwnd: HWND, fence_area: &Area<i32>) -> Result<Arc<Self>> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        let area = Self::area_from_fence_area(fence_area);
         Base::create_window(
             0,
             register_classname(w!("FenceScrollArea")),
             std::ptr::null(),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_VSCROLL,
-            0,
-            TITLE_BAR_HEIGHT,
-            width,
-            height - TITLE_BAR_HEIGHT,
+            area.x,
+            area.y,
+            area.width,
+            area.height,
             parent_hwnd,
             std::ptr::null_mut(),
             h_instance,
@@ -247,8 +263,9 @@ impl Fence {
             std::ptr::null_mut(),
             h_instance,
             |base| {
-                let title_bar = TitleBar::new(base.handle(), title_u16.as_ptr(), 300)?;
-                let scroll_area = ScrollArea::new(base.handle(), 300, 150)?;
+                let fence_area = Area::new(x, y, 300, 150);
+                let title_bar = TitleBar::new(base.handle(), title_u16.as_ptr(), &fence_area)?;
+                let scroll_area = ScrollArea::new(base.handle(), &fence_area)?;
 
                 let fence = Arc::new(Self {
                     base,
@@ -373,23 +390,33 @@ impl Fence {
         self.base.add_area(dl, dt, dw, dh);
 
         let bounds = self.base.area();
-        let width = bounds.width.load(Ordering::Relaxed);
-        let height = bounds.height.load(Ordering::Relaxed);
+        let fence_area = Area::new(
+            bounds.x.load(Ordering::Relaxed),
+            bounds.y.load(Ordering::Relaxed),
+            bounds.width.load(Ordering::Relaxed),
+            bounds.height.load(Ordering::Relaxed),
+        );
+
+        let title_area = TitleBar::area_from_fence_area(&fence_area);
+        let scroll_area = ScrollArea::area_from_fence_area(&fence_area);
 
         unsafe {
             let mut hdwp = BeginDeferWindowPos(2);
             if hdwp.is_null() {
                 panic!("hdwp is null");
             }
-            hdwp = self
-                .title_bar
-                .base()
-                .resize_to_deferred(0, 0, width, TITLE_BAR_HEIGHT, hdwp);
+            hdwp = self.title_bar.base().resize_to_deferred(
+                title_area.x,
+                title_area.y,
+                title_area.width,
+                title_area.height,
+                hdwp,
+            );
             hdwp = self.scroll_area.base().resize_to_deferred(
-                0,
-                TITLE_BAR_HEIGHT,
-                width,
-                height - TITLE_BAR_HEIGHT,
+                scroll_area.x,
+                scroll_area.y,
+                scroll_area.width,
+                scroll_area.height,
                 hdwp,
             );
             EndDeferWindowPos(hdwp);
