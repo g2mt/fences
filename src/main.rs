@@ -4,37 +4,43 @@ use tracing_subscriber::prelude::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod desktop_cover;
-mod paths;
 mod fence;
 mod geo;
+mod paths;
 mod window;
 
 use crate::desktop_cover::DesktopCover;
 
 fn main() -> Result<()> {
     let log_path = paths::get_log_path()?;
-    let file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_path)?;
+    let file = std::fs::OpenOptions::new().create(true).open(log_path)?;
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
         .with(tracing_subscriber::fmt::layer().with_writer(file))
         .init();
 
-    info!("Starting Desktop Cover");
+    let r: Result<()> = {
+        info!("Starting Desktop Cover");
 
-    unsafe {
-        let cover = DesktopCover::new()?;
-        let mut msg = std::mem::zeroed();
-        while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
+        unsafe {
+            let cover = DesktopCover::new()?;
+            let mut msg = std::mem::zeroed();
+            while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+            info!("Message loop stopped");
+            cover.save_state()?;
+            std::mem::drop(cover); // dropped at the end of program
         }
-        info!("Message loop stopped");
-        cover.save_state()?;
-        std::mem::drop(cover); // dropped at the end of program
+
+        Ok(())
+    };
+    if let Err(e) = r {
+        error!("{}", e.to_string());
+        Err(e)
+    } else {
+        Ok(())
     }
-    Ok(())
 }
