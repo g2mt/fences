@@ -434,6 +434,7 @@ impl DesktopCover {
             hit_type = inner.hit_type.take();
         }
 
+        let mut should_save = false;
         match command {
             IDM_EXIT => unsafe {
                 DestroyWindow(hwnd);
@@ -445,12 +446,14 @@ impl DesktopCover {
                     let mut inner = self.inner.lock().unwrap();
                     inner.fences.push(fence);
                 }
+                should_save = true;
             }
             IDM_ADD_FENCE_FROM_FOLDER => {
                 if let Ok(fence) = Fence::from_folder_selector(hwnd) {
                     let mut inner = self.inner.lock().unwrap();
                     inner.fences.push(fence);
                 }
+                should_save = true;
             }
             IDM_ADD_ICON => {
                 let inner = self.inner.lock().unwrap();
@@ -458,6 +461,7 @@ impl DesktopCover {
                     let title = format!("Icon #{}", fence.icon_count());
                     fence.add_icon(&title);
                 }
+                should_save = true;
             }
             IDM_DELETE_FENCE => {
                 let result = unsafe {
@@ -472,6 +476,7 @@ impl DesktopCover {
                     let mut inner = self.inner.lock().unwrap();
                     inner.fences.pop();
                 }
+                should_save = true;
             }
             IDM_RUN_ICON => unsafe {
                 MessageBoxW(hwnd, w!("Clicked"), w!("Test"), MB_OK | MB_ICONINFORMATION);
@@ -483,10 +488,11 @@ impl DesktopCover {
                         fence.remove_icon(icon_idx);
                     }
                 }
+                should_save = true;
             }
             _ => {}
         }
-        if let Some(save_thread) = self.save_thread.get() {
+        if should_save && let Some(save_thread) = self.save_thread.get() {
             save_thread.set_unsaved();
         }
         0
