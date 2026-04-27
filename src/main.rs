@@ -54,10 +54,8 @@ fn main() -> Result<()> {
             }
             info!("Message loop stopped");
         }
-        if let Some(app) = APP.get() {
-            if let Err(e) = app.save_state() {
-                error!("{}", e.to_string());
-            }
+        if let Err(e) = APP.get().unwrap().save_state() {
+            error!("{}", e.to_string());
         }
 
         Ok(())

@@ -11,6 +11,10 @@ pub struct App {
     pub cover: OnceLock<Arc<DesktopCover>>,
 }
 
+/// Assume that the APP is always initialized and use the following to get the App:
+/// ```
+/// APP.get().unwrap()
+/// ```
 pub static APP: OnceLock<App> = OnceLock::new();
 
 impl App {
