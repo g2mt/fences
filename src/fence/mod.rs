@@ -6,6 +6,7 @@ use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use icon::Icon;
@@ -362,18 +363,18 @@ impl Fence {
             let x = FENCE_PADDING + col * (ICON_SIZE + FENCE_SPACING);
             let y = FENCE_PADDING + row * (ICON_SIZE + FENCE_SPACING);
 
-            icon.base().resize_to(x, y, x + ICON_SIZE, y + ICON_SIZE);
+            icon.base().resize_to(x, y, ICON_SIZE, ICON_SIZE);
         }
         drop(inner);
         self.update_scroll_info();
     }
 
-    pub fn resize_by(&self, dl: i32, dt: i32, dr: i32, db: i32) {
-        self.base.resize_by(dl, dt, dr, db);
+    pub fn add_bounds(&self, dl: i32, dt: i32, dw: i32, dh: i32) {
+        self.base.add_bounds(dl, dt, dw, dh);
 
-        let rect = self.base.rect();
-        let width = rect.right - rect.left;
-        let height = rect.bottom - rect.top;
+        let bounds = self.base.bounds();
+        let width = bounds.width.load(Ordering::Relaxed);
+        let height = bounds.height.load(Ordering::Relaxed);
 
         self.title_bar
             .base()

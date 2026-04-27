@@ -64,6 +64,7 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
 
 // Base
 
+#[derive(Clone)]
 pub struct WindowRect {
     pub x: AtomicI32,
     pub y: AtomicI32,
@@ -89,7 +90,7 @@ impl WindowRect {
 pub struct Base {
     hwnd: HWND,
     window: OnceLock<Arc<dyn Window>>,
-    rect: WindowRect,
+    bounds: WindowRect,
 }
 
 unsafe impl Sync for Base {}
@@ -152,7 +153,7 @@ impl Base {
         let mut self_ref = Box::into_pin(Box::new(Self {
             hwnd: std::ptr::null_mut(),
             window: OnceLock::new(),
-            rect: WindowRect {
+            bounds: WindowRect {
                 x: AtomicI32::new(x),
                 y: AtomicI32::new(y),
                 width: AtomicI32::new(nwidth),
@@ -189,15 +190,19 @@ impl Base {
         self.hwnd
     }
 
+    pub fn bounds(&self) -> WindowRect {
+        self.bounds.clone()
+    }
+
     pub fn rect(&self) -> RECT {
-        self.rect.to_rect()
+        self.bounds.to_rect()
     }
 
     fn set_window_pos(&self) {
-        let x = self.rect.x.load(Ordering::Relaxed);
-        let y = self.rect.y.load(Ordering::Relaxed);
-        let width = self.rect.width.load(Ordering::Relaxed);
-        let height = self.rect.height.load(Ordering::Relaxed);
+        let x = self.bounds.x.load(Ordering::Relaxed);
+        let y = self.bounds.y.load(Ordering::Relaxed);
+        let width = self.bounds.width.load(Ordering::Relaxed);
+        let height = self.bounds.height.load(Ordering::Relaxed);
         unsafe {
             SetWindowPos(
                 self.hwnd,
@@ -211,19 +216,25 @@ impl Base {
         }
     }
 
-    pub fn resize_to(&self, left: i32, top: i32, right: i32, bottom: i32) {
-        self.rect.x.store(left, Ordering::Relaxed);
-        self.rect.y.store(top, Ordering::Relaxed);
-        self.rect.width.store(right - left, Ordering::Relaxed);
-        self.rect.height.store(bottom - top, Ordering::Relaxed);
+    pub fn move_by(&self, dl: i32, dt: i32) {
+        self.bounds.x.fetch_add(dl, Ordering::Relaxed);
+        self.bounds.y.fetch_add(dt, Ordering::Relaxed);
         self.set_window_pos();
     }
 
-    pub fn resize_by(&self, dl: i32, dt: i32, dr: i32, db: i32) {
-        self.rect.x.fetch_add(dl, Ordering::Relaxed);
-        self.rect.y.fetch_add(dt, Ordering::Relaxed);
-        self.rect.width.fetch_add(dr - dl, Ordering::Relaxed);
-        self.rect.height.fetch_add(db - dt, Ordering::Relaxed);
+    pub fn resize_to(&self, left: i32, top: i32, width: i32, height: i32) {
+        self.bounds.x.store(left, Ordering::Relaxed);
+        self.bounds.y.store(top, Ordering::Relaxed);
+        self.bounds.width.store(width, Ordering::Relaxed);
+        self.bounds.height.store(height, Ordering::Relaxed);
+        self.set_window_pos();
+    }
+
+    pub fn add_bounds(&self, dl: i32, dt: i32, dw: i32, dh: i32) {
+        self.bounds.x.fetch_add(dl, Ordering::Relaxed);
+        self.bounds.y.fetch_add(dt, Ordering::Relaxed);
+        self.bounds.width.fetch_add(dw, Ordering::Relaxed);
+        self.bounds.height.fetch_add(dh, Ordering::Relaxed);
         self.set_window_pos();
     }
 }
