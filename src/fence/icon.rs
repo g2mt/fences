@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
+use tracing::info;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -105,6 +106,7 @@ impl Icon {
     pub fn run(&self) {
         let path = self.path();
         if let Some(path) = path {
+            info!("Running {}", path);
             let _ = std::process::Command::new("cmd")
                 .args(["/C", "start", "", &path])
                 .creation_flags(0x08000000) // CREATE_NO_WINDOW

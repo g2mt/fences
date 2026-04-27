@@ -499,7 +499,14 @@ impl DesktopCover {
                 should_save = true;
             }
             IDM_RUN_ICON => unsafe {
-                MessageBoxW(hwnd, w!("Clicked"), w!("Test"), MB_OK | MB_ICONINFORMATION);
+                if let Some(HitTest::Icon(icon_idx)) = hit_type {
+                    let inner = self.inner.lock().unwrap();
+                    if let Some(fence) = inner.fences.last() {
+                        if let Some(icon) = fence.icon_by_index(icon_idx) {
+                            icon.run();
+                        }
+                    }
+                }
             },
             IDM_RENAME_ICON => {
                 if let Some(HitTest::Icon(icon_idx)) = hit_type {
@@ -530,7 +537,7 @@ impl DesktopCover {
                     let inner = self.inner.lock().unwrap();
                     if let Some(fence) = inner.fences.last() {
                         if let Some(icon) = fence.icon_by_index(icon_idx) {
-                            icon.set_path_from_selector();
+                            icon.set_info_from_selector();
                         }
                     }
                 }
