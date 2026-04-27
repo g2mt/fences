@@ -11,8 +11,8 @@ use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::core::*;
 
-use crate::app_state::AppState;
-use crate::app_state::save_thread::SaveThread;
+use crate::config::AppState;
+use crate::config::save_thread::SaveThread;
 use crate::fence::{Fence, HitTest};
 use crate::window::{Base, BaseRef, Window, register_classname};
 use crate::{paths, prompt};

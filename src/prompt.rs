@@ -1,11 +1,11 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use tracing::error;
-use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 const ID_EDIT: u32 = 101;
 const ID_OK: u32 = 1;
@@ -205,10 +205,6 @@ pub fn prompt_input(title: &str, message: &str, default: &str) -> Option<String>
         // Retrieve result
         let data = Box::from_raw(data_ptr);
         let result = data.ok_clicked.load(Ordering::SeqCst);
-        if result {
-            data.result
-        } else {
-            None
-        }
+        if result { data.result } else { None }
     }
 }
