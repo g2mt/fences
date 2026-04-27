@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use tracing::error;
+use tracing::{error, info};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -12,31 +12,30 @@ const ID_OK: u32 = 1;
 const ID_CANCEL: u32 = 2;
 
 struct InputDialogData {
+    message_utf16: Vec<u16>,
     edit_hwnd: HWND,
     result: Option<String>,
     ok_clicked: AtomicBool,
 }
 
-unsafe extern "system" fn input_proc(
+unsafe extern "system" fn input_wndproc(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    info!("msg={} {:x} {:x}", msg, wparam, lparam);
     match msg {
-        WM_INITDIALOG => unsafe {
+        WM_NCCREATE => unsafe {
             // Store the InputDialogData pointer passed through lParam
             let data = &mut *(lparam as *mut InputDialogData);
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, data as *mut InputDialogData as isize);
 
             // Create a static message label
-            let message = "Enter new name:";
-            let message_utf16: Vec<u16> =
-                message.encode_utf16().chain(std::iter::once(0)).collect();
             CreateWindowExW(
                 0,
                 w!("STATIC"),
-                message_utf16.as_ptr(),
+                data.message_utf16.as_ptr(),
                 WS_VISIBLE | WS_CHILD,
                 10,
                 10,
@@ -103,6 +102,12 @@ unsafe extern "system" fn input_proc(
                     default.encode_utf16().chain(std::iter::once(0)).collect();
                 SetWindowTextW(edit, default_utf16.as_ptr());
             }
+
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        },
+        WM_DESTROY => unsafe {
+            PostQuitMessage(0);
+            0
         },
         WM_COMMAND => unsafe {
             let id = (wparam as u32) & 0xFFFF;
@@ -127,19 +132,21 @@ unsafe extern "system" fn input_proc(
                     _ => {}
                 }
             }
+            0
         },
-        WM_DESTROY => unsafe {
-            PostQuitMessage(0);
-        },
-        _ => {}
+        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
-    0
 }
 
 static CLASS_REGISTERED: AtomicBool = AtomicBool::new(false);
 
 /// Shows a modal input dialog. Returns `None` if the user cancelled, otherwise `Some(String)`.
-pub fn prompt_input(title: &str, _message: &str, default: &str) -> Option<String> {
+pub fn prompt_input(
+    parent_hwnd: HWND,
+    title: &str,
+    message: &str,
+    default: &str,
+) -> Option<String> {
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
 
@@ -150,20 +157,21 @@ pub fn prompt_input(title: &str, _message: &str, default: &str) -> Option<String
         {
             let mut wc: WNDCLASSW = std::mem::zeroed();
             wc.style = CS_HREDRAW | CS_VREDRAW;
-            wc.lpfnWndProc = Some(input_proc);
+            wc.lpfnWndProc = Some(input_wndproc);
             wc.hInstance = h_instance;
             wc.hbrBackground = (COLOR_BTNFACE + 1) as HBRUSH;
             wc.lpszClassName = w!("InputDialogClass");
             let atom = RegisterClassW(&wc);
             if atom == 0 {
                 // Fallback: return default as stub
-                error!("prompt_input: atom == 0");
+                error!("atom == 0");
                 return Some(default.to_string());
             }
         }
 
         // Prepare data
         let data_ptr = Box::into_raw(Box::new(InputDialogData {
+            message_utf16: message.encode_utf16().chain(std::iter::once(0)).collect(),
             edit_hwnd: std::ptr::null_mut(),
             result: Some(default.to_string()),
             ok_clicked: AtomicBool::new(false),
@@ -172,7 +180,7 @@ pub fn prompt_input(title: &str, _message: &str, default: &str) -> Option<String
         // Create the dialog window
         let title_utf16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
         let hwnd = CreateWindowExW(
-            0,
+            WS_EX_CLIENTEDGE,
             w!("InputDialogClass"),
             title_utf16.as_ptr(),
             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
@@ -180,25 +188,27 @@ pub fn prompt_input(title: &str, _message: &str, default: &str) -> Option<String
             CW_USEDEFAULT,
             240,
             150,
-            std::ptr::null_mut(),
+            parent_hwnd,
             std::ptr::null_mut(),
             h_instance,
             data_ptr as *mut std::ffi::c_void,
         );
         if hwnd == std::ptr::null_mut() {
-            error!("prompt_input: hwnd == null");
+            error!("hwnd == null, {}", GetLastError());
             return Some(default.to_string());
         }
 
         // Show and run modal loop
         ShowWindow(hwnd, SW_SHOWNORMAL);
         UpdateWindow(hwnd);
+        info!("start event loop");
 
         let mut msg: MSG = std::mem::zeroed();
-        while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) != 0 {
+        while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
+        info!("returned from event loop");
 
         // Retrieve result
         let data = Box::from_raw(data_ptr);
