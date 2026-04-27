@@ -25,10 +25,6 @@ pub struct TitleBar {
 }
 
 impl TitleBar {
-    pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
-        Area::new(0, 0, fence_area.width, TITLE_BAR_HEIGHT)
-    }
-
     pub fn new(parent_hwnd: HWND, title: *const u16, fence_area: &Area<i32>) -> Result<Arc<Self>> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
         let area = Self::area_from_fence_area(fence_area);
@@ -46,6 +42,10 @@ impl TitleBar {
             h_instance,
             |base| Ok(Arc::new(Self { base })),
         )
+    }
+
+    pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
+        Area::new(0, 0, fence_area.width, TITLE_BAR_HEIGHT)
     }
 }
 
@@ -102,15 +102,6 @@ pub struct ScrollArea {
 }
 
 impl ScrollArea {
-    pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
-        Area::new(
-            0,
-            TITLE_BAR_HEIGHT,
-            fence_area.width,
-            fence_area.height - TITLE_BAR_HEIGHT,
-        )
-    }
-
     pub fn new(parent_hwnd: HWND, fence_area: &Area<i32>) -> Result<Arc<Self>> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
         let area = Self::area_from_fence_area(fence_area);
@@ -127,6 +118,15 @@ impl ScrollArea {
             std::ptr::null_mut(),
             h_instance,
             |base| Ok(Arc::new(Self { base })),
+        )
+    }
+
+    pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
+        Area::new(
+            0,
+            TITLE_BAR_HEIGHT,
+            fence_area.width,
+            fence_area.height - TITLE_BAR_HEIGHT,
         )
     }
 }
