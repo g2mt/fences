@@ -13,7 +13,10 @@ use crate::desktop_cover::DesktopCover;
 
 fn main() -> Result<()> {
     let log_path = paths::get_log_path()?;
-    let file = std::fs::OpenOptions::new().create(true).open(log_path)?;
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(log_path)?;
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
