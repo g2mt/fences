@@ -382,11 +382,6 @@ impl Fence {
             .base()
             .resize_to(0, TITLE_BAR_HEIGHT, width, height - TITLE_BAR_HEIGHT);
 
-        unsafe {
-            InvalidateRect(self.title_bar.base().handle(), std::ptr::null(), TRUE);
-            InvalidateRect(self.scroll_area.base().handle(), std::ptr::null(), TRUE);
-        }
-
         self.reflow_icons();
     }
 
