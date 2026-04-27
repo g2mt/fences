@@ -72,9 +72,7 @@ impl Icon {
 
     pub fn set_title(&mut self, title: String) {
         self.title = title;
-        unsafe {
-            InvalidateRect(self.base.hwnd(), std::ptr::null(), TRUE);
-        }
+        self.base.redraw();
     }
 
     pub fn path(&self) -> Option<&String> {

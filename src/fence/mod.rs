@@ -370,6 +370,7 @@ impl Fence {
     pub fn set_title(&self, title: &str) {
         let mut inner = self.inner.lock().unwrap();
         inner.title = title.to_string();
+        self.base.redraw();
     }
 
     pub fn add_icon(&self, title: &str) {
@@ -378,13 +379,9 @@ impl Fence {
 
     pub fn add_icon_with_path(&self, title: &str, path: Option<&str>) {
         let mut inner = self.inner.lock().unwrap();
-        inner.icons.push(Icon::new(
-            self.scroll_area.base().hwnd(),
-            title,
-            path,
-            0,
-            0,
-        ));
+        inner
+            .icons
+            .push(Icon::new(self.scroll_area.base().hwnd(), title, path, 0, 0));
         drop(inner);
         self.reflow_icons();
     }
