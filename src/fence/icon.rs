@@ -96,7 +96,7 @@ impl Icon {
     }
 
     pub fn set_path(&self, path: Option<Arc<str>>) {
-        std::mem::replace(&mut self.state.lock().unwrap().path, path);
+        let _ = std::mem::replace(&mut self.state.lock().unwrap().path, path);
         self.base.redraw();
     }
 }
