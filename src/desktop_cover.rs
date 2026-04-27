@@ -101,6 +101,7 @@ impl DesktopCover {
                     }),
                 });
 
+                cover.update_layered_window();
                 Ok(cover)
             },
         )
