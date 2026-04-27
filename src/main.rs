@@ -3,6 +3,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod desktop_cover;
 mod fence;
+mod geo;
 mod window;
 
 use crate::desktop_cover::DesktopCover;

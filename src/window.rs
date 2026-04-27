@@ -9,6 +9,8 @@ use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
+use crate::geo::Area;
+
 // Class names
 
 static REGISTERED_CLASSNAMES: LazyLock<Mutex<HashSet<ClassName>>> =
@@ -64,32 +66,10 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
 
 // Base
 
-pub struct WindowArea {
-    pub x: AtomicI32,
-    pub y: AtomicI32,
-    pub width: AtomicI32,
-    pub height: AtomicI32,
-}
-
-impl WindowArea {
-    pub fn to_rect(&self) -> RECT {
-        let x = self.x.load(Ordering::Relaxed);
-        let y = self.y.load(Ordering::Relaxed);
-        let w = self.width.load(Ordering::Relaxed);
-        let h = self.height.load(Ordering::Relaxed);
-        RECT {
-            left: x,
-            top: y,
-            right: x + w,
-            bottom: y + h,
-        }
-    }
-}
-
 pub struct Base {
     hwnd: HWND,
     window: OnceLock<Arc<dyn Window>>,
-    area: WindowArea,
+    area: Area<AtomicI32>,
 }
 
 unsafe impl Sync for Base {}
@@ -152,12 +132,7 @@ impl Base {
         let mut self_ref = Box::into_pin(Box::new(Self {
             hwnd: std::ptr::null_mut(),
             window: OnceLock::new(),
-            area: WindowArea {
-                x: AtomicI32::new(x),
-                y: AtomicI32::new(y),
-                width: AtomicI32::new(nwidth),
-                height: AtomicI32::new(nheight),
-            },
+            area: Area::new(x, y, nwidth, nheight),
         }));
         let hwnd = unsafe {
             CreateWindowExW(
@@ -189,12 +164,12 @@ impl Base {
         self.hwnd
     }
 
-    pub fn area(&self) -> &WindowArea {
+    pub fn area(&self) -> &Area<AtomicI32> {
         &self.area
     }
 
     pub fn rect(&self) -> RECT {
-        self.area.to_rect()
+        (&self.area).into()
     }
 
     fn set_window_pos(&self) {
