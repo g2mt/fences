@@ -7,6 +7,7 @@ use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::Win32::UI::Controls::Dialogs::*;
 
 use crate::window::{register_classname, Base, BaseRef, Window};
 
@@ -98,6 +99,29 @@ impl Icon {
     pub fn set_path(&self, path: Option<Arc<str>>) {
         let _ = std::mem::replace(&mut self.state.lock().unwrap().path, path);
         self.base.redraw();
+    }
+
+    pub fn set_path_from_selector(&self) {
+        let mut file_buf = [0u16; MAX_PATH as usize];
+        let mut ofn: OPENFILENAMEW = unsafe { std::mem::zeroed() };
+        ofn.lStructSize = std::mem::size_of::<OPENFILENAMEW>() as u32;
+        ofn.hwndOwner = self.base.hwnd();
+        ofn.lpstrFile = file_buf.as_mut_ptr();
+        ofn.nMaxFile = MAX_PATH;
+        ofn.lpstrFilter = w!("All Files\0*.*\0\0");
+        ofn.nFilterIndex = 1;
+        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+        if unsafe { GetOpenFileNameW(&mut ofn) } != 0 {
+            let path_str = String::from_utf16_lossy(
+                &file_buf[..file_buf.iter().position(|&c| c == 0).unwrap_or(0)],
+            );
+            let path = std::path::Path::new(&path_str);
+            if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
+                self.set_title(Arc::from(name));
+            }
+            self.set_path(Some(Arc::from(path_str)));
+        }
     }
 }
 
