@@ -16,6 +16,7 @@ fn main() -> Result<()> {
     let file = std::fs::OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(log_path)?;
 
     tracing_subscriber::registry()
