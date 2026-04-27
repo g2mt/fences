@@ -2,13 +2,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub const ICON_SIZE: i32 = 64;
 
@@ -166,15 +166,17 @@ impl Window for Icon {
                 SetBkMode(hdc, TRANSPARENT as _);
                 SetTextColor(hdc, 0x00FFFFFF); // White text
 
-                let mut title = vec![0u16; 256];
-                let len = GetWindowTextW(hwnd, title.as_mut_ptr(), 256);
-
+                let title_utf16: Vec<u16> = self
+                    .title()
+                    .encode_utf16()
+                    .chain(std::iter::once(0))
+                    .collect();
                 let mut text_rect = rect;
                 text_rect.top += icon_height;
                 DrawTextW(
                     hdc,
-                    title.as_ptr(),
-                    len,
+                    title_utf16.as_ptr(),
+                    title_utf16.len() as _,
                     &mut text_rect,
                     DT_CENTER | DT_WORDBREAK | DT_NOPREFIX,
                 );
