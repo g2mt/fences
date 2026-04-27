@@ -506,7 +506,7 @@ impl DesktopCover {
                             let current_title = icon.title();
                             // TODO: Implement real input dialog
                             let new_title = format!("Renamed {}", current_title);
-                            icon.set_title(new_title);
+                            icon.set_title(new_title.into());
                             unsafe {
                                 MessageBoxW(hwnd, w!("Icon renamed"), w!("Rename"), MB_OK);
                             }

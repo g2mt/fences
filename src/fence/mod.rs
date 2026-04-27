@@ -315,8 +315,8 @@ impl Fence {
                 .icons
                 .iter()
                 .map(|i| IconState {
-                    title: i.title().to_string(),
-                    path: i.path().cloned(),
+                    title: i.title(),
+                    path: i.path(),
                 })
                 .collect(),
         }
@@ -470,8 +470,8 @@ impl Fence {
         }
     }
 
-    pub fn icon_by_index(&self, index: usize) -> Option<&Arc<Icon>> {
-        self.inner.lock().unwrap().icons.get(index)
+    pub fn icon_by_index(&self, index: usize) -> Option<Arc<Icon>> {
+        self.inner.lock().unwrap().icons.get(index).cloned()
     }
 
     pub fn reflow_icons(&self) {
