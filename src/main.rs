@@ -45,7 +45,7 @@ fn main() -> Result<()> {
         let cover = DesktopCover::new()?;
         APP.get().unwrap().cover.get_or_init(|| cover.clone());
         let save_thread = SaveThread::new();
-        APP.get().unwrap().set_save_thread(save_thread);
+        APP.get().unwrap().save_thread.set(save_thread);
         unsafe {
             let mut msg = std::mem::zeroed();
             while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {

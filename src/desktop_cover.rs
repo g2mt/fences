@@ -2,19 +2,18 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use tracing::{error, info, warn};
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
-use crate::config::state::AppState;
 use crate::app::APP;
+use crate::config::state::AppState;
 use crate::fence::{Fence, HitTest};
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 use crate::{paths, prompt};
 
 // Menus
@@ -107,7 +106,6 @@ impl DesktopCover {
             },
         )
     }
-
 
     pub fn state(&self) -> AppState {
         let inner = self.inner.lock().unwrap();
@@ -282,7 +280,7 @@ impl DesktopCover {
             }
 
             self.base.redraw();
-            APP.get().unwrap().mark_unsaved();
+            APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
             inner.last_mouse_pos = POINT { x, y };
         }
         0
@@ -470,7 +468,7 @@ impl DesktopCover {
                         }
                     }
                 }
-            },
+            }
             IDM_RENAME_ICON => {
                 if let Some(HitTest::Icon(icon_idx)) = hit_type {
                     let inner = self.inner.lock().unwrap();
