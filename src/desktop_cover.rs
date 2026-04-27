@@ -53,7 +53,7 @@ impl DesktopCover {
         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
 
         Base::create_window(
-            WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TOPMOST,
+            WS_EX_NOACTIVATE | WS_EX_TOPMOST,
             register_classname(w!("BottomWindowClass")),
             w!("Desktop Cover"),
             WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN,
@@ -101,8 +101,6 @@ impl DesktopCover {
                         last_mouse_pos: POINT { x: 0, y: 0 },
                     }),
                 });
-
-                cover.update_layered_window();
                 Ok(cover)
             },
         )
@@ -186,7 +184,7 @@ impl DesktopCover {
                 right: width,
                 bottom: height,
             };
-            let brush = CreateSolidBrush(0x00000000);
+            let brush = CreateSolidBrush(0x000000FF);
             FillRect(mem_dc, &rect, brush);
             DeleteObject(brush);
 
@@ -257,7 +255,7 @@ impl DesktopCover {
         }
     }
 
-    fn on_paint(&self) -> LRESULT {
+    /*fn on_paint(&self) -> LRESULT {
         info!("on_paint");
         let hwnd = self.base().hwnd();
         unsafe {
@@ -265,9 +263,8 @@ impl DesktopCover {
             BeginPaint(hwnd, &mut ps);
             EndPaint(hwnd, &ps);
         }
-        self.update_layered_window();
         0
-    }
+    }*/
 
     fn on_set_cursor(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
@@ -357,9 +354,8 @@ impl DesktopCover {
                     };
                 }
             }
+            self.update_layered_window();
         }
-        drop(inner);
-        self.update_layered_window();
         0
     }
 
@@ -388,11 +384,9 @@ impl DesktopCover {
                 }
             }
 
-            self.base.redraw();
+            self.update_layered_window();
             APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
             inner.last_mouse_pos = POINT { x, y };
-            drop(inner);
-            self.update_layered_window();
         }
         0
     }
@@ -647,7 +641,7 @@ impl Window for DesktopCover {
             WM_DESTROY => self.on_destroy(),
             WM_WINDOWPOSCHANGING => self.on_window_pos_changing(msg, wparam, lparam),
             WM_MOUSEACTIVATE => MA_NOACTIVATE as LRESULT,
-            WM_PAINT => self.on_paint(),
+            // WM_PAINT => self.on_paint(),
             WM_SETCURSOR => self.on_set_cursor(msg, wparam, lparam),
             WM_LBUTTONDBLCLK => self.on_lbutton_dblclk(lparam),
             WM_LBUTTONDOWN => self.on_lbutton_down(lparam),
