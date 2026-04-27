@@ -249,10 +249,10 @@ impl DesktopCover {
                 }
             }
 
-            /* unsafe {
+            unsafe {
                 InvalidateRect(self.base.handle(), std::ptr::null(), FALSE);
                 UpdateWindow(self.base.handle());
-            } */
+            }
             inner.last_mouse_pos = POINT { x, y };
         }
         0
