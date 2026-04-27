@@ -27,6 +27,7 @@ pub const IDM_RUN_ICON: usize = 106;
 pub const IDM_DELETE_ICON: usize = 107;
 pub const IDM_RENAME_FENCE: usize = 108;
 pub const IDM_RENAME_ICON: usize = 109;
+pub const IDM_SET_ICON_PATH: usize = 110;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
@@ -373,6 +374,7 @@ impl DesktopCover {
                 if let HitTest::Icon(_) = hit {
                     AppendMenuW(h_menu, MF_STRING, IDM_RUN_ICON, w!("&Run"));
                     AppendMenuW(h_menu, MF_STRING, IDM_RENAME_ICON, w!("Re&name"));
+                    AppendMenuW(h_menu, MF_STRING, IDM_SET_ICON_PATH, w!("Set &path"));
                     AppendMenuW(h_menu, MF_STRING, IDM_DELETE_ICON, w!("&Delete"));
                 } else {
                     AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
@@ -516,6 +518,28 @@ impl DesktopCover {
                                     if !new_title.is_empty() {
                                         icon.set_title(new_title.into());
                                     }
+                                }
+                            });
+                        }
+                    }
+                }
+                should_save = true;
+            }
+            IDM_SET_ICON_PATH => {
+                if let Some(HitTest::Icon(icon_idx)) = hit_type {
+                    let inner = self.inner.lock().unwrap();
+                    if let Some(fence) = inner.fences.last() {
+                        if let Some(icon) = fence.icon_by_index(icon_idx) {
+                            let icon = icon.clone();
+                            std::thread::spawn(move || {
+                                let current_path = icon.path().unwrap_or_default();
+                                let new_path = prompt::prompt_input(
+                                    "Set icon path",
+                                    "Enter new path:",
+                                    &current_path,
+                                );
+                                if let Some(new_path) = new_path {
+                                    icon.set_path(Some(new_path.into()));
                                 }
                             });
                         }
