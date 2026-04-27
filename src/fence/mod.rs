@@ -1,11 +1,11 @@
 use anyhow::Result;
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::Com::CoTaskMemFree;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 mod icon;
 use std::sync::atomic::Ordering;
@@ -15,7 +15,7 @@ use crate::app::App;
 use crate::config::state::{FenceState, IconState};
 use crate::fence::icon::Icon;
 use crate::geo::Area;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub struct TitleBar {
     base: BaseRef,
@@ -87,11 +87,17 @@ impl Window for TitleBar {
                     DeleteObject(title_brush);
                 } else if alpha > 0 {
                     let mem_dc = CreateCompatibleDC(hdc);
-                    let bitmap = CreateCompatibleBitmap(hdc, rect.right - rect.left, rect.bottom - rect.top);
+                    let bitmap =
+                        CreateCompatibleBitmap(hdc, rect.right - rect.left, rect.bottom - rect.top);
                     SelectObject(mem_dc, bitmap);
-                    
+
                     let brush = CreateSolidBrush(color & 0xFFFFFF);
-                    let local_rect = RECT { left: 0, top: 0, right: rect.right - rect.left, bottom: rect.bottom - rect.top };
+                    let local_rect = RECT {
+                        left: 0,
+                        top: 0,
+                        right: rect.right - rect.left,
+                        bottom: rect.bottom - rect.top,
+                    };
                     FillRect(mem_dc, &local_rect, brush);
                     DeleteObject(brush);
 
@@ -101,14 +107,26 @@ impl Window for TitleBar {
                         SourceConstantAlpha: alpha,
                         AlphaFormat: 0,
                     };
-                    GdiAlphaBlend(hdc, 0, 0, rect.right, rect.bottom, mem_dc, 0, 0, rect.right, rect.bottom, blend);
-                    
+                    GdiAlphaBlend(
+                        hdc,
+                        0,
+                        0,
+                        rect.right,
+                        rect.bottom,
+                        mem_dc,
+                        0,
+                        0,
+                        rect.right,
+                        rect.bottom,
+                        blend,
+                    );
+
                     DeleteObject(bitmap);
                     DeleteDC(mem_dc);
                 }
 
                 SetBkMode(hdc, TRANSPARENT as _);
-                SetTextColor(hdc, config.fence.title_text_color);
+                SetTextColor(hdc, config.fence.title_text_color.0);
 
                 let title_utf16: Vec<u16> = self.title.lock().unwrap().encode_utf16().collect();
                 let mut text_rect = rect;
@@ -265,11 +283,17 @@ impl Window for ScrollArea {
                     DeleteObject(scroll_brush);
                 } else if alpha > 0 {
                     let mem_dc = CreateCompatibleDC(hdc);
-                    let bitmap = CreateCompatibleBitmap(hdc, rect.right - rect.left, rect.bottom - rect.top);
+                    let bitmap =
+                        CreateCompatibleBitmap(hdc, rect.right - rect.left, rect.bottom - rect.top);
                     SelectObject(mem_dc, bitmap);
-                    
+
                     let brush = CreateSolidBrush(color & 0xFFFFFF);
-                    let local_rect = RECT { left: 0, top: 0, right: rect.right - rect.left, bottom: rect.bottom - rect.top };
+                    let local_rect = RECT {
+                        left: 0,
+                        top: 0,
+                        right: rect.right - rect.left,
+                        bottom: rect.bottom - rect.top,
+                    };
                     FillRect(mem_dc, &local_rect, brush);
                     DeleteObject(brush);
 
@@ -279,8 +303,20 @@ impl Window for ScrollArea {
                         SourceConstantAlpha: alpha,
                         AlphaFormat: 0,
                     };
-                    GdiAlphaBlend(hdc, 0, 0, rect.right, rect.bottom, mem_dc, 0, 0, rect.right, rect.bottom, blend);
-                    
+                    GdiAlphaBlend(
+                        hdc,
+                        0,
+                        0,
+                        rect.right,
+                        rect.bottom,
+                        mem_dc,
+                        0,
+                        0,
+                        rect.right,
+                        rect.bottom,
+                        blend,
+                    );
+
                     DeleteObject(bitmap);
                     DeleteDC(mem_dc);
                 }
@@ -661,11 +697,17 @@ impl Window for Fence {
                     DeleteObject(brush);
                 } else if alpha > 0 {
                     let mem_dc = CreateCompatibleDC(hdc);
-                    let bitmap = CreateCompatibleBitmap(hdc, rect.right - rect.left, rect.bottom - rect.top);
+                    let bitmap =
+                        CreateCompatibleBitmap(hdc, rect.right - rect.left, rect.bottom - rect.top);
                     SelectObject(mem_dc, bitmap);
-                    
+
                     let brush = CreateSolidBrush(color & 0xFFFFFF);
-                    let local_rect = RECT { left: 0, top: 0, right: rect.right - rect.left, bottom: rect.bottom - rect.top };
+                    let local_rect = RECT {
+                        left: 0,
+                        top: 0,
+                        right: rect.right - rect.left,
+                        bottom: rect.bottom - rect.top,
+                    };
                     FillRect(mem_dc, &local_rect, brush);
                     DeleteObject(brush);
 
@@ -675,8 +717,20 @@ impl Window for Fence {
                         SourceConstantAlpha: alpha,
                         AlphaFormat: 0,
                     };
-                    GdiAlphaBlend(hdc, 0, 0, rect.right, rect.bottom, mem_dc, 0, 0, rect.right, rect.bottom, blend);
-                    
+                    GdiAlphaBlend(
+                        hdc,
+                        0,
+                        0,
+                        rect.right,
+                        rect.bottom,
+                        mem_dc,
+                        0,
+                        0,
+                        rect.right,
+                        rect.bottom,
+                        blend,
+                    );
+
                     DeleteObject(bitmap);
                     DeleteDC(mem_dc);
                 }

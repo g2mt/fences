@@ -3,16 +3,16 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use tracing::info;
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Controls::Dialogs::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 use crate::app::App;
 use crate::config::state::IconState;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub struct Icon {
     base: BaseRef,
@@ -175,7 +175,8 @@ impl Window for Icon {
                     config.icon.selected_bg_color
                 } else {
                     config.icon.unselected_bg_color
-                };
+                }
+                .0;
                 let brush = CreateSolidBrush(bg_color);
                 FillRect(hdc, &rect, brush);
                 DeleteObject(brush);
@@ -222,7 +223,7 @@ impl Window for Icon {
                 }
 
                 SetBkMode(hdc, TRANSPARENT as _);
-                SetTextColor(hdc, config.icon.text_color);
+                SetTextColor(hdc, config.icon.text_color.0);
 
                 let title_utf16: Vec<u16> = state.title.encode_utf16().collect();
                 let mut text_rect = rect;
