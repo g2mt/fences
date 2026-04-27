@@ -25,7 +25,6 @@ pub struct FenceConfig {
     /// - https://stackoverflow.com/questions/12252864/winapi-setlayeredwindowattributes-with-lwa-colorkey-only-sets-pixels-to-either
     /// - https://www.magpcss.org/ceforum/viewtopic.php?f=6&t=13382
     pub fence_bg_color: Color,
-    pub opacity: f32,
 }
 
 impl Default for FenceConfig {
@@ -39,7 +38,6 @@ impl Default for FenceConfig {
             title_bar_bg_color: Color(0x00323232),
             scroll_area_bg_color: Color(0x007D7D7D),
             fence_bg_color: Color(0x00323232),
-            opacity: 1.0,
         }
     }
 }
