@@ -198,6 +198,11 @@ pub fn prompt_input(
             return Some(default.to_string());
         }
 
+        // Disable parent to make it modal
+        if parent_hwnd != std::ptr::null_mut() {
+            EnableWindow(parent_hwnd, 0);
+        }
+
         // Show and run modal loop
         ShowWindow(hwnd, SW_SHOWNORMAL);
         UpdateWindow(hwnd);
@@ -209,6 +214,12 @@ pub fn prompt_input(
             DispatchMessageW(&msg);
         }
         info!("returned from event loop");
+
+        // Re-enable parent
+        if parent_hwnd != std::ptr::null_mut() {
+            EnableWindow(parent_hwnd, 1);
+            SetForegroundWindow(parent_hwnd);
+        }
 
         // Retrieve result
         let data = Box::from_raw(data_ptr);
