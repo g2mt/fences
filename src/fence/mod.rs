@@ -2,9 +2,8 @@ use anyhow::Result;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
-use windows_sys::Win32::System::Com::*;
 use windows_sys::Win32::UI::Controls::*;
-use windows_sys::Win32::UI::Shell::{IFileOpenDialog, IShellItem, *};
+use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
@@ -386,46 +385,30 @@ impl Fence {
 
     pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Arc<Self>> {
         unsafe {
-            let mut pfd: *mut IFileOpenDialog = std::ptr::null_mut();
-            if CoCreateInstance(
-                &FileOpenDialog,
-                std::ptr::null_mut(),
-                CLSCTX_ALL,
-                &IFileOpenDialog::IID,
-                &mut pfd as *mut _ as _,
-            ) != S_OK
-            {
-                return Err(anyhow::anyhow!("Failed to create FileOpenDialog"));
-            }
-            let pfd = &*pfd;
-            pfd.SetOptions(FOS_PICKFOLDERS);
+            let mut path_buf = [0u16; MAX_PATH as usize];
+            let mut bi = BROWSEINFOW {
+                hwndOwner: parent_hwnd,
+                pidlRoot: std::ptr::null(),
+                pszDisplayName: path_buf.as_mut_ptr(),
+                lpszTitle: w!("Select a folder to create a fence"),
+                ulFlags: BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE,
+                lpfn: None,
+                lParam: 0,
+                iImage: 0,
+            };
 
-            if pfd.Show(parent_hwnd) != S_OK {
-                pfd.Release();
+            let pidl = SHBrowseForFolderW(&mut bi);
+            if pidl.is_null() {
                 return Err(anyhow::anyhow!("Dialog cancelled"));
             }
 
-            let mut psi: *mut IShellItem = std::ptr::null_mut();
-            if pfd.GetResult(&mut psi) != S_OK {
-                pfd.Release();
-                return Err(anyhow::anyhow!("Failed to get result"));
-            }
-            let psi = &*psi;
+            let mut path_str_buf = [0u16; MAX_PATH as usize];
+            SHGetPathFromIDListW(pidl, path_str_buf.as_mut_ptr());
+            CoTaskMemFree(pidl as _);
 
-            let mut name: PWSTR = std::ptr::null_mut();
-            if psi.GetDisplayName(SIGDN_FILESYSPATH, &mut name) != S_OK {
-                psi.Release();
-                pfd.Release();
-                return Err(anyhow::anyhow!("Failed to get display name"));
-            }
-
-            let path_str = String::from_utf16_lossy(std::slice::from_raw_parts(
-                name,
-                (0..).take_while(|&i| *name.add(i) != 0).count(),
-            ));
-            CoTaskMemFree(name as _);
-            psi.Release();
-            pfd.Release();
+            let path_str = String::from_utf16_lossy(
+                &path_str_buf[..path_str_buf.iter().position(|&c| c == 0).unwrap_or(0)],
+            );
 
             let folder_path = std::path::Path::new(&path_str);
             let title = folder_path
