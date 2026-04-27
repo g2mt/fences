@@ -11,6 +11,7 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
+use crate::app_state::save_thread::SaveThread;
 use crate::app_state::AppState;
 use crate::fence::{Fence, HitTest};
 use crate::paths;
@@ -30,6 +31,7 @@ pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
 pub struct DesktopCover {
     base: BaseRef,
     inner: Mutex<DesktopCoverInner>,
+    save_thread: OnceLock<Arc<SaveThread>>,
 }
 
 struct DesktopCoverInner {
@@ -96,6 +98,7 @@ impl DesktopCover {
                         hit_type: None,
                         last_mouse_pos: POINT { x: 0, y: 0 },
                     }),
+                    save_thread: OnceLock::new(),
                 });
 
                 if let Err(e) = cover.load_state() {
@@ -109,6 +112,10 @@ impl DesktopCover {
                 Ok(cover)
             },
         )
+    }
+
+    pub fn set_save_thread(&self, save_thread: Arc<SaveThread>) {
+        let _ = self.save_thread.set(save_thread);
     }
 
     pub fn save_state(&self) {
