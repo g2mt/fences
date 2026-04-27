@@ -473,7 +473,7 @@ impl DesktopCover {
                     let current_title = fence.title();
                     // TODO: Implement real input dialog
                     let new_title = format!("Renamed {}", current_title);
-                    fence.set_title(&new_title);
+                    fence.set_title(new_title.into());
                     unsafe {
                         MessageBoxW(hwnd, w!("Fence renamed"), w!("Rename"), MB_OK);
                     }

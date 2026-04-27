@@ -372,9 +372,9 @@ impl Fence {
         self.inner.lock().unwrap().title.clone()
     }
 
-    pub fn set_title(&self, title: &str) {
+    pub fn set_title(&self, title: Arc<str>) {
         let mut inner = self.inner.lock().unwrap();
-        inner.title = Arc::from(title);
+        inner.title = title;
         self.base.redraw();
     }
 
