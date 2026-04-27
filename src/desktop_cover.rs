@@ -313,10 +313,7 @@ impl DesktopCover {
                 }
             }
 
-            unsafe {
-                InvalidateRect(self.base.handle(), std::ptr::null(), TRUE);
-                UpdateWindow(self.base.handle());
-            }
+            self.base.redraw();
             if let Some(save_thread) = self.save_thread.get() {
                 save_thread.set_unsaved();
             }

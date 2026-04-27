@@ -6,6 +6,7 @@ use std::sync::{Arc, LazyLock, Mutex, MutexGuard, OnceLock, Weak};
 use anyhow::{anyhow, Result};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
@@ -162,6 +163,13 @@ impl Base {
 
     pub fn handle(&self) -> HWND {
         self.hwnd
+    }
+
+    pub fn redraw(&self) {
+        unsafe {
+            InvalidateRect(self.hwnd, std::ptr::null(), TRUE);
+            UpdateWindow(self.hwnd);
+        }
     }
 
     pub fn area(&self) -> &Area<AtomicI32> {
