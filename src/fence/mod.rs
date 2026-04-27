@@ -388,10 +388,10 @@ impl Fence {
         unsafe {
             let mut pfd: *mut IFileOpenDialog = std::ptr::null_mut();
             if CoCreateInstance(
-                &CLSID_FileOpenDialog,
+                &FileOpenDialog,
                 std::ptr::null_mut(),
                 CLSCTX_ALL,
-                &IID_IFileOpenDialog,
+                &IFileOpenDialog::IID,
                 &mut pfd as *mut _ as _,
             ) != S_OK
             {
