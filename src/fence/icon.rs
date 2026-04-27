@@ -1,3 +1,4 @@
+use std::os::windows::process::CommandExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -99,6 +100,16 @@ impl Icon {
     pub fn set_path(&self, path: Option<Arc<str>>) {
         let _ = std::mem::replace(&mut self.state.lock().unwrap().path, path);
         self.base.redraw();
+    }
+
+    pub fn run(&self) {
+        let path = self.path();
+        if let Some(path) = path {
+            let _ = std::process::Command::new("cmd")
+                .args(["/C", "start", "", &path])
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                .spawn();
+        }
     }
 
     pub fn set_info_from_selector(&self) {
