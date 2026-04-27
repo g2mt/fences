@@ -21,6 +21,7 @@ use crate::desktop_cover::DesktopCover;
 fn main() -> Result<()> {
     APP.get_or_init(|| app::App {
         cover: OnceLock::new(),
+        save_thread: OnceLock::new(),
     });
 
     let log_path = paths::get_log_path()?;
