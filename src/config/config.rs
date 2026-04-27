@@ -15,9 +15,14 @@ pub struct FenceConfig {
     pub padding: i32,
     pub spacing: i32,
     pub title_text_color: Color,
-    pub title_bar_bg_color: Color<true>,
-    pub scroll_area_bg_color: Color<true>,
-    pub fence_bg_color: Color<true>,
+    pub title_bar_bg_color: Color,
+    pub scroll_area_bg_color: Color,
+    /// Alpha is not enabled, because there is a limitation where LWA_COLORKEY doesn't work with full rendering
+    ///
+    /// See:
+    /// - https://stackoverflow.com/questions/12252864/winapi-setlayeredwindowattributes-with-lwa-colorkey-only-sets-pixels-to-either
+    /// - https://www.magpcss.org/ceforum/viewtopic.php?f=6&t=13382
+    pub fence_bg_color: Color,
 }
 
 impl Default for FenceConfig {
@@ -28,9 +33,9 @@ impl Default for FenceConfig {
             padding: 10,
             spacing: 10,
             title_text_color: Color(0x00FFFFFF),
-            title_bar_bg_color: Color(0xFF323232),
-            scroll_area_bg_color: Color(0xFF7D7D7D),
-            fence_bg_color: Color(0xFF000000),
+            title_bar_bg_color: Color(0x00323232),
+            scroll_area_bg_color: Color(0x007D7D7D),
+            fence_bg_color: Color(0x00000000),
         }
     }
 }

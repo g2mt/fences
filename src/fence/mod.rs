@@ -79,7 +79,9 @@ impl Window for TitleBar {
                 GetClientRect(hwnd, &mut rect);
 
                 let config = App::config();
-                config.fence.title_bar_bg_color.paint_background(hdc, &rect);
+                let brush = CreateSolidBrush(config.fence.title_bar_bg_color.0 & 0xFFFFFF);
+                FillRect(hdc, &rect, brush);
+                DeleteObject(brush);
 
                 SetBkMode(hdc, TRANSPARENT as _);
                 SetTextColor(hdc, config.fence.title_text_color.0);
@@ -231,7 +233,10 @@ impl Window for ScrollArea {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
-                App::config().fence.scroll_area_bg_color.paint_background(hdc, &rect);
+                let config = App::config();
+                let brush = CreateSolidBrush(config.fence.scroll_area_bg_color.0 & 0xFFFFFF);
+                FillRect(hdc, &rect, brush);
+                DeleteObject(brush);
 
                 EndPaint(hwnd, &ps);
                 0
@@ -601,7 +606,10 @@ impl Window for Fence {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
-                App::config().fence.fence_bg_color.paint_background(hdc, &rect);
+                let config = App::config();
+                let brush = CreateSolidBrush(config.fence.fence_bg_color.0 & 0xFFFFFF);
+                FillRect(hdc, &rect, brush);
+                DeleteObject(brush);
 
                 EndPaint(hwnd, &ps);
                 0
