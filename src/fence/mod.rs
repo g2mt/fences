@@ -250,20 +250,20 @@ impl Fence {
         let title = "Untitled";
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
 
+        let fence_area = Area::new(x, y, 300, 150);
         Base::create_window(
             0,
             register_classname(w!("Fence")),
             std::ptr::null(),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-            x,
-            y,
-            300,
-            150,
+            fence_area.x,
+            fence_area.y,
+            fence_area.width,
+            fence_area.height,
             parent_hwnd,
             std::ptr::null_mut(),
             h_instance,
             |base| {
-                let fence_area = Area::new(x, y, 300, 150);
                 let title_bar = TitleBar::new(base.handle(), title_u16.as_ptr(), &fence_area)?;
                 let scroll_area = ScrollArea::new(base.handle(), &fence_area)?;
 
