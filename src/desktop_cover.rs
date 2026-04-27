@@ -2,7 +2,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
@@ -12,7 +11,8 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-use crate::fence::{Fence, FenceState, HitTest};
+use crate::app_state::AppState;
+use crate::fence::{Fence, HitTest};
 use crate::paths;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
@@ -26,11 +26,6 @@ pub const IDM_DELETE_ICON: usize = 106;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
-
-#[derive(Serialize, Deserialize)]
-struct AppState {
-    fences: Vec<FenceState>,
-}
 
 pub struct DesktopCover {
     base: BaseRef,
