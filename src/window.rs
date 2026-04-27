@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, MutexGuard, OnceLock};
 
 use anyhow::{anyhow, Result};
@@ -63,10 +64,32 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
 
 // Base
 
+pub struct WindowRect {
+    pub x: AtomicI32,
+    pub y: AtomicI32,
+    pub width: AtomicI32,
+    pub height: AtomicI32,
+}
+
+impl WindowRect {
+    pub fn to_rect(&self) -> RECT {
+        let x = self.x.load(Ordering::Relaxed);
+        let y = self.y.load(Ordering::Relaxed);
+        let w = self.width.load(Ordering::Relaxed);
+        let h = self.height.load(Ordering::Relaxed);
+        RECT {
+            left: x,
+            top: y,
+            right: x + w,
+            bottom: y + h,
+        }
+    }
+}
+
 pub struct Base {
     hwnd: HWND,
     window: OnceLock<Arc<dyn Window>>,
-    rect: Mutex<RECT>,
+    rect: WindowRect,
 }
 
 unsafe impl Sync for Base {}
@@ -129,12 +152,12 @@ impl Base {
         let mut self_ref = Box::into_pin(Box::new(Self {
             hwnd: std::ptr::null_mut(),
             window: OnceLock::new(),
-            rect: Mutex::new(RECT {
-                left: x,
-                top: y,
-                right: x + nwidth,
-                bottom: y + nheight,
-            }),
+            rect: WindowRect {
+                x: AtomicI32::new(x),
+                y: AtomicI32::new(y),
+                width: AtomicI32::new(nwidth),
+                height: AtomicI32::new(nheight),
+            },
         }));
         let hwnd = unsafe {
             CreateWindowExW(
@@ -167,19 +190,20 @@ impl Base {
     }
 
     pub fn rect(&self) -> RECT {
-        *self.rect.lock().unwrap()
+        self.rect.to_rect()
     }
 
     fn set_window_pos(&self) {
-        let rect = self.rect.lock().unwrap();
-        let width = rect.right - rect.left;
-        let height = rect.bottom - rect.top;
+        let x = self.rect.x.load(Ordering::Relaxed);
+        let y = self.rect.y.load(Ordering::Relaxed);
+        let width = self.rect.width.load(Ordering::Relaxed);
+        let height = self.rect.height.load(Ordering::Relaxed);
         unsafe {
             SetWindowPos(
                 self.hwnd,
                 std::ptr::null_mut(),
-                rect.left,
-                rect.top,
+                x,
+                y,
                 width,
                 height,
                 SWP_NOZORDER | SWP_NOACTIVATE,
@@ -188,25 +212,18 @@ impl Base {
     }
 
     pub fn resize_to(&self, left: i32, top: i32, right: i32, bottom: i32) {
-        {
-            *self.rect.lock().unwrap() = RECT {
-                left,
-                top,
-                right,
-                bottom,
-            };
-        }
+        self.rect.x.store(left, Ordering::Relaxed);
+        self.rect.y.store(top, Ordering::Relaxed);
+        self.rect.width.store(right - left, Ordering::Relaxed);
+        self.rect.height.store(bottom - top, Ordering::Relaxed);
         self.set_window_pos();
     }
 
     pub fn resize_by(&self, dl: i32, dt: i32, dr: i32, db: i32) {
-        {
-            let mut rect = self.rect.lock().unwrap();
-            rect.left += dl;
-            rect.top += dt;
-            rect.right += dr;
-            rect.bottom += db;
-        }
+        self.rect.x.fetch_add(dl, Ordering::Relaxed);
+        self.rect.y.fetch_add(dt, Ordering::Relaxed);
+        self.rect.width.fetch_add(dr - dl, Ordering::Relaxed);
+        self.rect.height.fetch_add(db - dt, Ordering::Relaxed);
         self.set_window_pos();
     }
 }
