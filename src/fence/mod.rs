@@ -2,16 +2,17 @@ use anyhow::Result;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::System::Com::CoTaskMemFree;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
-use serde::{Deserialize, Serialize};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use icon::{Icon, IconState};
+use serde::{Deserialize, Serialize};
 
 use crate::fence::icon::ICON_SIZE;
 use crate::geo::Area;
@@ -388,7 +389,7 @@ impl Fence {
             let mut path_buf = [0u16; MAX_PATH as usize];
             let mut bi = BROWSEINFOW {
                 hwndOwner: parent_hwnd,
-                pidlRoot: std::ptr::null(),
+                pidlRoot: std::ptr::null_mut(),
                 pszDisplayName: path_buf.as_mut_ptr(),
                 lpszTitle: w!("Select a folder to create a fence"),
                 ulFlags: BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE,
