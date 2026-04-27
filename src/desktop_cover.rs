@@ -11,6 +11,9 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
+use std::ffi::OsStr;
+use std::os::windows::ffi::OsStrExt;
+
 use crate::app_state::save_thread::SaveThread;
 use crate::app_state::AppState;
 use crate::fence::{Fence, HitTest};
@@ -465,7 +468,16 @@ impl DesktopCover {
                 should_save = true;
             }
             IDM_RENAME_FENCE => {
-                // TODO: Implement rename dialog
+                let inner = self.inner.lock().unwrap();
+                if let Some(fence) = inner.fences.last() {
+                    let current_title = fence.title();
+                    // TODO: Implement real input dialog
+                    let new_title = format!("Renamed {}", current_title);
+                    fence.set_title(&new_title);
+                    unsafe {
+                        MessageBoxW(hwnd, w!("Fence renamed"), w!("Rename"), MB_OK);
+                    }
+                }
                 should_save = true;
             }
             IDM_DELETE_FENCE => {
@@ -487,7 +499,20 @@ impl DesktopCover {
                 MessageBoxW(hwnd, w!("Clicked"), w!("Test"), MB_OK | MB_ICONINFORMATION);
             },
             IDM_RENAME_ICON => {
-                // TODO: Implement rename dialog
+                if let Some(HitTest::Icon(icon_idx)) = hit_type {
+                    let inner = self.inner.lock().unwrap();
+                    if let Some(fence) = inner.fences.last() {
+                        if let Some(icon) = fence.icon_by_index(icon_idx) {
+                            let current_title = icon.title();
+                            // TODO: Implement real input dialog
+                            let new_title = format!("Renamed {}", current_title);
+                            icon.set_title(new_title);
+                            unsafe {
+                                MessageBoxW(hwnd, w!("Icon renamed"), w!("Rename"), MB_OK);
+                            }
+                        }
+                    }
+                }
                 should_save = true;
             }
             IDM_DELETE_ICON => {

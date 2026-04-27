@@ -367,6 +367,10 @@ impl Fence {
         Some(hit)
     }
 
+    pub fn title(&self) -> String {
+        self.inner.lock().unwrap().title.clone()
+    }
+
     pub fn set_title(&self, title: &str) {
         let mut inner = self.inner.lock().unwrap();
         inner.title = title.to_string();
@@ -463,6 +467,10 @@ impl Fence {
         if let Some(icon) = inner.icons.get(index) {
             icon.set_selected(true);
         }
+    }
+
+    pub fn icon_by_index(&self, index: usize) -> Option<&Arc<Icon>> {
+        self.inner.lock().unwrap().icons.get(index)
     }
 
     pub fn reflow_icons(&self) {

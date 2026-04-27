@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 use windows_sys::core::*;
@@ -20,7 +20,7 @@ pub struct IconState {
 
 pub struct Icon {
     base: BaseRef,
-    title: String,
+    title: Mutex<String>,
     path: Option<String>,
     selected: AtomicBool,
 }
@@ -45,7 +45,7 @@ impl Icon {
             |base| {
                 Ok(Arc::new(Self {
                     base,
-                    title: title.to_string(),
+                    title: Mutex::new(title.to_string()),
                     path: path.map(|s| s.to_string()),
                     selected: AtomicBool::new(false),
                 }))
@@ -66,12 +66,21 @@ impl Icon {
         rel_x >= rect.left && rel_x < rect.right && rel_y >= rect.top && rel_y < rect.bottom
     }
 
-    pub fn title(&self) -> &str {
-        &self.title
+    pub fn title(&self) -> String {
+        self.title.lock().unwrap().clone()
     }
 
-    pub fn set_title(&mut self, title: String) {
-        self.title = title;
+    pub fn set_title(&self, title: String) {
+        *self.title.lock().unwrap() = title;
+        // Update window text
+        let hwnd = self.base.hwnd();
+        let title_u16: Vec<u16> = self.title.lock().unwrap()
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        unsafe {
+            SetWindowTextW(hwnd, title_u16.as_ptr());
+        }
         self.base.redraw();
     }
 
