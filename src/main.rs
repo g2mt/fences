@@ -1,5 +1,5 @@
 use anyhow::Result;
-use tracing::{info, error};
+use tracing::{error, info};
 use tracing_subscriber::prelude::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
@@ -32,7 +32,7 @@ fn main() -> Result<()> {
             DispatchMessageW(&msg);
         }
         info!("Message loop stopped");
-        let _ = cover.save_state();
+        cover.save_state()?;
         std::mem::drop(cover); // dropped at the end of program
     }
     Ok(())
