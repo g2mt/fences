@@ -25,6 +25,8 @@ pub const IDM_DELETE_FENCE: usize = 104;
 pub const IDM_ADD_ICON: usize = 105;
 pub const IDM_RUN_ICON: usize = 106;
 pub const IDM_DELETE_ICON: usize = 107;
+pub const IDM_RENAME_FENCE: usize = 108;
+pub const IDM_RENAME_ICON: usize = 109;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
@@ -370,9 +372,11 @@ impl DesktopCover {
             unsafe {
                 if let HitTest::Icon(_) = hit {
                     AppendMenuW(h_menu, MF_STRING, IDM_RUN_ICON, w!("&Run"));
+                    AppendMenuW(h_menu, MF_STRING, IDM_RENAME_ICON, w!("Re&name"));
                     AppendMenuW(h_menu, MF_STRING, IDM_DELETE_ICON, w!("&Delete"));
                 } else {
                     AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
+                    AppendMenuW(h_menu, MF_STRING, IDM_RENAME_FENCE, w!("Re&name fence"));
                     AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
                 }
                 SetForegroundWindow(hwnd);
@@ -460,6 +464,10 @@ impl DesktopCover {
                 }
                 should_save = true;
             }
+            IDM_RENAME_FENCE => {
+                // TODO: Implement rename dialog
+                should_save = true;
+            }
             IDM_DELETE_FENCE => {
                 let result = unsafe {
                     MessageBoxW(
@@ -478,6 +486,10 @@ impl DesktopCover {
             IDM_RUN_ICON => unsafe {
                 MessageBoxW(hwnd, w!("Clicked"), w!("Test"), MB_OK | MB_ICONINFORMATION);
             },
+            IDM_RENAME_ICON => {
+                // TODO: Implement rename dialog
+                should_save = true;
+            }
             IDM_DELETE_ICON => {
                 if let Some(HitTest::Icon(icon_idx)) = hit_type {
                     let inner = self.inner.lock().unwrap();
