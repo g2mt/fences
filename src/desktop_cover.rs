@@ -4,6 +4,7 @@ use anyhow::Result;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::Storage::Xps::{PrintWindow, PW_CLIENTONLY};
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows_sys::Win32::UI::Shell::*;
@@ -191,20 +192,24 @@ impl DesktopCover {
             for fence in &inner.fences {
                 let f_hwnd = fence.base().hwnd();
                 let f_rect = fence.base().rect();
-                
+
                 // PrintWindow captures the window content including children
                 PrintWindow(f_hwnd, mem_dc, PW_CLIENTONLY);
-                
-                // Since PrintWindow with PW_CLIENTONLY might not respect the offset, 
+
+                // Since PrintWindow with PW_CLIENTONLY might not respect the offset,
                 // we manually manage the DC transform or just print to the right spot.
                 // However, PrintWindow usually draws at 0,0 of the DC.
                 // A better way is to use a temporary DC per fence and BitBlt.
                 let fence_dc = CreateCompatibleDC(screen_dc);
-                let fence_bmp = CreateCompatibleBitmap(screen_dc, f_rect.right - f_rect.left, f_rect.bottom - f_rect.top);
+                let fence_bmp = CreateCompatibleBitmap(
+                    screen_dc,
+                    f_rect.right - f_rect.left,
+                    f_rect.bottom - f_rect.top,
+                );
                 let old_f_bmp = SelectObject(fence_dc, fence_bmp);
-                
+
                 PrintWindow(f_hwnd, fence_dc, 0);
-                
+
                 BitBlt(
                     mem_dc,
                     f_rect.left,
@@ -216,7 +221,7 @@ impl DesktopCover {
                     0,
                     SRCCOPY,
                 );
-                
+
                 SelectObject(fence_dc, old_f_bmp);
                 DeleteObject(fence_bmp);
                 DeleteDC(fence_dc);
