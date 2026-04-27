@@ -2,6 +2,14 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use windows_sys::Win32::Foundation::RECT;
 use windows_sys::Win32::Graphics::Gdi::*;
 
+/// Represents a color value stored as **AABBGGRR** (alpha, blue, green, red).
+///
+/// The generic const `ACCEPTS_ALPHA` indicates whether the color variant
+/// permits an explicit alpha component. When `true`, the color can be
+/// serialized/deserialized from `#AARRGGBB` strings; otherwise only `#RRGGBB`
+/// strings are accepted. Internally the value is always stored in the
+/// Windows `COLORREF` format with an optional alpha byte in the most‑significant
+/// position.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Color<const ACCEPTS_ALPHA: bool = false>(pub u32);
 
@@ -11,8 +19,10 @@ impl<const ACCEPTS_ALPHA: bool> Serialize for Color<ACCEPTS_ALPHA> {
         S: Serializer,
     {
         let s = if ACCEPTS_ALPHA {
+            // Include alpha when allowed
             format!("#{:08X}", self.0)
         } else {
+            // Omit alpha component
             format!("#{:06X}", self.0 & 0x00FFFFFF)
         };
         serializer.serialize_str(&s)
@@ -31,7 +41,9 @@ impl<'de, const ACCEPTS_ALPHA: bool> Deserialize<'de> for Color<ACCEPTS_ALPHA> {
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 if ACCEPTS_ALPHA {
-                    formatter.write_str("a hex color string like \"#RRGGBB\" or \"#AARRGGBB\"")
+                    formatter.write_str(
+                        "a hex color string like \"#RRGGBB\" or \"#AARRGGBB\"",
+                    )
                 } else {
                     formatter.write_str("a hex color string like \"#RRGGBB\"")
                 }
@@ -46,22 +58,24 @@ impl<'de, const ACCEPTS_ALPHA: bool> Deserialize<'de> for Color<ACCEPTS_ALPHA> {
                     .ok_or_else(|| E::custom("missing leading #"))?;
                 let value = match hex.len() {
                     6 => {
+                        // #RRGGBB – parse and convert to AABBGGRR with opaque alpha
                         let rgb = u32::from_str_radix(hex, 16)
                             .map_err(|_| E::custom("invalid hex digits"))?;
-                        if ACCEPTS_ALPHA {
-                            (0xFF << 24) | rgb
-                        } else {
-                            rgb
-                        }
+                        let r = (rgb >> 16) & 0xFF;
+                        let g = (rgb >> 8) & 0xFF;
+                        let b = rgb & 0xFF;
+                        // Alpha = 0xFF (opaque)
+                        (0xFF << 24) | (b << 16) | (g << 8) | r
                     }
                     8 => {
-                        let parsed = u32::from_str_radix(hex, 16)
+                        // #AARRGGBB – parse and reorder to AABBGGRR
+                        let argb = u32::from_str_radix(hex, 16)
                             .map_err(|_| E::custom("invalid hex digits"))?;
-                        if ACCEPTS_ALPHA {
-                            parsed
-                        } else {
-                            parsed & 0xFFFFFF
-                        }
+                        let a = (argb >> 24) & 0xFF;
+                        let r = (argb >> 16) & 0xFF;
+                        let g = (argb >> 8) & 0xFF;
+                        let b = argb & 0xFF;
+                        (a << 24) | (b << 16) | (g << 8) | r
                     }
                     _ => return Err(E::custom("hex color must be 6 or 8 characters")),
                 };
@@ -105,7 +119,19 @@ impl Color<true> {
                     SourceConstantAlpha: alpha,
                     AlphaFormat: 0,
                 };
-                GdiAlphaBlend(hdc, 0, 0, width, height, mem_dc, 0, 0, width, height, blend);
+                GdiAlphaBlend(
+                    hdc,
+                    0,
+                    0,
+                    width,
+                    height,
+                    mem_dc,
+                    0,
+                    0,
+                    width,
+                    height,
+                    blend,
+                );
 
                 DeleteObject(bitmap);
                 DeleteDC(mem_dc);
