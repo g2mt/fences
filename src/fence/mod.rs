@@ -234,9 +234,13 @@ impl Window for ScrollArea {
                 GetClientRect(hwnd, &mut rect);
 
                 let config = App::config();
-                let brush = CreateSolidBrush(config.fence.scroll_area_bg_color.0 & 0xFFFFFF);
+                /* let brush = CreateSolidBrush(config.fence.scroll_area_bg_color.0 & 0xFFFFFF);
                 FillRect(hdc, &rect, brush);
-                DeleteObject(brush);
+                DeleteObject(brush);*/
+                config
+                    .fence
+                    .scroll_area_bg_color
+                    .paint_background(hdc, &rect);
 
                 EndPaint(hwnd, &ps);
                 0
@@ -300,8 +304,9 @@ impl Fence {
             std::ptr::null_mut(),
             h_instance,
             |base| {
-                let title_bar = TitleBar::new(base.hwnd(), state.title.clone(), &state.area)?;
-                let scroll_area = ScrollArea::new(base.hwnd(), &state.area)?;
+                let hwnd = base.hwnd();
+                let title_bar = TitleBar::new(hwnd, state.title.clone(), &state.area)?;
+                let scroll_area = ScrollArea::new(hwnd, &state.area)?;
 
                 let fence = Arc::new(Self {
                     base,
@@ -315,6 +320,10 @@ impl Fence {
 
                 for icon_state in state.icons {
                     fence.add_icon_with_path(&icon_state.title, icon_state.path.as_deref());
+                }
+
+                unsafe {
+                    SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
                 }
                 Ok(fence)
             },
