@@ -16,6 +16,7 @@ fn main() -> Result<()> {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
+        println!("stop");
         std::mem::drop(cover); // dropped at the end of program
     }
     Ok(())

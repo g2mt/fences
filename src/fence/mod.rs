@@ -69,10 +69,6 @@ impl Window for TitleBar {
                 FillRect(hdc, &rect, title_brush);
                 DeleteObject(title_brush);
 
-                let mut edge_rect = rect;
-                edge_rect.bottom += 2;
-                DrawEdge(hdc, &mut edge_rect, EDGE_RAISED, BF_RECT);
-
                 SetBkMode(hdc, TRANSPARENT as _);
                 SetTextColor(hdc, 0x00FFFFFF);
 
@@ -203,10 +199,6 @@ impl Window for ScrollArea {
                 let scroll_brush = CreateSolidBrush(0x007D7D7D);
                 FillRect(hdc, &rect, scroll_brush);
                 DeleteObject(scroll_brush);
-
-                let mut edge_rect = rect;
-                edge_rect.top -= 2;
-                DrawEdge(hdc, &mut edge_rect, EDGE_RAISED, BF_RECT);
 
                 EndPaint(hwnd, &ps);
                 0
