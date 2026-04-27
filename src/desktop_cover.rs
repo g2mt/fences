@@ -473,6 +473,7 @@ impl DesktopCover {
                 if let Some(fence) = inner.fences.last() {
                     let current_title = fence.title();
                     let new_title = prompt::prompt_input(
+                        self.base.hwnd(),
                         "Rename fence",
                         "Enter new name:",
                         &current_title,
@@ -510,6 +511,7 @@ impl DesktopCover {
                         if let Some(icon) = fence.icon_by_index(icon_idx) {
                             let current_title = icon.title();
                             let new_title = prompt::prompt_input(
+                                self.base.hwnd(),
                                 "Rename icon",
                                 "Enter new icon name:",
                                 &current_title,
