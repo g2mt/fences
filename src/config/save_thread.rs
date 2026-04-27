@@ -7,6 +7,7 @@ use tracing::error;
 
 use crate::app::APP;
 
+#[derive(Debug)]
 pub struct SaveThread {
     flag: Arc<AtomicBool>,
     _handle: thread::JoinHandle<()>,
