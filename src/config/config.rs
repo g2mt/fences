@@ -52,7 +52,7 @@ impl<'de> Deserialize<'de> for Color {
             type Value = Color;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a hex color string like \"#RRGGBB\"")
+                formatter.write_str("a hex color string like \"#RRGGBB\" or \"#AARRGGBB\"")
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Color, E>
@@ -60,10 +60,16 @@ impl<'de> Deserialize<'de> for Color {
                 E: serde::de::Error,
             {
                 let hex = v.strip_prefix('#').ok_or_else(|| E::custom("missing leading #"))?;
-                if hex.len() != 6 {
-                    return Err(E::custom("hex color must be 6 characters"));
-                }
-                let value = u32::from_str_radix(hex, 16).map_err(|_| E::custom("invalid hex digits"))?;
+                let value = match hex.len() {
+                    6 => {
+                        let rgb = u32::from_str_radix(hex, 16).map_err(|_| E::custom("invalid hex digits"))?;
+                        (0xFF << 24) | rgb
+                    }
+                    8 => {
+                        u32::from_str_radix(hex, 16).map_err(|_| E::custom("invalid hex digits"))?
+                    }
+                    _ => return Err(E::custom("hex color must be 6 or 8 characters")),
+                };
                 Ok(Color(value))
             }
         }
