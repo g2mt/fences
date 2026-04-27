@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
+use tracing::info;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -150,6 +151,7 @@ impl DesktopCover {
     }
 
     pub fn update_layered_window(&self) {
+        info!("update_layered_window");
         let hwnd = self.base().hwnd();
         unsafe {
             let screen_dc = GetDC(std::ptr::null_mut());
@@ -256,6 +258,7 @@ impl DesktopCover {
     }
 
     fn on_paint(&self) -> LRESULT {
+        info!("on_paint");
         let hwnd = self.base().hwnd();
         unsafe {
             let mut ps: PAINTSTRUCT = std::mem::zeroed();
