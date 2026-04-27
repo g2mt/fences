@@ -1,7 +1,4 @@
-use std::ffi::OsStr;
-use std::os::windows::ffi::OsStrExt;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -46,7 +43,7 @@ unsafe extern "system" fn input_proc(
                 200,
                 20,
                 hwnd,
-                0,
+                std::ptr::null_mut(),
                 GetModuleHandleW(std::ptr::null()),
                 std::ptr::null(),
             );
@@ -56,7 +53,7 @@ unsafe extern "system" fn input_proc(
                 WS_EX_CLIENTEDGE,
                 w!("EDIT"),
                 std::ptr::null(),
-                WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL,
+                WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL as u32,
                 10,
                 40,
                 200,
@@ -73,7 +70,7 @@ unsafe extern "system" fn input_proc(
                 0,
                 w!("BUTTON"),
                 w!("OK"),
-                WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON as u32,
                 50,
                 80,
                 60,
@@ -110,8 +107,8 @@ unsafe extern "system" fn input_proc(
             }
         }
         WM_COMMAND => {
-            let id = LOWORD(wparam);
-            let hi = HIWORD(wparam);
+            let id = (wparam as u32) & 0xFFFF;
+            let hi = ((wparam as u32) >> 16) as u16;
             if hi == BN_CLICKED as u16 {
                 let data_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut InputDialogData;
                 let data = &mut *data_ptr;
