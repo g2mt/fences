@@ -530,18 +530,7 @@ impl DesktopCover {
                     let inner = self.inner.lock().unwrap();
                     if let Some(fence) = inner.fences.last() {
                         if let Some(icon) = fence.icon_by_index(icon_idx) {
-                            let icon = icon.clone();
-                            std::thread::spawn(move || {
-                                let current_path = icon.path().unwrap_or_default();
-                                let new_path = prompt::prompt_input(
-                                    "Set icon path",
-                                    "Enter new path:",
-                                    &current_path,
-                                );
-                                if let Some(new_path) = new_path {
-                                    icon.set_path(Some(new_path.into()));
-                                }
-                            });
+                            icon.set_path_from_selector();
                         }
                     }
                 }
