@@ -80,7 +80,7 @@ impl DesktopCover {
                     nid.szTip[..len].copy_from_slice(&tip[..len]);
                     Shell_NotifyIconW(NIM_ADD, &nid);
 
-                    SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
+                    // SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
                     SetWindowPos(
                         hwnd,
                         HWND_BOTTOM,
@@ -152,9 +152,9 @@ impl DesktopCover {
             let mut ps: PAINTSTRUCT = std::mem::zeroed();
             let hdc = BeginPaint(hwnd, &mut ps);
 
-            let brush = CreateSolidBrush(0x00000000);
+            /*let brush = CreateSolidBrush(0x00000000);
             FillRect(hdc, &ps.rcPaint, brush);
-            DeleteObject(brush);
+            DeleteObject(brush); */
 
             EndPaint(hwnd, &ps);
         }
