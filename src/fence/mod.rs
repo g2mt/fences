@@ -368,7 +368,7 @@ impl Fence {
         self.update_scroll_info();
     }
 
-    pub fn resize(&self, dl: i32, dt: i32, dr: i32, db: i32) {
+    pub fn resize_by(&self, dl: i32, dt: i32, dr: i32, db: i32) {
         self.base.resize_by(dl, dt, dr, db);
 
         let rect = self.base.rect();
@@ -382,23 +382,6 @@ impl Fence {
             .base()
             .resize_to(0, TITLE_BAR_HEIGHT, width, height - TITLE_BAR_HEIGHT);
         self.reflow_icons();
-    }
-
-    pub fn invalidate(&self) {
-        unsafe {
-            let parent = GetParent(self.base().handle());
-            if parent != std::ptr::null_mut() {
-                InvalidateRect(parent, std::ptr::null(), TRUE);
-            }
-            InvalidateRect(self.base().handle(), std::ptr::null(), TRUE);
-            InvalidateRect(self.title_bar.base().handle(), std::ptr::null(), TRUE);
-            InvalidateRect(self.scroll_area.base().handle(), std::ptr::null(), TRUE);
-
-            let inner = self.inner.lock().unwrap();
-            for icon in &inner.icons {
-                InvalidateRect(icon.base().handle(), std::ptr::null(), TRUE);
-            }
-        }
     }
 
     pub fn update_scroll_info(&self) {
@@ -424,7 +407,6 @@ impl Fence {
         si.nPage = view_height as u32;
         unsafe { SetScrollInfo(self.scroll_area.base().handle(), SB_VERT, &si, TRUE) };
         drop(inner);
-        self.invalidate();
     }
 
     pub fn bring_to_front(&self) {
@@ -439,7 +421,6 @@ impl Fence {
                 SWP_NOMOVE | SWP_NOSIZE,
             );
         }
-        self.invalidate();
     }
 }
 

@@ -50,7 +50,7 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
         let mut wc: WNDCLASSW = std::mem::zeroed();
-        wc.style = CS_DBLCLKS;
+        wc.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
         wc.hInstance = h_instance;
         wc.hCursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
         wc.lpszClassName = name;

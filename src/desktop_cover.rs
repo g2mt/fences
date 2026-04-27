@@ -121,14 +121,13 @@ impl DesktopCover {
 
     fn on_paint(&self) -> LRESULT {
         let hwnd = self.base().handle();
-        let mut ps: PAINTSTRUCT = unsafe { std::mem::zeroed() };
         unsafe {
+            let mut ps: PAINTSTRUCT = std::mem::zeroed();
             let hdc = BeginPaint(hwnd, &mut ps);
-            let mut rect: RECT = std::mem::zeroed();
-            GetClientRect(hwnd, &mut rect);
+
             let brush = CreateSolidBrush(0x00000000);
-            FillRect(hdc, &rect, brush);
-            DeleteObject(brush);
+            FillRect(hdc, &ps.rcPaint, brush);
+
             EndPaint(hwnd, &ps);
         }
         0
@@ -237,19 +236,23 @@ impl DesktopCover {
 
             if let Some(fence) = inner.fences.last() {
                 match hit_type {
-                    HitTest::TitleBar => fence.resize(dx, dy, dx, dy),
-                    HitTest::Left => fence.resize(-dx, 0, dx, 0),
-                    HitTest::Right => fence.resize(0, 0, dx, 0),
-                    HitTest::Top => fence.resize(0, -dy, 0, dy),
-                    HitTest::Bottom => fence.resize(0, 0, 0, dy),
-                    HitTest::TopLeft => fence.resize(-dx, -dy, dx, dy),
-                    HitTest::TopRight => fence.resize(0, -dy, dx, dy),
-                    HitTest::BottomLeft => fence.resize(-dx, 0, dx, dy),
-                    HitTest::BottomRight => fence.resize(0, 0, dx, dy),
+                    HitTest::TitleBar => fence.resize_by(dx, dy, dx, dy),
+                    HitTest::Left => fence.resize_by(-dx, 0, dx, 0),
+                    HitTest::Right => fence.resize_by(0, 0, dx, 0),
+                    HitTest::Top => fence.resize_by(0, -dy, 0, dy),
+                    HitTest::Bottom => fence.resize_by(0, 0, 0, dy),
+                    HitTest::TopLeft => fence.resize_by(-dx, -dy, dx, dy),
+                    HitTest::TopRight => fence.resize_by(0, -dy, dx, dy),
+                    HitTest::BottomLeft => fence.resize_by(-dx, 0, dx, dy),
+                    HitTest::BottomRight => fence.resize_by(0, 0, dx, dy),
                     _ => {}
                 }
             }
 
+            /* unsafe {
+                InvalidateRect(self.base.handle(), std::ptr::null(), FALSE);
+                UpdateWindow(self.base.handle());
+            } */
             inner.last_mouse_pos = POINT { x, y };
         }
         0
