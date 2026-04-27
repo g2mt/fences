@@ -51,7 +51,7 @@ impl DesktopCover {
         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
 
         Base::create_window(
-            WS_EX_NOACTIVATE | WS_EX_LAYERED,
+            WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TOPMOST,
             register_classname(w!("BottomWindowClass")),
             w!("Desktop Cover"),
             WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN,
@@ -80,7 +80,6 @@ impl DesktopCover {
                     nid.szTip[..len].copy_from_slice(&tip[..len]);
                     Shell_NotifyIconW(NIM_ADD, &nid);
 
-                    SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
                     SetWindowPos(
                         hwnd,
                         HWND_BOTTOM,
@@ -121,6 +120,8 @@ impl DesktopCover {
         }
         let mut inner = self.inner.lock().unwrap();
         inner.fences = fences;
+        drop(inner);
+        self.update_layered_window();
         Ok(())
     }
 
@@ -146,18 +147,121 @@ impl DesktopCover {
         }
     }
 
+    pub fn update_layered_window(&self) {
+        let hwnd = self.base().hwnd();
+        unsafe {
+            let screen_dc = GetDC(std::ptr::null_mut());
+            let mem_dc = CreateCompatibleDC(screen_dc);
+
+            let width = GetSystemMetrics(SM_CXSCREEN);
+            let height = GetSystemMetrics(SM_CYSCREEN);
+
+            let mut bmi: BITMAPINFO = std::mem::zeroed();
+            bmi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+            bmi.bmiHeader.biWidth = width;
+            bmi.bmiHeader.biHeight = -height; // top-down
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = BI_RGB as u32;
+
+            let mut bits = std::ptr::null_mut();
+            let bitmap = CreateDIBSection(
+                mem_dc,
+                &bmi,
+                DIB_RGB_COLORS,
+                &mut bits,
+                std::ptr::null_mut(),
+                0,
+            );
+            let old_bitmap = SelectObject(mem_dc, bitmap);
+
+            // Fill with transparent black
+            let rect = RECT {
+                left: 0,
+                top: 0,
+                right: width,
+                bottom: height,
+            };
+            let brush = CreateSolidBrush(0x00000000);
+            FillRect(mem_dc, &rect, brush);
+            DeleteObject(brush);
+
+            // Print children (fences) onto the buffer
+            let inner = self.inner.lock().unwrap();
+            for fence in &inner.fences {
+                let f_hwnd = fence.base().hwnd();
+                let f_rect = fence.base().rect();
+                
+                // PrintWindow captures the window content including children
+                PrintWindow(f_hwnd, mem_dc, PW_CLIENTONLY);
+                
+                // Since PrintWindow with PW_CLIENTONLY might not respect the offset, 
+                // we manually manage the DC transform or just print to the right spot.
+                // However, PrintWindow usually draws at 0,0 of the DC.
+                // A better way is to use a temporary DC per fence and BitBlt.
+                let fence_dc = CreateCompatibleDC(screen_dc);
+                let fence_bmp = CreateCompatibleBitmap(screen_dc, f_rect.right - f_rect.left, f_rect.bottom - f_rect.top);
+                let old_f_bmp = SelectObject(fence_dc, fence_bmp);
+                
+                PrintWindow(f_hwnd, fence_dc, 0);
+                
+                BitBlt(
+                    mem_dc,
+                    f_rect.left,
+                    f_rect.top,
+                    f_rect.right - f_rect.left,
+                    f_rect.bottom - f_rect.top,
+                    fence_dc,
+                    0,
+                    0,
+                    SRCCOPY,
+                );
+                
+                SelectObject(fence_dc, old_f_bmp);
+                DeleteObject(fence_bmp);
+                DeleteDC(fence_dc);
+            }
+
+            let mut pt_src = POINT { x: 0, y: 0 };
+            let mut pt_dst = POINT { x: 0, y: 0 };
+            let mut size = SIZE {
+                cx: width,
+                cy: height,
+            };
+            let mut blend = BLENDFUNCTION {
+                BlendOp: AC_SRC_OVER as u8,
+                BlendFlags: 0,
+                SourceConstantAlpha: 255,
+                AlphaFormat: AC_SRC_ALPHA as u8,
+            };
+
+            UpdateLayeredWindow(
+                hwnd,
+                screen_dc,
+                &mut pt_dst,
+                &mut size,
+                mem_dc,
+                &mut pt_src,
+                0,
+                &mut blend,
+                ULW_ALPHA,
+            );
+
+            SelectObject(mem_dc, old_bitmap);
+            DeleteObject(bitmap);
+            DeleteDC(mem_dc);
+            ReleaseDC(std::ptr::null_mut(), screen_dc);
+        }
+    }
+
     fn on_paint(&self) -> LRESULT {
         let hwnd = self.base().hwnd();
         unsafe {
             let mut ps: PAINTSTRUCT = std::mem::zeroed();
-            let hdc = BeginPaint(hwnd, &mut ps);
-
-            let brush = CreateSolidBrush(0x00000000);
-            FillRect(hdc, &ps.rcPaint, brush);
-            DeleteObject(brush);
-
+            BeginPaint(hwnd, &mut ps);
             EndPaint(hwnd, &ps);
         }
+        self.update_layered_window();
         0
     }
 
@@ -250,6 +354,8 @@ impl DesktopCover {
                 }
             }
         }
+        drop(inner);
+        self.update_layered_window();
         0
     }
 
@@ -281,6 +387,8 @@ impl DesktopCover {
             self.base.redraw();
             APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
             inner.last_mouse_pos = POINT { x, y };
+            drop(inner);
+            self.update_layered_window();
         }
         0
     }
@@ -325,6 +433,7 @@ impl DesktopCover {
 
                 inner.hit_type = Some(hit);
             }
+            self.update_layered_window();
 
             let mut pt = POINT { x, y };
             unsafe { ClientToScreen(hwnd, &mut pt) };
@@ -517,6 +626,7 @@ impl DesktopCover {
         if should_save {
             APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
         }
+        self.update_layered_window();
         0
     }
 }
