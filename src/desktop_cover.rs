@@ -516,7 +516,7 @@ impl DesktopCover {
             _ => {}
         }
         if should_save {
-            APP.get().unwrap().mark_unsaved();
+            APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
         }
         0
     }
