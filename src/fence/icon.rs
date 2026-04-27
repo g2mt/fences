@@ -20,8 +20,7 @@ pub struct IconState {
 
 pub struct Icon {
     base: BaseRef,
-    title: Mutex<String>,
-    path: Option<String>,
+    state: Mutex<IconState>,
     selected: AtomicBool,
 }
 
@@ -29,6 +28,11 @@ impl Icon {
     pub fn new(parent_hwnd: HWND, title: &str, path: Option<&str>, x: i32, y: i32) -> Arc<Self> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+
+        let state = Mutex::new(IconState {
+            title: title.to_string(),
+            path: path.map(|s| s.to_string()),
+        });
 
         Base::create_window(
             0,
@@ -45,8 +49,7 @@ impl Icon {
             |base| {
                 Ok(Arc::new(Self {
                     base,
-                    title: Mutex::new(title.to_string()),
-                    path: path.map(|s| s.to_string()),
+                    state,
                     selected: AtomicBool::new(false),
                 }))
             },
@@ -67,25 +70,26 @@ impl Icon {
     }
 
     pub fn title(&self) -> String {
-        self.title.lock().unwrap().clone()
+        self.state.lock().unwrap().title.clone()
     }
 
     pub fn set_title(&self, title: String) {
-        *self.title.lock().unwrap() = title;
+        let title_clone = title.clone();
+        {
+            let mut s = self.state.lock().unwrap();
+            s.title = title_clone;
+        }
         // Update window text
         let hwnd = self.base.hwnd();
-        let title_u16: Vec<u16> = self.title.lock().unwrap()
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
+        let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
         unsafe {
             SetWindowTextW(hwnd, title_u16.as_ptr());
         }
         self.base.redraw();
     }
 
-    pub fn path(&self) -> Option<&String> {
-        self.path.as_ref()
+    pub fn path(&self) -> Option<String> {
+        self.state.lock().unwrap().path.clone()
     }
 }
 
@@ -116,8 +120,12 @@ impl Window for Icon {
                 let icon_height = 32;
                 let width = rect.right - rect.left;
 
+                let state = self.state.lock().unwrap();
+                let path = state.path.clone();
+                drop(state); // release lock
+
                 let mut hicon = std::ptr::null_mut();
-                if let Some(ref path) = self.path {
+                if let Some(ref path) = path {
                     let path_u16: Vec<u16> =
                         path.encode_utf16().chain(std::iter::once(0)).collect();
                     let mut shfi: SHFILEINFOW = std::mem::zeroed();
@@ -147,7 +155,7 @@ impl Window for Icon {
                     DI_NORMAL,
                 );
 
-                if !self.path.is_none() {
+                if path.is_some() {
                     DestroyIcon(hicon);
                 }
 
