@@ -55,6 +55,10 @@ fn main() -> Result<()> {
         if let Err(e) = App::get().load_state() {
             error!("{}", e.to_string());
         }
+
+        // Ensure the layered window is updated after state is loaded
+        cover.update_layered_window();
+
         unsafe {
             let mut msg = std::mem::zeroed();
             while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
