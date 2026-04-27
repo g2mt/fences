@@ -103,14 +103,15 @@ unsafe extern "system" fn input_wndproc(
                     default.encode_utf16().chain(std::iter::once(0)).collect();
                 SetWindowTextW(edit, default_utf16.as_ptr());
             }
-
             DefWindowProcW(hwnd, msg, wparam, lparam)
         },
         WM_DESTROY => unsafe {
+            info!("des");
             PostQuitMessage(0);
             0
         },
         WM_COMMAND => unsafe {
+            info!("cmd");
             let id = (wparam as u32) & 0xFFFF;
             let hi = ((wparam as u32) >> 16) as u16;
             if hi == BN_CLICKED as u16 {
@@ -142,12 +143,7 @@ unsafe extern "system" fn input_wndproc(
 static CLASS_REGISTERED: AtomicBool = AtomicBool::new(false);
 
 /// Shows a modal input dialog. Returns `None` if the user cancelled, otherwise `Some(String)`.
-pub fn prompt_input(
-    parent_hwnd: HWND,
-    title: &str,
-    message: &str,
-    default: &str,
-) -> Option<String> {
+pub fn prompt_input(title: &str, message: &str, default: &str) -> Option<String> {
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
 
@@ -189,7 +185,7 @@ pub fn prompt_input(
             CW_USEDEFAULT,
             240,
             150,
-            parent_hwnd,
+            std::ptr::null_mut(),
             std::ptr::null_mut(),
             h_instance,
             data_ptr as *mut std::ffi::c_void,
@@ -199,27 +195,14 @@ pub fn prompt_input(
             return Some(default.to_string());
         }
 
-        // Disable parent to make it modal
-        if parent_hwnd != std::ptr::null_mut() {
-            EnableWindow(parent_hwnd, 0);
-        }
-
         // Show and run modal loop
         ShowWindow(hwnd, SW_SHOWNORMAL);
         UpdateWindow(hwnd);
-        info!("start event loop");
 
         let mut msg: MSG = std::mem::zeroed();
         while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
-        }
-        info!("returned from event loop");
-
-        // Re-enable parent
-        if parent_hwnd != std::ptr::null_mut() {
-            EnableWindow(parent_hwnd, 1);
-            SetForegroundWindow(parent_hwnd);
         }
 
         // Retrieve result
