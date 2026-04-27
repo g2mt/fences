@@ -166,11 +166,7 @@ impl Window for Icon {
                 SetBkMode(hdc, TRANSPARENT as _);
                 SetTextColor(hdc, 0x00FFFFFF); // White text
 
-                let title_utf16: Vec<u16> = self
-                    .title()
-                    .encode_utf16()
-                    .chain(std::iter::once(0))
-                    .collect();
+                let title_utf16: Vec<u16> = self.title().encode_utf16().collect();
                 let mut text_rect = rect;
                 text_rect.top += icon_height;
                 DrawTextW(
