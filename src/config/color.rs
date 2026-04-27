@@ -41,9 +41,7 @@ impl<'de, const ACCEPTS_ALPHA: bool> Deserialize<'de> for Color<ACCEPTS_ALPHA> {
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 if ACCEPTS_ALPHA {
-                    formatter.write_str(
-                        "a hex color string like \"#RRGGBB\" or \"#AARRGGBB\"",
-                    )
+                    formatter.write_str("a hex color string like \"#RRGGBB\" or \"#AARRGGBB\"")
                 } else {
                     formatter.write_str("a hex color string like \"#RRGGBB\"")
                 }
@@ -64,14 +62,19 @@ impl<'de, const ACCEPTS_ALPHA: bool> Deserialize<'de> for Color<ACCEPTS_ALPHA> {
                         let r = (rgb >> 16) & 0xFF;
                         let g = (rgb >> 8) & 0xFF;
                         let b = rgb & 0xFF;
+                        let a = if ACCEPTS_ALPHA { 0xFF } else { 0x0 };
                         // Alpha = 0xFF (opaque)
-                        (0xFF << 24) | (b << 16) | (g << 8) | r
+                        (a << 24) | (b << 16) | (g << 8) | r
                     }
                     8 => {
                         // #AARRGGBB – parse and reorder to AABBGGRR
                         let argb = u32::from_str_radix(hex, 16)
                             .map_err(|_| E::custom("invalid hex digits"))?;
-                        let a = (argb >> 24) & 0xFF;
+                        let a = if ACCEPTS_ALPHA {
+                            (argb >> 24) & 0xFF
+                        } else {
+                            0x0
+                        };
                         let r = (argb >> 16) & 0xFF;
                         let g = (argb >> 8) & 0xFF;
                         let b = argb & 0xFF;
@@ -119,19 +122,7 @@ impl Color<true> {
                     SourceConstantAlpha: alpha,
                     AlphaFormat: 0,
                 };
-                GdiAlphaBlend(
-                    hdc,
-                    0,
-                    0,
-                    width,
-                    height,
-                    mem_dc,
-                    0,
-                    0,
-                    width,
-                    height,
-                    blend,
-                );
+                GdiAlphaBlend(hdc, 0, 0, width, height, mem_dc, 0, 0, width, height, blend);
 
                 DeleteObject(bitmap);
                 DeleteDC(mem_dc);
