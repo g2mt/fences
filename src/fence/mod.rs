@@ -6,10 +6,11 @@ use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
-use icon::Icon;
+use icon::{Icon, IconState};
 
 use crate::fence::icon::ICON_SIZE;
 use crate::geo::Area;
@@ -223,6 +224,13 @@ pub enum HitTest {
     BottomRight,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FenceState {
+    pub title: String,
+    pub area: Area<i32>,
+    pub icons: Vec<IconState>,
+}
+
 pub struct Fence {
     base: BaseRef,
     inner: Mutex<FenceInner>,
@@ -236,43 +244,78 @@ struct FenceInner {
 }
 
 impl Fence {
-    pub fn new(parent_hwnd: HWND, x: i32, y: i32) -> Result<Arc<Self>> {
+    pub fn new(parent_hwnd: HWND, x: i32, y: i32, title: &str) -> Result<Arc<Self>> {
+        Self::from_state(
+            parent_hwnd,
+            FenceState {
+                title: title.to_string(),
+                area: Area::new(x, y, 300, 150),
+                icons: Vec::new(),
+            },
+        )
+    }
+
+    pub fn from_state(parent_hwnd: HWND, state: FenceState) -> Result<Arc<Self>> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        let title_u16: Vec<u16> = state
+            .title
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
 
-        let title = "Untitled";
-        let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
-
-        let fence_area = Area::new(x, y, 300, 150);
         Base::create_window(
             0,
             register_classname(w!("Fence")),
             std::ptr::null(),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-            fence_area.x,
-            fence_area.y,
-            fence_area.width,
-            fence_area.height,
+            state.area.x,
+            state.area.y,
+            state.area.width,
+            state.area.height,
             parent_hwnd,
             std::ptr::null_mut(),
             h_instance,
             |base| {
-                let title_bar = TitleBar::new(base.handle(), title_u16.as_ptr(), &fence_area)?;
-                let scroll_area = ScrollArea::new(base.handle(), &fence_area)?;
+                let title_bar = TitleBar::new(base.handle(), title_u16.as_ptr(), &state.area)?;
+                let scroll_area = ScrollArea::new(base.handle(), &state.area)?;
 
                 let fence = Arc::new(Self {
                     base,
                     inner: Mutex::new(FenceInner {
-                        title: title.to_string(),
+                        title: state.title.clone(),
                         icons: Vec::new(),
                     }),
                     title_bar,
                     scroll_area,
                 });
 
-                fence.add_icon("Test Icon");
+                for icon_state in state.icons {
+                    fence.add_icon(&icon_state.title);
+                }
                 Ok(fence)
             },
         )
+    }
+
+    pub fn get_state(&self) -> FenceState {
+        let inner = self.inner.lock().unwrap();
+        let area = self.base.area();
+        FenceState {
+            title: inner.title.clone(),
+            area: Area::new(
+                area.x.load(Ordering::Relaxed),
+                area.y.load(Ordering::Relaxed),
+                area.width.load(Ordering::Relaxed),
+                area.height.load(Ordering::Relaxed),
+            ),
+            icons: inner
+                .icons
+                .iter()
+                .map(|i| IconState {
+                    title: i.title.clone(),
+                })
+                .collect(),
+        }
     }
 
     pub fn hit_test(&self, x: i32, y: i32) -> Option<HitTest> {

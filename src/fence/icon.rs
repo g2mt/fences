@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -9,6 +10,11 @@ use windows_sys::core::*;
 use crate::window::{Base, BaseRef, Window, register_classname};
 
 pub const ICON_SIZE: i32 = 64;
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct IconState {
+    pub title: String,
+}
 
 pub struct Icon {
     base: BaseRef,

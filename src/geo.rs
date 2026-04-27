@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicI32, Ordering};
 
 use windows_sys::Win32::Foundation::RECT;
@@ -18,6 +19,7 @@ impl Scalar for AtomicI32 {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Area<S: Scalar> {
     pub x: S,
     pub y: S,

@@ -17,6 +17,7 @@ fn main() -> Result<()> {
             DispatchMessageW(&msg);
         }
         println!("stop");
+        let _ = cover.save_state();
         std::mem::drop(cover); // dropped at the end of program
     }
     Ok(())

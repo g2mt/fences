@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -9,7 +11,7 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-use crate::fence::{Fence, HitTest};
+use crate::fence::{Fence, FenceState, HitTest};
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Menus
@@ -22,6 +24,11 @@ pub const IDM_DELETE_ICON: usize = 106;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
+
+#[derive(Serialize, Deserialize)]
+struct AppState {
+    fences: Vec<FenceState>,
+}
 
 pub struct DesktopCover {
     base: BaseRef,
@@ -85,16 +92,74 @@ impl DesktopCover {
                     );
                 }
 
-                Ok(Arc::new(Self {
+                let cover = Arc::new(Self {
                     base,
                     inner: Mutex::new(DesktopCoverInner {
                         fences: Vec::new(),
                         hit_type: None,
                         last_mouse_pos: POINT { x: 0, y: 0 },
                     }),
-                }))
+                });
+
+                if let Err(e) = cover.load_state() {
+                    let msg = format!("Failed to load state: {}", e);
+                    let msg_u16: Vec<u16> = msg.encode_utf16().chain(std::iter::once(0)).collect();
+                    unsafe {
+                        MessageBoxW(
+                            hwnd,
+                            msg_u16.as_ptr(),
+                            w!("Error"),
+                            MB_OK | MB_ICONERROR,
+                        );
+                    }
+                }
+
+                Ok(cover)
             },
         )
+    }
+
+    fn get_config_path() -> Result<PathBuf> {
+        let mut path = vec![0u16; MAX_PATH as usize];
+        unsafe {
+            if SHGetSpecialFolderPathW(std::ptr::null_mut(), path.as_mut_ptr(), CSIDL_PERSONAL as _, FALSE) == FALSE {
+                return Err(anyhow::anyhow!("Failed to get Documents folder"));
+            }
+        }
+        let path_str = String::from_utf16_lossy(&path.iter().take_while(|&&c| c != 0).cloned().collect::<Vec<_>>());
+        let mut config_path = PathBuf::from(path_str);
+        config_path.push("FencesConf");
+        if !config_path.exists() {
+            std::fs::create_dir_all(&config_path)?;
+        }
+        config_path.push("state.json");
+        Ok(config_path)
+    }
+
+    pub fn save_state(&self) -> Result<()> {
+        let inner = self.inner.lock().unwrap();
+        let state = AppState {
+            fences: inner.fences.iter().map(|f| f.get_state()).collect(),
+        };
+        let path = Self::get_config_path()?;
+        let json = serde_json::to_string_pretty(&state)?;
+        std::fs::write(path, json)?;
+        Ok(())
+    }
+
+    fn load_state(&self) -> Result<()> {
+        let path = Self::get_config_path()?;
+        if !path.exists() {
+            return Ok(());
+        }
+        let json = std::fs::read_to_string(path)?;
+        let state: AppState = serde_json::from_str(&json)?;
+        let mut inner = self.inner.lock().unwrap();
+        for f_state in state.fences {
+            let fence = Fence::from_state(self.base.handle(), f_state)?;
+            inner.fences.push(fence);
+        }
+        Ok(())
     }
 
     fn on_destroy(&self) -> LRESULT {
@@ -370,7 +435,7 @@ impl DesktopCover {
             IDM_ADD_FENCE => {
                 let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
                 let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
-                if let Ok(fence) = Fence::new(hwnd, width / 2 - 150, height / 2 - 75) {
+                if let Ok(fence) = Fence::new(hwnd, width / 2 - 150, height / 2 - 75, "Untitled") {
                     let mut inner = self.inner.lock().unwrap();
                     inner.fences.push(fence);
                 }
