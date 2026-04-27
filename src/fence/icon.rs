@@ -14,8 +14,8 @@ pub const ICON_SIZE: i32 = 64;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct IconState {
-    pub title: String,
-    pub path: Option<String>,
+    pub title: Arc<str>,
+    pub path: Option<Arc<str>>,
 }
 
 pub struct Icon {
@@ -30,8 +30,8 @@ impl Icon {
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
 
         let state = Mutex::new(IconState {
-            title: title.to_string(),
-            path: path.map(|s| s.to_string()),
+            title: Arc::from(title),
+            path: path.map(|s| Arc::from(s)),
         });
 
         Base::create_window(
@@ -70,14 +70,14 @@ impl Icon {
     }
 
     pub fn title(&self) -> String {
-        self.state.lock().unwrap().title.clone()
+        self.state.lock().unwrap().title.to_string()
     }
 
     pub fn set_title(&self, title: String) {
         let title_clone = title.clone();
         {
             let mut s = self.state.lock().unwrap();
-            s.title = title_clone;
+            s.title = Arc::from(title_clone);
         }
         // Update window text
         let hwnd = self.base.hwnd();
@@ -89,7 +89,12 @@ impl Icon {
     }
 
     pub fn path(&self) -> Option<String> {
-        self.state.lock().unwrap().path.clone()
+        self.state
+            .lock()
+            .unwrap()
+            .path
+            .as_ref()
+            .map(|arc| arc.to_string())
     }
 }
 
