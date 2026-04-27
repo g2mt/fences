@@ -29,7 +29,8 @@ unsafe extern "system" fn input_wndproc(
     match msg {
         WM_NCCREATE => unsafe {
             // Store the InputDialogData pointer passed through lParam
-            let data = &mut *(lparam as *mut InputDialogData);
+            let cs = lparam as *const CREATESTRUCTW;
+            let data = &mut *((*cs).lpCreateParams as *mut InputDialogData);
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, data as *mut InputDialogData as isize);
 
             // Create a static message label
