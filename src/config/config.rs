@@ -57,7 +57,7 @@ impl Default for IconConfig {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Color<const ACCEPTS_ALPHA: bool = true>(pub u32);
+pub struct Color<const ACCEPTS_ALPHA: bool = false>(pub u32);
 
 impl<const ACCEPTS_ALPHA: bool> Serialize for Color<ACCEPTS_ALPHA> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -109,10 +109,12 @@ impl<'de, const ACCEPTS_ALPHA: bool> Deserialize<'de> for Color<ACCEPTS_ALPHA> {
                         }
                     }
                     8 => {
+                        let parsed = u32::from_str_radix(hex, 16)
+                            .map_err(|_| E::custom("invalid hex digits"))?;
                         if ACCEPTS_ALPHA {
-                            u32::from_str_radix(hex, 16).map_err(|_| E::custom("invalid hex digits"))?
+                            parsed
                         } else {
-                            return Err(E::custom("alpha channel not allowed"));
+                            parsed & 0xFFFFFF
                         }
                     }
                     _ => return Err(E::custom("hex color must be 6 or 8 characters")),
