@@ -105,14 +105,6 @@ impl DesktopCover {
                     save_thread: OnceLock::new(),
                 });
 
-                if let Err(e) = cover.load_state() {
-                    let msg = format!("Failed to load state: {}", e);
-                    let msg_u16: Vec<u16> = msg.encode_utf16().chain(std::iter::once(0)).collect();
-                    unsafe {
-                        MessageBoxW(hwnd, msg_u16.as_ptr(), w!("Error"), MB_OK | MB_ICONERROR);
-                    }
-                }
-
                 Ok(cover)
             },
         )
@@ -124,41 +116,21 @@ impl DesktopCover {
         }
     }
 
-    pub fn save_state(&self) {
-        let r: Result<PathBuf> = (|| {
-            let inner = self.inner.lock().unwrap();
-            let state = AppState {
-                fences: inner.fences.iter().map(|f| f.get_state()).collect(),
-            };
-            let path = paths::get_state_path()?;
-            let json = serde_json::to_string_pretty(&state)?;
-            std::fs::write(&path, json)?;
-            Ok(path)
-        })();
-        match r {
-            Ok(path) => {
-                info!("State saved to {:?}", path);
-            }
-            Err(e) => {
-                error!("{}", e.to_string());
-            }
+    pub fn state(&self) -> AppState {
+        let inner = self.inner.lock().unwrap();
+        AppState {
+            fences: inner.fences.iter().map(|f| f.get_state()).collect(),
         }
     }
 
-    fn load_state(&self) -> Result<()> {
-        let path = paths::get_state_path()?;
-        if !path.exists() {
-            warn!("No state file found at {:?}", path);
-            return Ok(());
+    pub fn set_state(&self, state: &AppState) -> Result<()> {
+        let mut fences = Vec::new();
+        for f_state in &state.fences {
+            let fence = Fence::from_state(self.base().hwnd(), f_state.clone())?;
+            fences.push(fence);
         }
-        let json = std::fs::read_to_string(&path)?;
-        let state: AppState = serde_json::from_str(&json)?;
-        info!("Loading state from {:?}", path);
         let mut inner = self.inner.lock().unwrap();
-        for f_state in state.fences {
-            let fence = Fence::from_state(self.base.hwnd(), f_state)?;
-            inner.fences.push(fence);
-        }
+        inner.fences = fences;
         Ok(())
     }
 

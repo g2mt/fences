@@ -54,7 +54,11 @@ fn main() -> Result<()> {
             }
             info!("Message loop stopped");
         }
-        cover.save_state();
+        if let Some(app) = APP.get() {
+            if let Err(e) = app.save_state() {
+                error!("{}", e.to_string());
+            }
+        }
 
         Ok(())
     })();
