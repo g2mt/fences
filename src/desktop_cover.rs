@@ -238,14 +238,14 @@ impl DesktopCover {
             if let Some(fence) = inner.fences.last() {
                 match hit_type {
                     HitTest::TitleBar => fence.base().move_by(dx, dy),
-                    HitTest::Left => fence.add_bounds(dx, 0, -dx, 0),
-                    HitTest::Right => fence.add_bounds(0, 0, dx, 0),
-                    HitTest::Top => fence.add_bounds(0, dy, 0, -dy),
-                    HitTest::Bottom => fence.add_bounds(0, 0, 0, dy),
-                    HitTest::TopLeft => fence.add_bounds(dx, dy, -dx, -dy),
-                    HitTest::TopRight => fence.add_bounds(0, dy, dx, -dy),
-                    HitTest::BottomLeft => fence.add_bounds(dx, 0, -dx, dy),
-                    HitTest::BottomRight => fence.add_bounds(0, 0, dx, dy),
+                    HitTest::Left => fence.add_area(dx, 0, -dx, 0),
+                    HitTest::Right => fence.add_area(0, 0, dx, 0),
+                    HitTest::Top => fence.add_area(0, dy, 0, -dy),
+                    HitTest::Bottom => fence.add_area(0, 0, 0, dy),
+                    HitTest::TopLeft => fence.add_area(dx, dy, -dx, -dy),
+                    HitTest::TopRight => fence.add_area(0, dy, dx, -dy),
+                    HitTest::BottomLeft => fence.add_area(dx, 0, -dx, dy),
+                    HitTest::BottomRight => fence.add_area(0, 0, dx, dy),
                     HitTest::Client => (),
                     HitTest::Icon(_) => (),
                 }

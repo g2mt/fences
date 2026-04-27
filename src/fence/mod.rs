@@ -369,10 +369,10 @@ impl Fence {
         self.update_scroll_info();
     }
 
-    pub fn add_bounds(&self, dl: i32, dt: i32, dw: i32, dh: i32) {
-        self.base.add_bounds(dl, dt, dw, dh);
+    pub fn add_area(&self, dl: i32, dt: i32, dw: i32, dh: i32) {
+        self.base.add_area(dl, dt, dw, dh);
 
-        let bounds = self.base.bounds();
+        let bounds = self.base.area();
         let width = bounds.width.load(Ordering::Relaxed);
         let height = bounds.height.load(Ordering::Relaxed);
 
