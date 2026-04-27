@@ -244,8 +244,23 @@ impl Base {
         width: i32,
         height: i32,
         hwinposinfo: HDWP,
-    ) {
-        todo!()
+    ) -> HDWP {
+        self.area.x.store(left, Ordering::Relaxed);
+        self.area.y.store(top, Ordering::Relaxed);
+        self.area.width.store(width, Ordering::Relaxed);
+        self.area.height.store(height, Ordering::Relaxed);
+        unsafe {
+            DeferWindowPos(
+                hwinposinfo,
+                self.hwnd,
+                std::ptr::null_mut(),
+                left,
+                top,
+                width,
+                height,
+                SWP_NOZORDER | SWP_NOACTIVATE,
+            )
+        }
     }
 }
 

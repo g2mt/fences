@@ -376,12 +376,20 @@ impl Fence {
         let width = bounds.width.load(Ordering::Relaxed);
         let height = bounds.height.load(Ordering::Relaxed);
 
-        self.title_bar
-            .base()
-            .resize_to(0, 0, width, TITLE_BAR_HEIGHT);
-        self.scroll_area
-            .base()
-            .resize_to(0, TITLE_BAR_HEIGHT, width, height - TITLE_BAR_HEIGHT);
+        unsafe {
+            let mut hdwp = BeginDeferWindowPos(2);
+            if hdwp != 0 {
+                hdwp = self.title_bar.base().resize_to_deferred(0, 0, width, TITLE_BAR_HEIGHT, hdwp);
+                hdwp = self.scroll_area.base().resize_to_deferred(
+                    0,
+                    TITLE_BAR_HEIGHT,
+                    width,
+                    height - TITLE_BAR_HEIGHT,
+                    hdwp,
+                );
+                EndDeferWindowPos(hdwp);
+            }
+        }
 
         self.reflow_icons();
     }
