@@ -1,13 +1,13 @@
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub const ICON_SIZE: i32 = 64;
 
@@ -18,7 +18,7 @@ pub struct IconState {
 
 pub struct Icon {
     base: BaseRef,
-    pub title: String,
+    title: String,
     selected: AtomicBool,
 }
 
@@ -60,6 +60,17 @@ impl Icon {
     pub fn hit_test(&self, rel_x: i32, rel_y: i32) -> bool {
         let rect = self.base.rect();
         rel_x >= rect.left && rel_x < rect.right && rel_y >= rect.top && rel_y < rect.bottom
+    }
+
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    pub fn set_title(&mut self, title: String) {
+        self.title = title;
+        unsafe {
+            InvalidateRect(self.base.handle(), std::ptr::null(), TRUE);
+        }
     }
 }
 
