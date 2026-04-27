@@ -4,5 +4,5 @@ use crate::fence::FenceState;
 
 #[derive(Serialize, Deserialize)]
 pub struct AppState {
-    fences: Vec<FenceState>,
+    pub fences: Vec<FenceState>,
 }
