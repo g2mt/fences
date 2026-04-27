@@ -48,9 +48,9 @@ impl Default for IconConfig {
     fn default() -> Self {
         IconConfig {
             size: 64,
-            selected_bg_color: Color(0x00FFAA44),
-            unselected_bg_color: Color(0x007D7D7D),
-            text_color: Color(0x00FFFFFF),
+            selected_bg_color: Color(0xFFFFAA44),
+            unselected_bg_color: Color(0xFF7D7D7D),
+            text_color: Color(0xFFFFFFFF),
             icon_size_draw: 32,
         }
     }
