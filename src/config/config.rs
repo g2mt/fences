@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer, Deserializer};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -26,6 +26,50 @@ pub struct IconConfig {
     pub unselected_bg_color: u32,
     pub text_color: u32,
     pub icon_size_draw: i32,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Color(pub u32);
+
+impl Serialize for Color {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = format!("#{:06X}", self.0 & 0xFFFFFF);
+        serializer.serialize_str(&s)
+    }
+}
+
+impl<'de> Deserialize<'de> for Color {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ColorVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for ColorVisitor {
+            type Value = Color;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a hex color string like \"#RRGGBB\"")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Color, E>
+            where
+                E: serde::de::Error,
+            {
+                let hex = v.strip_prefix('#').ok_or_else(|| E::custom("missing leading #"))?;
+                if hex.len() != 6 {
+                    return Err(E::custom("hex color must be 6 characters"));
+                }
+                let value = u32::from_str_radix(hex, 16).map_err(|_| E::custom("invalid hex digits"))?;
+                Ok(Color(value))
+            }
+        }
+
+        deserializer.deserialize_str(ColorVisitor)
+    }
 }
 
 impl Default for Config {
