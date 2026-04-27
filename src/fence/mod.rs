@@ -228,7 +228,7 @@ pub enum HitTest {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct FenceState {
-    pub title: String,
+    pub title: Arc<str>,
     pub area: Area<i32>,
     pub icons: Vec<IconState>,
 }
@@ -241,7 +241,7 @@ pub struct Fence {
 }
 
 struct FenceInner {
-    title: String,
+    title: Arc<str>,
     icons: Vec<Arc<Icon>>,
 }
 
@@ -250,7 +250,7 @@ impl Fence {
         Self::from_state(
             parent_hwnd,
             FenceState {
-                title: title.to_string(),
+                title: Arc::from(title),
                 area: Area::new(x, y, 300, 150),
                 icons: Vec::new(),
             },
@@ -261,6 +261,7 @@ impl Fence {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
         let title_u16: Vec<u16> = state
             .title
+            .as_ref()
             .encode_utf16()
             .chain(std::iter::once(0))
             .collect();
@@ -367,13 +368,13 @@ impl Fence {
         Some(hit)
     }
 
-    pub fn title(&self) -> String {
+    pub fn title(&self) -> Arc<str> {
         self.inner.lock().unwrap().title.clone()
     }
 
     pub fn set_title(&self, title: &str) {
         let mut inner = self.inner.lock().unwrap();
-        inner.title = title.to_string();
+        inner.title = Arc::from(title);
         self.base.redraw();
     }
 
