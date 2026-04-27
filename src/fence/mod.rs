@@ -386,12 +386,12 @@ impl Fence {
 
     pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Arc<Self>> {
         unsafe {
-            let mut pfd: *mut IFileOpenDialog = std::ptr::null_mut();
+            let mut pfd: *mut FileOpenDialog = std::ptr::null_mut();
             if CoCreateInstance(
                 &FileOpenDialog,
                 std::ptr::null_mut(),
                 CLSCTX_ALL,
-                &IFileOpenDialog::IID,
+                &FileOpenDialog::IID,
                 &mut pfd as *mut _ as _,
             ) != S_OK
             {
