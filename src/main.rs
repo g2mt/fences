@@ -8,6 +8,7 @@ mod desktop_cover;
 mod fence;
 mod geo;
 mod paths;
+mod prompt;
 mod window;
 
 use crate::app_state::save_thread::SaveThread;
