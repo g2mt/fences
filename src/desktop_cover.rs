@@ -20,10 +20,11 @@ use crate::window::{register_classname, Base, BaseRef, Window};
 // Menus
 pub const IDM_EXIT: usize = 101;
 pub const IDM_ADD_FENCE: usize = 102;
-pub const IDM_DELETE_FENCE: usize = 103;
-pub const IDM_ADD_ICON: usize = 104;
-pub const IDM_RUN_ICON: usize = 105;
-pub const IDM_DELETE_ICON: usize = 106;
+pub const IDM_ADD_FENCE_FROM_FOLDER: usize = 103;
+pub const IDM_DELETE_FENCE: usize = 104;
+pub const IDM_ADD_ICON: usize = 105;
+pub const IDM_RUN_ICON: usize = 106;
+pub const IDM_DELETE_ICON: usize = 107;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
@@ -401,6 +402,12 @@ impl DesktopCover {
             let h_menu = unsafe { CreatePopupMenu() };
             unsafe {
                 AppendMenuW(h_menu, MF_STRING, IDM_ADD_FENCE, w!("&Add fence"));
+                AppendMenuW(
+                    h_menu,
+                    MF_STRING,
+                    IDM_ADD_FENCE_FROM_FOLDER,
+                    w!("Add fence from &folder"),
+                );
                 AppendMenuW(h_menu, MF_STRING, IDM_EXIT, w!("&Exit"));
                 SetForegroundWindow(hwnd);
                 TrackPopupMenu(
@@ -435,6 +442,12 @@ impl DesktopCover {
                 let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
                 let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
                 if let Ok(fence) = Fence::new(hwnd, width / 2 - 150, height / 2 - 75, "Untitled") {
+                    let mut inner = self.inner.lock().unwrap();
+                    inner.fences.push(fence);
+                }
+            }
+            IDM_ADD_FENCE_FROM_FOLDER => {
+                if let Ok(fence) = Fence::from_folder_selector(hwnd) {
                     let mut inner = self.inner.lock().unwrap();
                     inner.fences.push(fence);
                 }

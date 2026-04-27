@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 use crate::window::{register_classname, Base, BaseRef, Window};
@@ -14,16 +15,18 @@ pub const ICON_SIZE: i32 = 64;
 #[derive(Serialize, Deserialize, Clone)]
 pub struct IconState {
     pub title: String,
+    pub path: Option<String>,
 }
 
 pub struct Icon {
     base: BaseRef,
-    title: String,
+    pub title: String,
+    pub path: Option<String>,
     selected: AtomicBool,
 }
 
 impl Icon {
-    pub fn new(parent_hwnd: HWND, title: &str, x: i32, y: i32) -> Arc<Self> {
+    pub fn new(parent_hwnd: HWND, title: &str, path: Option<&str>, x: i32, y: i32) -> Arc<Self> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
 
@@ -43,6 +46,7 @@ impl Icon {
                 Ok(Arc::new(Self {
                     base,
                     title: title.to_string(),
+                    path: path.map(|s| s.to_string()),
                     selected: AtomicBool::new(false),
                 }))
             },
@@ -101,7 +105,25 @@ impl Window for Icon {
                 let icon_height = 32;
                 let width = rect.right - rect.left;
 
-                let hicon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
+                let mut hicon = std::ptr::null_mut();
+                if let Some(ref path) = self.path {
+                    let path_u16: Vec<u16> =
+                        path.encode_utf16().chain(std::iter::once(0)).collect();
+                    let mut shfi: SHFILEINFOW = std::mem::zeroed();
+                    SHGetFileInfoW(
+                        path_u16.as_ptr(),
+                        0,
+                        &mut shfi,
+                        std::mem::size_of::<SHFILEINFOW>() as u32,
+                        SHGFI_ICON | SHGFI_LARGEICON,
+                    );
+                    hicon = shfi.hIcon;
+                }
+
+                if hicon.is_null() {
+                    hicon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
+                }
+
                 DrawIconEx(
                     hdc,
                     (width - icon_width) / 2,
@@ -113,6 +135,10 @@ impl Window for Icon {
                     std::ptr::null_mut(),
                     DI_NORMAL,
                 );
+
+                if !self.path.is_none() {
+                    DestroyIcon(hicon);
+                }
 
                 SetBkMode(hdc, TRANSPARENT as _);
                 SetTextColor(hdc, 0x00FFFFFF); // White text

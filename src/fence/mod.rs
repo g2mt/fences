@@ -2,7 +2,9 @@ use anyhow::Result;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::System::Com::*;
 use windows_sys::Win32::UI::Controls::*;
+use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
@@ -290,7 +292,7 @@ impl Fence {
                 });
 
                 for icon_state in state.icons {
-                    fence.add_icon(&icon_state.title);
+                    fence.add_icon_with_path(&icon_state.title, icon_state.path.as_deref());
                 }
                 Ok(fence)
             },
@@ -313,6 +315,7 @@ impl Fence {
                 .iter()
                 .map(|i| IconState {
                     title: i.title.clone(),
+                    path: i.path.clone(),
                 })
                 .collect(),
         }
@@ -365,12 +368,88 @@ impl Fence {
     }
 
     pub fn add_icon(&self, title: &str) {
+        self.add_icon_with_path(title, None);
+    }
+
+    pub fn add_icon_with_path(&self, title: &str, path: Option<&str>) {
         let mut inner = self.inner.lock().unwrap();
-        inner
-            .icons
-            .push(Icon::new(self.scroll_area.base().handle(), title, 0, 0));
+        inner.icons.push(Icon::new(
+            self.scroll_area.base().handle(),
+            title,
+            path,
+            0,
+            0,
+        ));
         drop(inner);
         self.reflow_icons();
+    }
+
+    pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Arc<Self>> {
+        unsafe {
+            let mut pfd: *mut IFileOpenDialog = std::ptr::null_mut();
+            if CoCreateInstance(
+                &CLSID_FileOpenDialog,
+                std::ptr::null_mut(),
+                CLSCTX_ALL,
+                &IID_IFileOpenDialog,
+                &mut pfd as *mut _ as _,
+            ) != S_OK
+            {
+                return Err(anyhow::anyhow!("Failed to create FileOpenDialog"));
+            }
+            let pfd = &*pfd;
+            pfd.SetOptions(FOS_PICKFOLDERS);
+
+            if pfd.Show(parent_hwnd) != S_OK {
+                pfd.Release();
+                return Err(anyhow::anyhow!("Dialog cancelled"));
+            }
+
+            let mut psi: *mut IShellItem = std::ptr::null_mut();
+            if pfd.GetResult(&mut psi) != S_OK {
+                pfd.Release();
+                return Err(anyhow::anyhow!("Failed to get result"));
+            }
+            let psi = &*psi;
+
+            let mut name: PWSTR = std::ptr::null_mut();
+            if psi.GetDisplayName(SIGDN_FILESYSPATH, &mut name) != S_OK {
+                psi.Release();
+                pfd.Release();
+                return Err(anyhow::anyhow!("Failed to get display name"));
+            }
+
+            let path_str = String::from_utf16_lossy(std::slice::from_raw_parts(
+                name,
+                (0..).take_while(|&i| *name.add(i) != 0).count(),
+            ));
+            CoTaskMemFree(name as _);
+            psi.Release();
+            pfd.Release();
+
+            let folder_path = std::path::Path::new(&path_str);
+            let title = folder_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("Folder Fence");
+
+            let width = GetSystemMetrics(SM_CXSCREEN);
+            let height = GetSystemMetrics(SM_CYSCREEN);
+            let fence = Self::new(parent_hwnd, width / 2 - 150, height / 2 - 75, title)?;
+
+            if let Ok(entries) = std::fs::read_dir(folder_path) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.extension().and_then(|s| s.to_str()) == Some("lnk") {
+                        if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
+                            fence.add_icon_with_path(name, path.to_str());
+                        }
+                    }
+                }
+            }
+
+            Ok(fence)
+        }
     }
 
     pub fn remove_icon(&self, index: usize) {
