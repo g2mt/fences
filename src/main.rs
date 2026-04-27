@@ -10,6 +10,7 @@ mod geo;
 mod paths;
 mod window;
 
+use crate::app_state::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
 
 fn main() -> Result<()> {
@@ -34,6 +35,7 @@ fn main() -> Result<()> {
 
         unsafe {
             let cover = DesktopCover::new()?;
+            let save_thread = SaveThread::new(cover.clone());
             let mut msg = std::mem::zeroed();
             while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
                 TranslateMessage(&msg);
@@ -41,7 +43,10 @@ fn main() -> Result<()> {
             }
             info!("Message loop stopped");
             cover.save_state();
-            std::mem::drop(cover); // dropped at the end of program
+
+            // dropped at the end of program
+            drop(cover);
+            drop(save_thread);
         }
 
         Ok(())
