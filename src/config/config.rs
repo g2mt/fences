@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize, Serializer, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Config {
     pub fence: FenceConfig,
     pub icon: IconConfig,
@@ -19,6 +19,22 @@ pub struct FenceConfig {
     pub fence_bg_color: Color,
 }
 
+impl Default for FenceConfig {
+    fn default() -> Self {
+        FenceConfig {
+            border_thickness: 3,
+            title_bar_height: 24,
+            padding: 10,
+            spacing: 10,
+            border_color: Color(0x00323232),
+            title_bar_bg_color: Color(0x00323232),
+            title_text_color: Color(0x00FFFFFF),
+            scroll_area_bg_color: Color(0x007D7D7D),
+            fence_bg_color: Color(0x000000FF),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct IconConfig {
     pub size: i32,
@@ -26,6 +42,18 @@ pub struct IconConfig {
     pub unselected_bg_color: Color,
     pub text_color: Color,
     pub icon_size_draw: i32,
+}
+
+impl Default for IconConfig {
+    fn default() -> Self {
+        IconConfig {
+            size: 64,
+            selected_bg_color: Color(0x00FFAA44),
+            unselected_bg_color: Color(0x007D7D7D),
+            text_color: Color(0x00FFFFFF),
+            icon_size_draw: 32,
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -36,7 +64,7 @@ impl Serialize for Color {
     where
         S: Serializer,
     {
-        let s = format!("#{:06X}", self.0 & 0xFFFFFF);
+        let s = format!("#{:08X}", self.0);
         serializer.serialize_str(&s)
     }
 }
@@ -59,10 +87,13 @@ impl<'de> Deserialize<'de> for Color {
             where
                 E: serde::de::Error,
             {
-                let hex = v.strip_prefix('#').ok_or_else(|| E::custom("missing leading #"))?;
+                let hex = v
+                    .strip_prefix('#')
+                    .ok_or_else(|| E::custom("missing leading #"))?;
                 let value = match hex.len() {
                     6 => {
-                        let rgb = u32::from_str_radix(hex, 16).map_err(|_| E::custom("invalid hex digits"))?;
+                        let rgb = u32::from_str_radix(hex, 16)
+                            .map_err(|_| E::custom("invalid hex digits"))?;
                         (0xFF << 24) | rgb
                     }
                     8 => {
@@ -75,42 +106,5 @@ impl<'de> Deserialize<'de> for Color {
         }
 
         deserializer.deserialize_str(ColorVisitor)
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            fence: FenceConfig::default(),
-            icon: IconConfig::default(),
-        }
-    }
-}
-
-impl Default for FenceConfig {
-    fn default() -> Self {
-        FenceConfig {
-            border_thickness: 3,
-            title_bar_height: 24,
-            padding: 10,
-            spacing: 10,
-            border_color: Color(0x00323232),
-            title_bar_bg_color: Color(0x00323232),
-            title_text_color: Color(0x00FFFFFF),
-            scroll_area_bg_color: Color(0x007D7D7D),
-            fence_bg_color: Color(0x000000FF),
-        }
-    }
-}
-
-impl Default for IconConfig {
-    fn default() -> Self {
-        IconConfig {
-            size: 64,
-            selected_bg_color: Color(0x00FFAA44),
-            unselected_bg_color: Color(0x007D7D7D),
-            text_color: Color(0x00FFFFFF),
-            icon_size_draw: 32,
-        }
     }
 }
