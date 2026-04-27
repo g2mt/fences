@@ -47,6 +47,9 @@ fn main() -> Result<()> {
         APP.get().unwrap().cover.get_or_init(|| cover.clone());
         let save_thread = SaveThread::new();
         APP.get().unwrap().save_thread.set(save_thread).unwrap();
+        if let Err(e) = APP.get().unwrap().load_state() {
+            error!("{}", e.to_string());
+        }
         unsafe {
             let mut msg = std::mem::zeroed();
             while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {

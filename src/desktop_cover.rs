@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -14,7 +13,7 @@ use crate::app::APP;
 use crate::config::state::AppState;
 use crate::fence::{Fence, HitTest};
 use crate::window::{register_classname, Base, BaseRef, Window};
-use crate::{paths, prompt};
+use crate::prompt;
 
 // Menus
 pub const IDM_EXIT: usize = 101;

@@ -1,4 +1,4 @@
-use std::os::windows::process::CommandExt;
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -98,13 +98,15 @@ impl Icon {
     }
 
     pub fn run(&self) {
-        let path = self.path();
-        if let Some(path) = path {
+        #[cfg(windows)]
+        use std::os::windows::process::CommandExt;
+        if let Some(path) = self.path() {
             info!("Running {}", path);
-            let _ = std::process::Command::new("cmd")
-                .args(["/C", "start", "", &path])
-                .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                .spawn();
+            let mut command = Command::new("cmd");
+            command.args(["/C", &path]);
+            #[cfg(windows)]
+            command.creation_flags(CREATE_NO_WINDOW);
+            let _ = command.spawn();
         }
     }
 
