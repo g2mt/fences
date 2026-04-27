@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::{Arc, LazyLock, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, LazyLock, Mutex, MutexGuard, OnceLock, Weak};
 
 use anyhow::{anyhow, Result};
 use windows_sys::core::*;
@@ -38,7 +38,7 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
                 return DefWindowProcW(hwnd, msg, wparam, lparam);
             }
             let base = &*(userdata as *const () as *const Base);
-            if let Some(window) = base.window.get() {
+            if let Some(window) = base.window.get().and_then(|w| w.upgrade()) {
                 window.wndproc(msg, wparam, lparam)
             } else {
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -68,7 +68,7 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
 
 pub struct Base {
     hwnd: HWND,
-    window: OnceLock<Arc<dyn Window>>,
+    window: OnceLock<Weak<dyn Window>>,
     area: Area<AtomicI32>,
 }
 
@@ -111,8 +111,7 @@ impl Base {
             )?
         };
         let window = f(base)?;
-        let window_ = window.clone();
-        window.base().window.get_or_init(|| window_);
+        window.base().window.get_or_init(|| Arc::downgrade(&window));
         Ok(window)
     }
 
