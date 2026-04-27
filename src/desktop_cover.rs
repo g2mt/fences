@@ -177,7 +177,7 @@ impl DesktopCover {
             );
             let old_bitmap = SelectObject(mem_dc, bitmap);
 
-            // Fill with transparent black
+            // Fill with transparent black (alpha 0)
             let rect = RECT {
                 left: 0,
                 top: 0,
@@ -194,38 +194,33 @@ impl DesktopCover {
                 let f_hwnd = fence.base().hwnd();
                 let f_rect = fence.base().rect();
 
-                // PrintWindow captures the window content including children
-                PrintWindow(f_hwnd, mem_dc, PW_CLIENTONLY);
+                let f_width = f_rect.right - f_rect.left;
+                let f_height = f_rect.bottom - f_rect.top;
 
-                // Since PrintWindow with PW_CLIENTONLY might not respect the offset,
-                // we manually manage the DC transform or just print to the right spot.
-                // However, PrintWindow usually draws at 0,0 of the DC.
-                // A better way is to use a temporary DC per fence and BitBlt.
-                let fence_dc = CreateCompatibleDC(screen_dc);
-                let fence_bmp = CreateCompatibleBitmap(
-                    screen_dc,
-                    f_rect.right - f_rect.left,
-                    f_rect.bottom - f_rect.top,
-                );
-                let old_f_bmp = SelectObject(fence_dc, fence_bmp);
+                if f_width > 0 && f_height > 0 {
+                    let fence_dc = CreateCompatibleDC(screen_dc);
+                    let fence_bmp = CreateCompatibleBitmap(screen_dc, f_width, f_height);
+                    let old_f_bmp = SelectObject(fence_dc, fence_bmp);
 
-                PrintWindow(f_hwnd, fence_dc, 0);
+                    // PW_RENDERFULLCONTENT or 0 to capture the window
+                    PrintWindow(f_hwnd, fence_dc, 0);
 
-                BitBlt(
-                    mem_dc,
-                    f_rect.left,
-                    f_rect.top,
-                    f_rect.right - f_rect.left,
-                    f_rect.bottom - f_rect.top,
-                    fence_dc,
-                    0,
-                    0,
-                    SRCCOPY,
-                );
+                    BitBlt(
+                        mem_dc,
+                        f_rect.left,
+                        f_rect.top,
+                        f_width,
+                        f_height,
+                        fence_dc,
+                        0,
+                        0,
+                        SRCCOPY,
+                    );
 
-                SelectObject(fence_dc, old_f_bmp);
-                DeleteObject(fence_bmp);
-                DeleteDC(fence_dc);
+                    SelectObject(fence_dc, old_f_bmp);
+                    DeleteObject(fence_bmp);
+                    DeleteDC(fence_dc);
+                }
             }
 
             let mut pt_src = POINT { x: 0, y: 0 };
