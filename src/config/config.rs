@@ -57,33 +57,41 @@ impl Default for IconConfig {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Color(pub u32);
+pub struct Color<const ACCEPTS_ALPHA: bool = true>(pub u32);
 
-impl Serialize for Color {
+impl<const ACCEPTS_ALPHA: bool> Serialize for Color<ACCEPTS_ALPHA> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let s = format!("#{:08X}", self.0);
+        let s = if ACCEPTS_ALPHA {
+            format!("#{:08X}", self.0)
+        } else {
+            format!("#{:06X}", self.0 & 0x00FFFFFF)
+        };
         serializer.serialize_str(&s)
     }
 }
 
-impl<'de> Deserialize<'de> for Color {
+impl<'de, const ACCEPTS_ALPHA: bool> Deserialize<'de> for Color<ACCEPTS_ALPHA> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct ColorVisitor;
+        struct ColorVisitor<const ACCEPTS_ALPHA: bool>;
 
-        impl<'de> serde::de::Visitor<'de> for ColorVisitor {
-            type Value = Color;
+        impl<'de, const ACCEPTS_ALPHA: bool> serde::de::Visitor<'de> for ColorVisitor<ACCEPTS_ALPHA> {
+            type Value = Color<ACCEPTS_ALPHA>;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a hex color string like \"#RRGGBB\" or \"#AARRGGBB\"")
+                if ACCEPTS_ALPHA {
+                    formatter.write_str("a hex color string like \"#RRGGBB\" or \"#AARRGGBB\"")
+                } else {
+                    formatter.write_str("a hex color string like \"#RRGGBB\"")
+                }
             }
 
-            fn visit_str<E>(self, v: &str) -> Result<Color, E>
+            fn visit_str<E>(self, v: &str) -> Result<Color<ACCEPTS_ALPHA>, E>
             where
                 E: serde::de::Error,
             {
@@ -94,10 +102,18 @@ impl<'de> Deserialize<'de> for Color {
                     6 => {
                         let rgb = u32::from_str_radix(hex, 16)
                             .map_err(|_| E::custom("invalid hex digits"))?;
-                        (0xFF << 24) | rgb
+                        if ACCEPTS_ALPHA {
+                            (0xFF << 24) | rgb
+                        } else {
+                            rgb
+                        }
                     }
                     8 => {
-                        u32::from_str_radix(hex, 16).map_err(|_| E::custom("invalid hex digits"))?
+                        if ACCEPTS_ALPHA {
+                            u32::from_str_radix(hex, 16).map_err(|_| E::custom("invalid hex digits"))?
+                        } else {
+                            return Err(E::custom("alpha channel not allowed"));
+                        }
                     }
                     _ => return Err(E::custom("hex color must be 6 or 8 characters")),
                 };
@@ -105,6 +121,6 @@ impl<'de> Deserialize<'de> for Color {
             }
         }
 
-        deserializer.deserialize_str(ColorVisitor)
+        deserializer.deserialize_str(ColorVisitor::<ACCEPTS_ALPHA>)
     }
 }
