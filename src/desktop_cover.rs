@@ -1,19 +1,19 @@
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
-use crate::app::APP;
+use crate::app::{App, APP};
 use crate::config::state::AppState;
 use crate::fence::{Fence, HitTest};
 use crate::prompt;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Menus
 pub const IDM_EXIT: usize = 101;
@@ -80,7 +80,11 @@ impl DesktopCover {
                     nid.szTip[..len].copy_from_slice(&tip[..len]);
                     Shell_NotifyIconW(NIM_ADD, &nid);
 
-                    let opacity = APP.get().unwrap().config.lock().unwrap().fence.opacity;
+                    let opacity = if App::is_config_loaded() {
+                        App::config().fence.opacity
+                    } else {
+                        1.0
+                    };
                     SetLayeredWindowAttributes(
                         hwnd,
                         0x00000000,

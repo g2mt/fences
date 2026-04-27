@@ -3,12 +3,14 @@ use serde::{Deserialize, Serialize};
 use crate::config::color::Color;
 
 #[derive(Serialize, Deserialize, Clone, Default)]
+#[serde(default)]
 pub struct Config {
     pub fence: FenceConfig,
     pub icon: IconConfig,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct FenceConfig {
     pub border_thickness: i32,
     pub title_bar_height: i32,
@@ -36,13 +38,14 @@ impl Default for FenceConfig {
             title_text_color: Color(0x00FFFFFF),
             title_bar_bg_color: Color(0x00323232),
             scroll_area_bg_color: Color(0x007D7D7D),
-            fence_bg_color: Color(0x00000000),
+            fence_bg_color: Color(0x00FFFFFF),
             opacity: 1.0,
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct IconConfig {
     pub size: i32,
     pub selected_bg_color: Color,

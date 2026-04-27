@@ -1,13 +1,13 @@
 use std::sync::{Arc, OnceLock};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use tracing::{info, warn};
 
 use crate::config::config::Config;
 use crate::config::save_thread::SaveThread;
 use crate::config::state::AppState;
 use crate::desktop_cover::DesktopCover;
-use crate::paths::{STATE_PATH, app_file};
+use crate::paths::{app_file, STATE_PATH};
 
 pub struct App {
     pub cover: OnceLock<Arc<DesktopCover>>,
@@ -25,6 +25,10 @@ impl App {
 
     pub fn config() -> Arc<Config> {
         Self::get().config.get().expect("Config not loaded").clone()
+    }
+
+    pub fn is_config_loaded() -> bool {
+        Self::get().config.get().is_some()
     }
 
     pub fn save_state(&self) -> Result<()> {
