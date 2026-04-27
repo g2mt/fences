@@ -78,7 +78,6 @@ impl Icon {
             let mut s = self.state.lock().unwrap();
             s.title = title.clone();
         }
-        // Update window text
         let hwnd = self.base.hwnd();
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
         unsafe {
@@ -94,6 +93,11 @@ impl Icon {
             .path
             .as_ref()
             .map(|arc| arc.clone())
+    }
+
+    pub fn set_path(&self, path: Option<Arc<str>>) {
+        std::mem::replace(&mut self.state.lock().unwrap().path, path);
+        self.base.redraw();
     }
 }
 
@@ -126,7 +130,6 @@ impl Window for Icon {
 
                 let state = self.state.lock().unwrap();
                 let path = state.path.clone();
-                drop(state); // release lock
 
                 let mut hicon = std::ptr::null_mut();
                 if let Some(ref path) = path {
@@ -166,7 +169,7 @@ impl Window for Icon {
                 SetBkMode(hdc, TRANSPARENT as _);
                 SetTextColor(hdc, 0x00FFFFFF); // White text
 
-                let title_utf16: Vec<u16> = self.title().encode_utf16().collect();
+                let title_utf16: Vec<u16> = state.title.encode_utf16().collect();
                 let mut text_rect = rect;
                 text_rect.top += icon_height;
                 DrawTextW(

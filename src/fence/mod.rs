@@ -1,11 +1,11 @@
 use anyhow::Result;
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::Com::CoTaskMemFree;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 mod icon;
 use std::sync::atomic::Ordering;
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::fence::icon::ICON_SIZE;
 use crate::geo::Area;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub const BORDER_THICKNESS: i32 = 3;
 pub const TITLE_BAR_HEIGHT: i32 = 24;
@@ -25,16 +25,21 @@ pub const FENCE_SPACING: i32 = 10;
 
 pub struct TitleBar {
     base: BaseRef,
+    title: Mutex<Arc<str>>,
 }
 
 impl TitleBar {
-    pub fn new(parent_hwnd: HWND, title: *const u16, fence_area: &Area<i32>) -> Result<Arc<Self>> {
+    pub fn new(parent_hwnd: HWND, title: Arc<str>, fence_area: &Area<i32>) -> Result<Arc<Self>> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
         let area = Self::area_from_fence_area(fence_area);
         Base::create_window(
             0,
             register_classname(w!("FenceTitleBar")),
-            title,
+            title
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect::<Vec<_>>()
+                .as_ptr(),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
             area.x,
             area.y,
@@ -43,12 +48,22 @@ impl TitleBar {
             parent_hwnd,
             std::ptr::null_mut(),
             h_instance,
-            |base| Ok(Arc::new(Self { base })),
+            |base| {
+                Ok(Arc::new(Self {
+                    base,
+                    title: Mutex::new(title),
+                }))
+            },
         )
     }
 
     pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
         Area::new(0, 0, fence_area.width, TITLE_BAR_HEIGHT)
+    }
+
+    pub fn set_title(&self, title: Arc<str>) {
+        *self.title.lock().unwrap() = title;
+        self.base.redraw();
     }
 }
 
@@ -75,15 +90,13 @@ impl Window for TitleBar {
                 SetBkMode(hdc, TRANSPARENT as _);
                 SetTextColor(hdc, 0x00FFFFFF);
 
-                let mut title = vec![0u16; 256];
-                let len = GetWindowTextW(hwnd, title.as_mut_ptr(), 256);
-
+                let title_utf16: Vec<u16> = self.title.lock().unwrap().encode_utf16().collect();
                 let mut text_rect = rect;
                 text_rect.left += 5;
                 DrawTextW(
                     hdc,
-                    title.as_ptr(),
-                    len,
+                    title_utf16.as_ptr(),
+                    title_utf16.len() as _,
                     &mut text_rect,
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE,
                 );
@@ -259,13 +272,6 @@ impl Fence {
 
     pub fn from_state(parent_hwnd: HWND, state: FenceState) -> Result<Arc<Self>> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
-        let title_u16: Vec<u16> = state
-            .title
-            .as_ref()
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
-
         Base::create_window(
             0,
             register_classname(w!("Fence")),
@@ -279,7 +285,7 @@ impl Fence {
             std::ptr::null_mut(),
             h_instance,
             |base| {
-                let title_bar = TitleBar::new(base.hwnd(), title_u16.as_ptr(), &state.area)?;
+                let title_bar = TitleBar::new(base.hwnd(), state.title.clone(), &state.area)?;
                 let scroll_area = ScrollArea::new(base.hwnd(), &state.area)?;
 
                 let fence = Arc::new(Self {
@@ -374,8 +380,8 @@ impl Fence {
 
     pub fn set_title(&self, title: Arc<str>) {
         let mut inner = self.inner.lock().unwrap();
+        self.title_bar.set_title(title.clone());
         inner.title = title;
-        self.base.redraw();
     }
 
     pub fn add_icon(&self, title: &str) {
