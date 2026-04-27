@@ -116,10 +116,12 @@ impl Icon {
             let path_str = String::from_utf16_lossy(
                 &file_buf[..file_buf.iter().position(|&c| c == 0).unwrap_or(0)],
             );
-            let path = std::path::Path::new(&path_str);
-            self.set_path(Some(Arc::from(path_str)));
+            let path_stem: Option<String> = std::path::Path::new(&path_str)
+                .file_stem()
+                .and_then(|s| s.to_str().map(|s| s.to_string()));
+            self.set_path(Some(path_str.into()));
 
-            if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
+            if let Some(name) = path_stem {
                 let result = unsafe {
                     MessageBoxW(
                         self.base.hwnd(),
