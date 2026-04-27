@@ -18,6 +18,7 @@ use crate::app_state::save_thread::SaveThread;
 use crate::app_state::AppState;
 use crate::fence::{Fence, HitTest};
 use crate::paths;
+use crate::prompt;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Menus
@@ -504,11 +505,15 @@ impl DesktopCover {
                     if let Some(fence) = inner.fences.last() {
                         if let Some(icon) = fence.icon_by_index(icon_idx) {
                             let current_title = icon.title();
-                            // TODO: Implement real input dialog
-                            let new_title = format!("Renamed {}", current_title);
-                            icon.set_title(new_title.into());
-                            unsafe {
-                                MessageBoxW(hwnd, w!("Icon renamed"), w!("Rename"), MB_OK);
+                            let new_title = prompt::prompt_input(
+                                "Rename icon",
+                                "Enter new icon name:",
+                                &current_title,
+                            );
+                            if let Some(new_title) = new_title {
+                                if !new_title.is_empty() {
+                                    icon.set_title(new_title.into());
+                                }
                             }
                         }
                     }
