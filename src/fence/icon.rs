@@ -10,10 +10,9 @@ use windows_sys::Win32::UI::Controls::Dialogs::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
+use crate::app::App;
 use crate::config::state::IconState;
 use crate::window::{register_classname, Base, BaseRef, Window};
-
-pub const ICON_SIZE: i32 = 64;
 
 pub struct Icon {
     base: BaseRef,
@@ -31,6 +30,8 @@ impl Icon {
             path: path.map(|s| Arc::from(s)),
         });
 
+        let icon_size = App::get_config().icon.size;
+
         Base::create_window(
             0,
             register_classname(w!("FenceIcon")),
@@ -38,8 +39,8 @@ impl Icon {
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
             x,
             y,
-            ICON_SIZE,
-            ICON_SIZE,
+            icon_size,
+            icon_size,
             parent_hwnd,
             std::ptr::null_mut(),
             h_instance,
@@ -167,15 +168,19 @@ impl Window for Icon {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
+                let config = App::get_config();
                 let selected = self.selected.load(Ordering::SeqCst);
 
-                let bg_color = if selected { 0x00FFAA44 } else { 0x007D7D7D };
+                let bg_color = if selected {
+                    config.icon.selected_bg_color
+                } else {
+                    config.icon.unselected_bg_color
+                };
                 let brush = CreateSolidBrush(bg_color);
                 FillRect(hdc, &rect, brush);
                 DeleteObject(brush);
 
-                let icon_width = 32;
-                let icon_height = 32;
+                let icon_draw_size = config.icon.icon_size_draw;
                 let width = rect.right - rect.left;
 
                 let state = self.state.lock().unwrap();
@@ -202,11 +207,11 @@ impl Window for Icon {
 
                 DrawIconEx(
                     hdc,
-                    (width - icon_width) / 2,
+                    (width - icon_draw_size) / 2,
                     0,
                     hicon,
-                    icon_width,
-                    icon_height,
+                    icon_draw_size,
+                    icon_draw_size,
                     0,
                     std::ptr::null_mut(),
                     DI_NORMAL,
@@ -217,11 +222,11 @@ impl Window for Icon {
                 }
 
                 SetBkMode(hdc, TRANSPARENT as _);
-                SetTextColor(hdc, 0x00FFFFFF); // White text
+                SetTextColor(hdc, config.icon.text_color);
 
                 let title_utf16: Vec<u16> = state.title.encode_utf16().collect();
                 let mut text_rect = rect;
-                text_rect.top += icon_height;
+                text_rect.top += icon_draw_size;
                 DrawTextW(
                     hdc,
                     title_utf16.as_ptr(),

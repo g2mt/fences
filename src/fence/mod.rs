@@ -11,15 +11,11 @@ mod icon;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
+use crate::app::App;
 use crate::config::state::{FenceState, IconState};
-use crate::fence::icon::{Icon, ICON_SIZE};
+use crate::fence::icon::Icon;
 use crate::geo::Area;
 use crate::window::{register_classname, Base, BaseRef, Window};
-
-pub const BORDER_THICKNESS: i32 = 3;
-pub const TITLE_BAR_HEIGHT: i32 = 24;
-pub const FENCE_PADDING: i32 = 10;
-pub const FENCE_SPACING: i32 = 10;
 
 pub struct TitleBar {
     base: BaseRef,
@@ -56,7 +52,8 @@ impl TitleBar {
     }
 
     pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
-        Area::new(0, 0, fence_area.width, TITLE_BAR_HEIGHT)
+        let title_bar_height = App::get_config().fence.title_bar_height;
+        Area::new(0, 0, fence_area.width, title_bar_height)
     }
 
     pub fn set_title(&self, title: Arc<str>) {
@@ -81,12 +78,13 @@ impl Window for TitleBar {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
-                let title_brush = CreateSolidBrush(0x00323232);
+                let config = App::get_config();
+                let title_brush = CreateSolidBrush(config.fence.title_bar_bg_color);
                 FillRect(hdc, &rect, title_brush);
                 DeleteObject(title_brush);
 
                 SetBkMode(hdc, TRANSPARENT as _);
-                SetTextColor(hdc, 0x00FFFFFF);
+                SetTextColor(hdc, config.fence.title_text_color);
 
                 let title_utf16: Vec<u16> = self.title.lock().unwrap().encode_utf16().collect();
                 let mut text_rect = rect;
@@ -114,7 +112,15 @@ pub struct ScrollArea {
 impl ScrollArea {
     pub fn new(parent_hwnd: HWND, fence_area: &Area<i32>) -> Result<Arc<Self>> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
-        let area = Self::area_from_fence_area(fence_area);
+        let config = App::get_config();
+        let border = config.fence.border_thickness;
+        let title_h = config.fence.title_bar_height;
+        let area = Area::new(
+            border,
+            title_h,
+            fence_area.width - (border * 2),
+            fence_area.height - title_h - border,
+        );
         Base::create_window(
             0,
             register_classname(w!("FenceScrollArea")),
@@ -132,11 +138,14 @@ impl ScrollArea {
     }
 
     pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
+        let config = App::get_config();
+        let border = config.fence.border_thickness;
+        let title_h = config.fence.title_bar_height;
         Area::new(
-            BORDER_THICKNESS,
-            TITLE_BAR_HEIGHT,
-            fence_area.width - (BORDER_THICKNESS * 2),
-            fence_area.height - TITLE_BAR_HEIGHT - BORDER_THICKNESS,
+            border,
+            title_h,
+            fence_area.width - (border * 2),
+            fence_area.height - title_h - border,
         )
     }
 }
@@ -224,7 +233,7 @@ impl Window for ScrollArea {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
-                let scroll_brush = CreateSolidBrush(0x007D7D7D);
+                let scroll_brush = CreateSolidBrush(App::get_config().fence.scroll_area_bg_color);
                 FillRect(hdc, &rect, scroll_brush);
                 DeleteObject(scroll_brush);
 
@@ -334,15 +343,19 @@ impl Fence {
     }
 
     pub fn hit_test(&self, x: i32, y: i32) -> Option<HitTest> {
+        let config = App::get_config();
+        let border = config.fence.border_thickness;
+        let title_h = config.fence.title_bar_height;
+
         let rect = self.base.rect();
         if x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom {
             return None;
         }
 
-        let on_left = x < rect.left + BORDER_THICKNESS;
-        let on_right = x >= rect.right - BORDER_THICKNESS;
-        let on_top = y < rect.top + BORDER_THICKNESS;
-        let on_bottom = y >= rect.bottom - BORDER_THICKNESS;
+        let on_left = x < rect.left + border;
+        let on_right = x >= rect.right - border;
+        let on_top = y < rect.top + border;
+        let on_bottom = y >= rect.bottom - border;
 
         let hit = match (on_left, on_right, on_top, on_bottom) {
             (true, _, true, _) => HitTest::TopLeft,
@@ -354,7 +367,7 @@ impl Fence {
             (_, _, true, _) => HitTest::Top,
             (_, _, _, true) => HitTest::Bottom,
             _ => {
-                if y < rect.top + TITLE_BAR_HEIGHT {
+                if y < rect.top + title_h {
                     HitTest::TitleBar
                 } else {
                     let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
@@ -363,7 +376,7 @@ impl Fence {
                     unsafe { GetScrollInfo(self.scroll_area.base().hwnd(), SB_VERT, &mut si) };
 
                     let rel_x = x - rect.left;
-                    let rel_y = y - (rect.top + TITLE_BAR_HEIGHT) + si.nPos;
+                    let rel_y = y - (rect.top + title_h) + si.nPos;
                     let mut icon_hit = None;
                     let inner = self.inner.lock().unwrap();
                     for (i, icon) in inner.icons.iter().enumerate() {
@@ -486,21 +499,26 @@ impl Fence {
     }
 
     pub fn reflow_icons(&self) {
+        let config = App::get_config();
+        let icon_size = config.icon.size;
+        let fence_padding = config.fence.padding;
+        let fence_spacing = config.fence.spacing;
+
         let rect = self.base.rect();
         let width = rect.right - rect.left;
 
-        let available_width = width - (FENCE_PADDING * 2);
-        let cols = (available_width / (ICON_SIZE + FENCE_SPACING)).max(1);
+        let available_width = width - (fence_padding * 2);
+        let cols = (available_width / (icon_size + fence_spacing)).max(1);
 
         let inner = self.inner.lock().unwrap();
         for (i, icon) in inner.icons.iter().enumerate() {
             let col = i as i32 % cols;
             let row = i as i32 / cols;
 
-            let x = FENCE_PADDING + col * (ICON_SIZE + FENCE_SPACING);
-            let y = FENCE_PADDING + row * (ICON_SIZE + FENCE_SPACING);
+            let x = fence_padding + col * (icon_size + fence_spacing);
+            let y = fence_padding + row * (icon_size + fence_spacing);
 
-            icon.base().resize_to(x, y, ICON_SIZE, ICON_SIZE);
+            icon.base().resize_to(x, y, icon_size, icon_size);
         }
         drop(inner);
         self.update_scroll_info();
@@ -587,7 +605,7 @@ impl Window for Fence {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
-                let red_brush = CreateSolidBrush(0x000000FF);
+                let red_brush = CreateSolidBrush(App::get_config().fence.fence_bg_color);
                 FillRect(hdc, &rect, red_brush);
                 DeleteObject(red_brush);
 

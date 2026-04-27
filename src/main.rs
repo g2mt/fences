@@ -14,7 +14,7 @@ mod paths;
 mod prompt;
 mod window;
 
-use crate::app::APP;
+use crate::app::App;
 use crate::config::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
 use crate::paths::{app_file, LOG_PATH};
@@ -23,6 +23,7 @@ fn main() -> Result<()> {
     APP.get_or_init(|| app::App {
         cover: OnceLock::new(),
         save_thread: OnceLock::new(),
+        config: OnceLock::new(),
     });
 
     let log_path = app_file(LOG_PATH)?;
@@ -45,10 +46,13 @@ fn main() -> Result<()> {
         info!("Starting Desktop Cover");
 
         let cover = DesktopCover::new()?;
-        APP.get().unwrap().cover.get_or_init(|| cover.clone());
+        App::get().cover.get_or_init(|| cover.clone());
         let save_thread = SaveThread::new();
-        APP.get().unwrap().save_thread.set(save_thread).unwrap();
-        if let Err(e) = APP.get().unwrap().load_state() {
+        App::get().save_thread.set(save_thread).unwrap();
+
+        App::get().load_config()?;
+
+        if let Err(e) = App::get().load_state() {
             error!("{}", e.to_string());
         }
         unsafe {
@@ -59,7 +63,10 @@ fn main() -> Result<()> {
             }
             info!("Message loop stopped");
         }
-        if let Err(e) = APP.get().unwrap().save_state() {
+        if let Err(e) = App::get().save_state() {
+            error!("{}", e.to_string());
+        }
+        if let Err(e) = App::get().save_config() {
             error!("{}", e.to_string());
         }
 
