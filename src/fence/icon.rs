@@ -2,7 +2,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use tracing::info;
+use tracing::{error, info};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -112,6 +112,8 @@ impl Icon {
             #[cfg(windows)]
             command.creation_flags(CREATE_NO_WINDOW);
             let _ = command.spawn();
+        } else {
+            error!("No path specified for {}", self.title());
         }
     }
 
