@@ -35,8 +35,8 @@ fn main() -> Result<()> {
 
         unsafe {
             let cover = DesktopCover::new()?;
-            let save_thread = Arc::new(SaveThread::new(cover.clone()));
-            cover.set_save_thread(save_thread.clone());
+            let save_thread = SaveThread::new(cover.clone());
+            cover.set_save_thread(save_thread);
             let mut msg = std::mem::zeroed();
             while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
                 TranslateMessage(&msg);
@@ -47,7 +47,6 @@ fn main() -> Result<()> {
 
             // dropped at the end of program
             drop(cover);
-            drop(save_thread);
         }
 
         Ok(())

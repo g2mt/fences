@@ -31,7 +31,7 @@ pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
 pub struct DesktopCover {
     base: BaseRef,
     inner: Mutex<DesktopCoverInner>,
-    save_thread: OnceLock<Arc<SaveThread>>,
+    save_thread: OnceLock<SaveThread>,
 }
 
 struct DesktopCoverInner {
@@ -114,8 +114,10 @@ impl DesktopCover {
         )
     }
 
-    pub fn set_save_thread(&self, save_thread: Arc<SaveThread>) {
-        let _ = self.save_thread.set(save_thread);
+    pub fn set_save_thread(&self, save_thread: SaveThread) {
+        if self.save_thread.set(save_thread).is_err() {
+            panic!("set_save_thread")
+        }
     }
 
     pub fn save_state(&self) {
@@ -314,6 +316,9 @@ impl DesktopCover {
                 InvalidateRect(self.base.handle(), std::ptr::null(), TRUE);
                 UpdateWindow(self.base.handle());
             }
+            if let Some(save_thread) = self.save_thread.get() {
+                save_thread.set_unsaved();
+            }
             inner.last_mouse_pos = POINT { x, y };
         }
         0
@@ -467,6 +472,9 @@ impl DesktopCover {
                 }
             }
             _ => {}
+        }
+        if let Some(save_thread) = self.save_thread.get() {
+            save_thread.set_unsaved();
         }
         0
     }
