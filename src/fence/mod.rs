@@ -1,11 +1,11 @@
 use anyhow::Result;
-use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::Com::CoTaskMemFree;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 mod icon;
 use std::sync::atomic::Ordering;
@@ -15,7 +15,7 @@ use crate::app::App;
 use crate::config::state::{FenceState, IconState};
 use crate::fence::icon::Icon;
 use crate::geo::Area;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 pub struct TitleBar {
     base: BaseRef,

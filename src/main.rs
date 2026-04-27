@@ -17,7 +17,7 @@ mod window;
 use crate::app::App;
 use crate::config::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
-use crate::paths::{app_file, LOG_PATH};
+use crate::paths::{LOG_PATH, app_file};
 
 fn main() -> Result<()> {
     APP.get_or_init(|| app::App {
