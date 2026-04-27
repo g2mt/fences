@@ -80,7 +80,13 @@ impl DesktopCover {
                     nid.szTip[..len].copy_from_slice(&tip[..len]);
                     Shell_NotifyIconW(NIM_ADD, &nid);
 
-                    SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
+                    let opacity = APP.get().unwrap().config.lock().unwrap().fence.opacity;
+                    SetLayeredWindowAttributes(
+                        hwnd,
+                        0x00000000,
+                        (opacity * 255.0) as u8,
+                        LWA_COLORKEY | LWA_ALPHA,
+                    );
                     SetWindowPos(
                         hwnd,
                         HWND_BOTTOM,
