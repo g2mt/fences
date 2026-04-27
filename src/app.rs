@@ -4,11 +4,13 @@ use anyhow::Result;
 use tracing::{info, warn};
 
 use crate::config::state::AppState;
+use crate::config::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
 use crate::paths;
 
 pub struct App {
     pub cover: OnceLock<Arc<DesktopCover>>,
+    pub save_thread: OnceLock<SaveThread>,
 }
 
 /// Assume that the APP is always initialized and use the following to get the App:
@@ -40,5 +42,17 @@ impl App {
         let cover = self.cover.get().unwrap();
         cover.set_state(&state)?;
         Ok(())
+    }
+
+    pub fn set_save_thread(&self, thread: SaveThread) {
+        if self.save_thread.set(thread).is_err() {
+            panic!("set_save_thread already set");
+        }
+    }
+
+    pub fn mark_unsaved(&self) {
+        if let Some(thread) = self.save_thread.get() {
+            thread.set_unsaved();
+        }
     }
 }

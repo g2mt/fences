@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use tracing::{error, info, warn};
@@ -12,7 +12,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::core::*;
 
 use crate::config::state::AppState;
-use crate::config::save_thread::SaveThread;
+use crate::app::APP;
 use crate::fence::{Fence, HitTest};
 use crate::window::{Base, BaseRef, Window, register_classname};
 use crate::{paths, prompt};
@@ -35,7 +35,6 @@ pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
 pub struct DesktopCover {
     base: BaseRef,
     inner: Mutex<DesktopCoverInner>,
-    save_thread: OnceLock<SaveThread>,
 }
 
 struct DesktopCoverInner {
@@ -102,7 +101,6 @@ impl DesktopCover {
                         hit_type: None,
                         last_mouse_pos: POINT { x: 0, y: 0 },
                     }),
-                    save_thread: OnceLock::new(),
                 });
 
                 Ok(cover)
@@ -110,11 +108,6 @@ impl DesktopCover {
         )
     }
 
-    pub fn set_save_thread(&self, save_thread: SaveThread) {
-        if self.save_thread.set(save_thread).is_err() {
-            panic!("set_save_thread")
-        }
-    }
 
     pub fn state(&self) -> AppState {
         let inner = self.inner.lock().unwrap();
@@ -289,9 +282,7 @@ impl DesktopCover {
             }
 
             self.base.redraw();
-            if let Some(save_thread) = self.save_thread.get() {
-                save_thread.set_unsaved();
-            }
+            APP.get().unwrap().mark_unsaved();
             inner.last_mouse_pos = POINT { x, y };
         }
         0
@@ -526,8 +517,8 @@ impl DesktopCover {
             }
             _ => {}
         }
-        if should_save && let Some(save_thread) = self.save_thread.get() {
-            save_thread.set_unsaved();
+        if should_save {
+            APP.get().unwrap().mark_unsaved();
         }
         0
     }
