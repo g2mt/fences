@@ -1,3 +1,4 @@
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -276,13 +277,9 @@ impl DesktopCover {
                     HitTest::Client => (),
                     HitTest::Icon(_) => (),
                 }
-            }
 
-            self.base.redraw();
-            for fence in &inner.fences {
-                fence.base().redraw();
+                APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
             }
-            APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
             inner.last_mouse_pos = POINT { x, y };
         }
         0
