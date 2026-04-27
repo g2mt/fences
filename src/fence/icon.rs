@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::UI::Controls::Dialogs::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::Win32::UI::Controls::Dialogs::*;
 
 use crate::window::{register_classname, Base, BaseRef, Window};
 
@@ -101,7 +101,7 @@ impl Icon {
         self.base.redraw();
     }
 
-    pub fn set_path_from_selector(&self) {
+    pub fn set_info_from_selector(&self) {
         let mut file_buf = [0u16; MAX_PATH as usize];
         let mut ofn: OPENFILENAMEW = unsafe { std::mem::zeroed() };
         ofn.lStructSize = std::mem::size_of::<OPENFILENAMEW>() as u32;
