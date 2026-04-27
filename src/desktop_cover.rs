@@ -192,18 +192,21 @@ impl DesktopCover {
         let x = (lparam & 0xFFFF) as i16 as i32;
         let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
-        let mut hit_icon = false;
+        let mut hit_icon = None;
         {
             let inner = self.inner.lock().unwrap();
             for fence in inner.fences.iter().rev() {
-                if let Some(HitTest::Icon(_)) = fence.hit_test(x, y) {
-                    hit_icon = true;
+                if let Some(hit @ HitTest::Icon(_)) = fence.hit_test(x, y) {
+                    hit_icon = Some(hit);
                     break;
                 }
             }
         }
 
-        if hit_icon {
+        if let Some(hit) = hit_icon {
+            let mut inner = self.inner.lock().unwrap();
+            inner.hit_type = Some(hit);
+            drop(inner);
             self.on_command(IDM_RUN_ICON);
         }
         0
