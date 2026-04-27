@@ -13,6 +13,7 @@ use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 use crate::fence::{Fence, FenceState, HitTest};
+use crate::paths;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Menus
@@ -120,40 +121,12 @@ impl DesktopCover {
         )
     }
 
-    fn get_config_dir() -> Result<PathBuf> {
-        let mut path = vec![0u16; MAX_PATH as usize];
-        unsafe {
-            if SHGetSpecialFolderPathW(std::ptr::null_mut(), path.as_mut_ptr(), CSIDL_PERSONAL as _, FALSE) == FALSE {
-                return Err(anyhow::anyhow!("Failed to get Documents folder"));
-            }
-        }
-        let path_str = String::from_utf16_lossy(&path.iter().take_while(|&&c| c != 0).cloned().collect::<Vec<_>>());
-        let mut config_path = PathBuf::from(path_str);
-        config_path.push("FencesConf");
-        if !config_path.exists() {
-            std::fs::create_dir_all(&config_path)?;
-        }
-        Ok(config_path)
-    }
-
-    pub fn get_log_path() -> Result<PathBuf> {
-        let mut path = Self::get_config_dir()?;
-        path.push("log.txt");
-        Ok(path)
-    }
-
-    fn get_state_path() -> Result<PathBuf> {
-        let mut path = Self::get_config_dir()?;
-        path.push("state.json");
-        Ok(path)
-    }
-
     pub fn save_state(&self) -> Result<()> {
         let inner = self.inner.lock().unwrap();
         let state = AppState {
             fences: inner.fences.iter().map(|f| f.get_state()).collect(),
         };
-        let path = Self::get_state_path()?;
+        let path = paths::get_state_path()?;
         let json = serde_json::to_string_pretty(&state)?;
         std::fs::write(&path, json)?;
         info!("State saved to {:?}", path);
@@ -161,7 +134,7 @@ impl DesktopCover {
     }
 
     fn load_state(&self) -> Result<()> {
-        let path = Self::get_state_path()?;
+        let path = paths::get_state_path()?;
         if !path.exists() {
             warn!("No state file found at {:?}", path);
             return Ok(());

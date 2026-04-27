@@ -4,6 +4,7 @@ use tracing_subscriber::prelude::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod desktop_cover;
+mod paths;
 mod fence;
 mod geo;
 mod window;
@@ -11,7 +12,7 @@ mod window;
 use crate::desktop_cover::DesktopCover;
 
 fn main() -> Result<()> {
-    let log_path = DesktopCover::get_log_path()?;
+    let log_path = paths::get_log_path()?;
     let file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
