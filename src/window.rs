@@ -193,7 +193,7 @@ impl Base {
                 y,
                 width,
                 height,
-                SWP_NOZORDER | SWP_NOACTIVATE,
+                SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS,
             );
         }
     }
@@ -241,7 +241,7 @@ impl Base {
                 top,
                 width,
                 height,
-                SWP_NOZORDER | SWP_NOACTIVATE,
+                SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS,
             )
         }
     }
