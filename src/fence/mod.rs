@@ -52,7 +52,7 @@ impl TitleBar {
     }
 
     pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
-        let title_bar_height = App::get_config().fence.title_bar_height;
+        let title_bar_height = App::config().fence.title_bar_height;
         Area::new(0, 0, fence_area.width, title_bar_height)
     }
 
@@ -78,7 +78,7 @@ impl Window for TitleBar {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
-                let config = App::get_config();
+                let config = App::config();
                 let title_brush = CreateSolidBrush(config.fence.title_bar_bg_color);
                 FillRect(hdc, &rect, title_brush);
                 DeleteObject(title_brush);
@@ -112,7 +112,7 @@ pub struct ScrollArea {
 impl ScrollArea {
     pub fn new(parent_hwnd: HWND, fence_area: &Area<i32>) -> Result<Arc<Self>> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
-        let config = App::get_config();
+        let config = App::config();
         let border = config.fence.border_thickness;
         let title_h = config.fence.title_bar_height;
         let area = Area::new(
@@ -138,7 +138,7 @@ impl ScrollArea {
     }
 
     pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
-        let config = App::get_config();
+        let config = App::config();
         let border = config.fence.border_thickness;
         let title_h = config.fence.title_bar_height;
         Area::new(
@@ -233,7 +233,7 @@ impl Window for ScrollArea {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
-                let scroll_brush = CreateSolidBrush(App::get_config().fence.scroll_area_bg_color);
+                let scroll_brush = CreateSolidBrush(App::config().fence.scroll_area_bg_color);
                 FillRect(hdc, &rect, scroll_brush);
                 DeleteObject(scroll_brush);
 
@@ -343,7 +343,7 @@ impl Fence {
     }
 
     pub fn hit_test(&self, x: i32, y: i32) -> Option<HitTest> {
-        let config = App::get_config();
+        let config = App::config();
         let border = config.fence.border_thickness;
         let title_h = config.fence.title_bar_height;
 
@@ -499,7 +499,7 @@ impl Fence {
     }
 
     pub fn reflow_icons(&self) {
-        let config = App::get_config();
+        let config = App::config();
         let icon_size = config.icon.size;
         let fence_padding = config.fence.padding;
         let fence_spacing = config.fence.spacing;
@@ -605,7 +605,7 @@ impl Window for Fence {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
-                let red_brush = CreateSolidBrush(App::get_config().fence.fence_bg_color);
+                let red_brush = CreateSolidBrush(App::config().fence.fence_bg_color);
                 FillRect(hdc, &rect, red_brush);
                 DeleteObject(red_brush);
 

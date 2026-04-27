@@ -30,7 +30,7 @@ impl Icon {
             path: path.map(|s| Arc::from(s)),
         });
 
-        let icon_size = App::get_config().icon.size;
+        let icon_size = App::config().icon.size;
 
         Base::create_window(
             0,
@@ -168,7 +168,7 @@ impl Window for Icon {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
-                let config = App::get_config();
+                let config = App::config();
                 let selected = self.selected.load(Ordering::SeqCst);
 
                 let bg_color = if selected {

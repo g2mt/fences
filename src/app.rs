@@ -15,10 +15,7 @@ pub struct App {
     pub config: OnceLock<Arc<Config>>,
 }
 
-/// Assume that the APP is always initialized and use the following to get the App:
-/// ```
-/// APP.get().unwrap()
-/// ```
+/// Assume that the APP is always initialized and the [App::get()] api to access.
 pub static APP: OnceLock<App> = OnceLock::new();
 
 impl App {
@@ -26,12 +23,8 @@ impl App {
         APP.get().expect("App not initialized")
     }
 
-    pub fn get_config() -> Arc<Config> {
-        Self::get()
-            .config
-            .get()
-            .expect("Config not loaded")
-            .clone()
+    pub fn config() -> Arc<Config> {
+        Self::get().config.get().expect("Config not loaded").clone()
     }
 
     pub fn save_state(&self) -> Result<()> {
