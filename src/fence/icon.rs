@@ -117,10 +117,21 @@ impl Icon {
                 &file_buf[..file_buf.iter().position(|&c| c == 0).unwrap_or(0)],
             );
             let path = std::path::Path::new(&path_str);
-            if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                self.set_title(Arc::from(name));
-            }
             self.set_path(Some(Arc::from(path_str)));
+
+            if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
+                let result = unsafe {
+                    MessageBoxW(
+                        self.base.hwnd(),
+                        w!("Do you want to update the icon name to match the file?"),
+                        w!("Update Name"),
+                        MB_YESNO | MB_ICONQUESTION,
+                    )
+                };
+                if result == IDYES {
+                    self.set_title(Arc::from(name));
+                }
+            }
         }
     }
 }
