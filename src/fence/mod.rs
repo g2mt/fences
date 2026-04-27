@@ -314,8 +314,8 @@ impl Fence {
                 .icons
                 .iter()
                 .map(|i| IconState {
-                    title: i.title.clone(),
-                    path: i.path.clone(),
+                    title: i.title().to_string(),
+                    path: i.path().cloned(),
                 })
                 .collect(),
         }

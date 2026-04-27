@@ -20,8 +20,8 @@ pub struct IconState {
 
 pub struct Icon {
     base: BaseRef,
-    pub title: String,
-    pub path: Option<String>,
+    title: String,
+    path: Option<String>,
     selected: AtomicBool,
 }
 
@@ -75,6 +75,10 @@ impl Icon {
         unsafe {
             InvalidateRect(self.base.handle(), std::ptr::null(), TRUE);
         }
+    }
+
+    pub fn path(&self) -> Option<&String> {
+        self.path.as_ref()
     }
 }
 
