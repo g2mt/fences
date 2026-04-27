@@ -11,7 +11,7 @@ use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::core::*;
 
-use crate::config::AppState;
+use crate::config::state::AppState;
 use crate::config::save_thread::SaveThread;
 use crate::fence::{Fence, HitTest};
 use crate::window::{Base, BaseRef, Window, register_classname};
@@ -498,7 +498,7 @@ impl DesktopCover {
                 }
                 should_save = true;
             }
-            IDM_RUN_ICON => unsafe {
+            IDM_RUN_ICON => {
                 if let Some(HitTest::Icon(icon_idx)) = hit_type {
                     let inner = self.inner.lock().unwrap();
                     if let Some(fence) = inner.fences.last() {

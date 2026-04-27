@@ -1,22 +1,20 @@
 use anyhow::Result;
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::Com::CoTaskMemFree;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 mod icon;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
-use icon::{Icon, IconState};
-use serde::{Deserialize, Serialize};
-
-use crate::fence::icon::ICON_SIZE;
+use crate::config::state::{FenceState, IconState};
+use crate::fence::icon::{Icon, ICON_SIZE};
 use crate::geo::Area;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub const BORDER_THICKNESS: i32 = 3;
 pub const TITLE_BAR_HEIGHT: i32 = 24;
@@ -251,13 +249,6 @@ pub enum HitTest {
     TopRight,
     BottomLeft,
     BottomRight,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct FenceState {
-    pub title: Arc<str>,
-    pub area: Area<i32>,
-    pub icons: Vec<IconState>,
 }
 
 pub struct Fence {

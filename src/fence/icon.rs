@@ -2,24 +2,18 @@ use std::os::windows::process::CommandExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use serde::{Deserialize, Serialize};
 use tracing::info;
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Controls::Dialogs::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::config::state::IconState;
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub const ICON_SIZE: i32 = 64;
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct IconState {
-    pub title: Arc<str>,
-    pub path: Option<Arc<str>>,
-}
 
 pub struct Icon {
     base: BaseRef,
