@@ -111,7 +111,8 @@ impl Base {
             )?
         };
         let window = f(base)?;
-        window.base().window.get_or_init(|| Arc::downgrade(&window));
+        let window_ = Arc::downgrade(&window);
+        window.base().window.get_or_init(|| window_);
         Ok(window)
     }
 
