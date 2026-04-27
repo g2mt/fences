@@ -474,6 +474,20 @@ impl Window for Fence {
         let hwnd = self.base().handle();
         match msg {
             WM_NCHITTEST => HTTRANSPARENT as LRESULT,
+            WM_PAINT => unsafe {
+                let mut ps: PAINTSTRUCT = std::mem::zeroed();
+                let hdc = BeginPaint(hwnd, &mut ps);
+
+                let mut rect: RECT = std::mem::zeroed();
+                GetClientRect(hwnd, &mut rect);
+
+                let red_brush = CreateSolidBrush(0x000000FF);
+                FillRect(hdc, &rect, red_brush);
+                DeleteObject(red_brush);
+
+                EndPaint(hwnd, &ps);
+                0
+            },
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
     }
