@@ -201,8 +201,22 @@ impl Window for ScrollArea {
             },
             WM_MOUSEWHEEL => unsafe {
                 let delta = (wparam >> 16) as i16 as i32;
-                let msg = if delta > 0 { SB_LINEUP } else { SB_LINEDOWN };
-                SendMessageW(hwnd, WM_VSCROLL, msg as WPARAM, 0);
+                let mut si: SCROLLINFO = std::mem::zeroed();
+                si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
+                si.fMask = SIF_ALL;
+                GetScrollInfo(hwnd, SB_VERT, &mut si);
+
+                let scroll_amount = (delta / WHEEL_DELTA as i32) * 30;
+                let new_pos = (si.nPos - scroll_amount).clamp(si.nMin, si.nMax - si.nPage as i32);
+
+                if new_pos != si.nPos {
+                    SendMessageW(
+                        hwnd,
+                        WM_VSCROLL,
+                        ((new_pos as usize) << 16) | SB_THUMBTRACK as usize,
+                        0,
+                    );
+                }
                 0
             },
             WM_PAINT => unsafe {
