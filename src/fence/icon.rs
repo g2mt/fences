@@ -2,13 +2,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
-use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 pub const ICON_SIZE: i32 = 64;
 

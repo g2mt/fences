@@ -1,25 +1,23 @@
+use std::ffi::OsStr;
+use std::os::windows::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use anyhow::Result;
 use tracing::{error, info, warn};
-use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
-use std::ffi::OsStr;
-use std::os::windows::ffi::OsStrExt;
-
-use crate::app_state::save_thread::SaveThread;
 use crate::app_state::AppState;
+use crate::app_state::save_thread::SaveThread;
 use crate::fence::{Fence, HitTest};
-use crate::paths;
-use crate::prompt;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::{paths, prompt};
 
 // Menus
 pub const IDM_EXIT: usize = 101;
@@ -471,18 +469,17 @@ impl DesktopCover {
             IDM_RENAME_FENCE => {
                 let inner = self.inner.lock().unwrap();
                 if let Some(fence) = inner.fences.last() {
-                    let current_title = fence.title();
-                    let new_title = prompt::prompt_input(
-                        self.base.hwnd(),
-                        "Rename fence",
-                        "Enter new name:",
-                        &current_title,
-                    );
-                    if let Some(new_title) = new_title {
-                        if !new_title.is_empty() {
-                            fence.set_title(new_title.into());
+                    let fence = fence.clone();
+                    std::thread::spawn(move || {
+                        let current_title = fence.title();
+                        let new_title =
+                            prompt::prompt_input("Rename fence", "Enter new name:", &current_title);
+                        if let Some(new_title) = new_title {
+                            if !new_title.is_empty() {
+                                fence.set_title(new_title.into());
+                            }
                         }
-                    }
+                    });
                 }
                 should_save = true;
             }
@@ -509,18 +506,20 @@ impl DesktopCover {
                     let inner = self.inner.lock().unwrap();
                     if let Some(fence) = inner.fences.last() {
                         if let Some(icon) = fence.icon_by_index(icon_idx) {
-                            let current_title = icon.title();
-                            let new_title = prompt::prompt_input(
-                                self.base.hwnd(),
-                                "Rename icon",
-                                "Enter new icon name:",
-                                &current_title,
-                            );
-                            if let Some(new_title) = new_title {
-                                if !new_title.is_empty() {
-                                    icon.set_title(new_title.into());
+                            let icon = icon.clone();
+                            std::thread::spawn(move || {
+                                let current_title = icon.title();
+                                let new_title = prompt::prompt_input(
+                                    "Rename icon",
+                                    "Enter new icon name:",
+                                    &current_title,
+                                );
+                                if let Some(new_title) = new_title {
+                                    if !new_title.is_empty() {
+                                        icon.set_title(new_title.into());
+                                    }
                                 }
-                            }
+                            });
                         }
                     }
                 }

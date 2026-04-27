@@ -1,12 +1,12 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use tracing::{error, info};
-use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 const ID_EDIT: u32 = 101;
 const ID_OK: u32 = 1;
@@ -25,7 +25,6 @@ unsafe extern "system" fn input_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    info!("msg={} {:x} {:x}", msg, wparam, lparam);
     match msg {
         WM_NCCREATE => unsafe {
             // Store the InputDialogData pointer passed through lParam
@@ -209,10 +208,6 @@ pub fn prompt_input(title: &str, message: &str, default: &str) -> Option<String>
         // Retrieve result
         let data = Box::from_raw(data_ptr);
         let result = data.ok_clicked.load(Ordering::SeqCst);
-        if result {
-            data.result
-        } else {
-            None
-        }
+        if result { data.result } else { None }
     }
 }

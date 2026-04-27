@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicI32, Ordering};
 
+use serde::{Deserialize, Serialize};
 use windows_sys::Win32::Foundation::RECT;
 
 pub trait Scalar {

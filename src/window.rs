@@ -3,12 +3,12 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, MutexGuard, OnceLock, Weak};
 
-use anyhow::{anyhow, Result};
-use windows_sys::core::*;
+use anyhow::{Result, anyhow};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 use crate::geo::Area;
 
