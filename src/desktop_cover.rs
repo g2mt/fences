@@ -472,11 +472,15 @@ impl DesktopCover {
                 let inner = self.inner.lock().unwrap();
                 if let Some(fence) = inner.fences.last() {
                     let current_title = fence.title();
-                    // TODO: Implement real input dialog
-                    let new_title = format!("Renamed {}", current_title);
-                    fence.set_title(new_title.into());
-                    unsafe {
-                        MessageBoxW(hwnd, w!("Fence renamed"), w!("Rename"), MB_OK);
+                    let new_title = prompt::prompt_input(
+                        "Rename fence",
+                        "Enter new name:",
+                        &current_title,
+                    );
+                    if let Some(new_title) = new_title {
+                        if !new_title.is_empty() {
+                            fence.set_title(new_title.into());
+                        }
                     }
                 }
                 should_save = true;
