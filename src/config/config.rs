@@ -30,7 +30,7 @@ impl Default for FenceConfig {
             title_bar_bg_color: Color(0x00323232),
             title_text_color: Color(0x00FFFFFF),
             scroll_area_bg_color: Color(0x007D7D7D),
-            fence_bg_color: Color(0x000000FF),
+            fence_bg_color: Color(0x00000000),
         }
     }
 }
