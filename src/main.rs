@@ -1,4 +1,6 @@
 use anyhow::Result;
+use tracing::{info, error};
+use tracing_subscriber::prelude::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod desktop_cover;
@@ -9,6 +11,19 @@ mod window;
 use crate::desktop_cover::DesktopCover;
 
 fn main() -> Result<()> {
+    let log_path = DesktopCover::get_log_path()?;
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)?;
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
+        .with(tracing_subscriber::fmt::layer().with_writer(file))
+        .init();
+
+    info!("Starting Desktop Cover");
+
     unsafe {
         let cover = DesktopCover::new()?;
         let mut msg = std::mem::zeroed();
@@ -16,7 +31,7 @@ fn main() -> Result<()> {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
-        println!("stop");
+        info!("Message loop stopped");
         let _ = cover.save_state();
         std::mem::drop(cover); // dropped at the end of program
     }

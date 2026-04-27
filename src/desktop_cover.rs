@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
+use tracing::{info, warn, error};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -119,7 +120,7 @@ impl DesktopCover {
         )
     }
 
-    fn get_config_path() -> Result<PathBuf> {
+    fn get_config_dir() -> Result<PathBuf> {
         let mut path = vec![0u16; MAX_PATH as usize];
         unsafe {
             if SHGetSpecialFolderPathW(std::ptr::null_mut(), path.as_mut_ptr(), CSIDL_PERSONAL as _, FALSE) == FALSE {
@@ -132,8 +133,19 @@ impl DesktopCover {
         if !config_path.exists() {
             std::fs::create_dir_all(&config_path)?;
         }
-        config_path.push("state.json");
         Ok(config_path)
+    }
+
+    pub fn get_log_path() -> Result<PathBuf> {
+        let mut path = Self::get_config_dir()?;
+        path.push("log.txt");
+        Ok(path)
+    }
+
+    fn get_state_path() -> Result<PathBuf> {
+        let mut path = Self::get_config_dir()?;
+        path.push("state.json");
+        Ok(path)
     }
 
     pub fn save_state(&self) -> Result<()> {
@@ -141,19 +153,22 @@ impl DesktopCover {
         let state = AppState {
             fences: inner.fences.iter().map(|f| f.get_state()).collect(),
         };
-        let path = Self::get_config_path()?;
+        let path = Self::get_state_path()?;
         let json = serde_json::to_string_pretty(&state)?;
-        std::fs::write(path, json)?;
+        std::fs::write(&path, json)?;
+        info!("State saved to {:?}", path);
         Ok(())
     }
 
     fn load_state(&self) -> Result<()> {
-        let path = Self::get_config_path()?;
+        let path = Self::get_state_path()?;
         if !path.exists() {
+            warn!("No state file found at {:?}", path);
             return Ok(());
         }
-        let json = std::fs::read_to_string(path)?;
+        let json = std::fs::read_to_string(&path)?;
         let state: AppState = serde_json::from_str(&json)?;
+        info!("Loading state from {:?}", path);
         let mut inner = self.inner.lock().unwrap();
         for f_state in state.fences {
             let fence = Fence::from_state(self.base.handle(), f_state)?;
