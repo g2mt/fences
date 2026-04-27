@@ -12,11 +12,11 @@ pub struct FenceConfig {
     pub title_bar_height: i32,
     pub padding: i32,
     pub spacing: i32,
-    pub border_color: Color,
-    pub title_bar_bg_color: Color,
+    pub border_color: Color<true>,
+    pub title_bar_bg_color: Color<true>,
     pub title_text_color: Color,
-    pub scroll_area_bg_color: Color,
-    pub fence_bg_color: Color,
+    pub scroll_area_bg_color: Color<true>,
+    pub fence_bg_color: Color<true>,
 }
 
 impl Default for FenceConfig {
@@ -26,10 +26,10 @@ impl Default for FenceConfig {
             title_bar_height: 24,
             padding: 10,
             spacing: 10,
-            border_color: Color(0x00323232),
-            title_bar_bg_color: Color(0x00323232),
+            border_color: Color(0xFF323232),
+            title_bar_bg_color: Color(0xFF323232),
             title_text_color: Color(0x00FFFFFF),
-            scroll_area_bg_color: Color(0x007D7D7D),
+            scroll_area_bg_color: Color(0xFF7D7D7D),
             fence_bg_color: Color(0x00000000),
         }
     }

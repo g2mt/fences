@@ -79,9 +79,33 @@ impl Window for TitleBar {
                 GetClientRect(hwnd, &mut rect);
 
                 let config = App::config();
-                let title_brush = CreateSolidBrush(config.fence.title_bar_bg_color);
-                FillRect(hdc, &rect, title_brush);
-                DeleteObject(title_brush);
+                let color = config.fence.title_bar_bg_color.0;
+                let alpha = (color >> 24) as u8;
+                if alpha == 255 {
+                    let title_brush = CreateSolidBrush(color & 0xFFFFFF);
+                    FillRect(hdc, &rect, title_brush);
+                    DeleteObject(title_brush);
+                } else if alpha > 0 {
+                    let mem_dc = CreateCompatibleDC(hdc);
+                    let bitmap = CreateCompatibleBitmap(hdc, rect.right - rect.left, rect.bottom - rect.top);
+                    SelectObject(mem_dc, bitmap);
+                    
+                    let brush = CreateSolidBrush(color & 0xFFFFFF);
+                    let local_rect = RECT { left: 0, top: 0, right: rect.right - rect.left, bottom: rect.bottom - rect.top };
+                    FillRect(mem_dc, &local_rect, brush);
+                    DeleteObject(brush);
+
+                    let blend = BLENDFUNCTION {
+                        BlendOp: AC_SRC_OVER as u8,
+                        BlendFlags: 0,
+                        SourceConstantAlpha: alpha,
+                        AlphaFormat: 0,
+                    };
+                    GdiAlphaBlend(hdc, 0, 0, rect.right, rect.bottom, mem_dc, 0, 0, rect.right, rect.bottom, blend);
+                    
+                    DeleteObject(bitmap);
+                    DeleteDC(mem_dc);
+                }
 
                 SetBkMode(hdc, TRANSPARENT as _);
                 SetTextColor(hdc, config.fence.title_text_color);
@@ -233,9 +257,33 @@ impl Window for ScrollArea {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
-                let scroll_brush = CreateSolidBrush(App::config().fence.scroll_area_bg_color);
-                FillRect(hdc, &rect, scroll_brush);
-                DeleteObject(scroll_brush);
+                let color = App::config().fence.scroll_area_bg_color.0;
+                let alpha = (color >> 24) as u8;
+                if alpha == 255 {
+                    let scroll_brush = CreateSolidBrush(color & 0xFFFFFF);
+                    FillRect(hdc, &rect, scroll_brush);
+                    DeleteObject(scroll_brush);
+                } else if alpha > 0 {
+                    let mem_dc = CreateCompatibleDC(hdc);
+                    let bitmap = CreateCompatibleBitmap(hdc, rect.right - rect.left, rect.bottom - rect.top);
+                    SelectObject(mem_dc, bitmap);
+                    
+                    let brush = CreateSolidBrush(color & 0xFFFFFF);
+                    let local_rect = RECT { left: 0, top: 0, right: rect.right - rect.left, bottom: rect.bottom - rect.top };
+                    FillRect(mem_dc, &local_rect, brush);
+                    DeleteObject(brush);
+
+                    let blend = BLENDFUNCTION {
+                        BlendOp: AC_SRC_OVER as u8,
+                        BlendFlags: 0,
+                        SourceConstantAlpha: alpha,
+                        AlphaFormat: 0,
+                    };
+                    GdiAlphaBlend(hdc, 0, 0, rect.right, rect.bottom, mem_dc, 0, 0, rect.right, rect.bottom, blend);
+                    
+                    DeleteObject(bitmap);
+                    DeleteDC(mem_dc);
+                }
 
                 EndPaint(hwnd, &ps);
                 0
@@ -605,9 +653,33 @@ impl Window for Fence {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
-                let red_brush = CreateSolidBrush(App::config().fence.fence_bg_color);
-                FillRect(hdc, &rect, red_brush);
-                DeleteObject(red_brush);
+                let color = App::config().fence.fence_bg_color.0;
+                let alpha = (color >> 24) as u8;
+                if alpha == 255 {
+                    let brush = CreateSolidBrush(color & 0xFFFFFF);
+                    FillRect(hdc, &rect, brush);
+                    DeleteObject(brush);
+                } else if alpha > 0 {
+                    let mem_dc = CreateCompatibleDC(hdc);
+                    let bitmap = CreateCompatibleBitmap(hdc, rect.right - rect.left, rect.bottom - rect.top);
+                    SelectObject(mem_dc, bitmap);
+                    
+                    let brush = CreateSolidBrush(color & 0xFFFFFF);
+                    let local_rect = RECT { left: 0, top: 0, right: rect.right - rect.left, bottom: rect.bottom - rect.top };
+                    FillRect(mem_dc, &local_rect, brush);
+                    DeleteObject(brush);
+
+                    let blend = BLENDFUNCTION {
+                        BlendOp: AC_SRC_OVER as u8,
+                        BlendFlags: 0,
+                        SourceConstantAlpha: alpha,
+                        AlphaFormat: 0,
+                    };
+                    GdiAlphaBlend(hdc, 0, 0, rect.right, rect.bottom, mem_dc, 0, 0, rect.right, rect.bottom, blend);
+                    
+                    DeleteObject(bitmap);
+                    DeleteDC(mem_dc);
+                }
 
                 EndPaint(hwnd, &ps);
                 0
