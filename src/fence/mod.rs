@@ -4,7 +4,7 @@ use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::Com::*;
 use windows_sys::Win32::UI::Controls::*;
-use windows_sys::Win32::UI::Shell::*;
+use windows_sys::Win32::UI::Shell::{IFileOpenDialog, IShellItem, *};
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
