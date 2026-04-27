@@ -236,6 +236,17 @@ impl Base {
         self.area.height.fetch_add(dh, Ordering::Relaxed);
         self.set_window_pos();
     }
+
+    pub unsafe fn resize_to_deferred(
+        &self,
+        left: i32,
+        top: i32,
+        width: i32,
+        height: i32,
+        hwinposinfo: HDWP,
+    ) {
+        todo!()
+    }
 }
 
 impl Drop for Base {
