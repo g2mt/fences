@@ -378,17 +378,21 @@ impl Fence {
 
         unsafe {
             let mut hdwp = BeginDeferWindowPos(2);
-            if hdwp != 0 {
-                hdwp = self.title_bar.base().resize_to_deferred(0, 0, width, TITLE_BAR_HEIGHT, hdwp);
-                hdwp = self.scroll_area.base().resize_to_deferred(
-                    0,
-                    TITLE_BAR_HEIGHT,
-                    width,
-                    height - TITLE_BAR_HEIGHT,
-                    hdwp,
-                );
-                EndDeferWindowPos(hdwp);
+            if hdwp.is_null() {
+                panic!("hdwp is null");
             }
+            hdwp = self
+                .title_bar
+                .base()
+                .resize_to_deferred(0, 0, width, TITLE_BAR_HEIGHT, hdwp);
+            hdwp = self.scroll_area.base().resize_to_deferred(
+                0,
+                TITLE_BAR_HEIGHT,
+                width,
+                height - TITLE_BAR_HEIGHT,
+                hdwp,
+            );
+            EndDeferWindowPos(hdwp);
         }
 
         self.reflow_icons();
