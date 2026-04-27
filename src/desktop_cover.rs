@@ -127,6 +127,7 @@ impl DesktopCover {
 
             let brush = CreateSolidBrush(0x00000000);
             FillRect(hdc, &ps.rcPaint, brush);
+            DeleteObject(brush);
 
             EndPaint(hwnd, &ps);
         }
@@ -250,7 +251,7 @@ impl DesktopCover {
             }
 
             unsafe {
-                InvalidateRect(self.base.handle(), std::ptr::null(), FALSE);
+                InvalidateRect(self.base.handle(), std::ptr::null(), TRUE);
                 UpdateWindow(self.base.handle());
             }
             inner.last_mouse_pos = POINT { x, y };
