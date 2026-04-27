@@ -161,7 +161,7 @@ impl Base {
         Ok(self_ref)
     }
 
-    pub fn handle(&self) -> HWND {
+    pub fn hwnd(&self) -> HWND {
         self.hwnd
     }
 

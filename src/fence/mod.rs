@@ -58,7 +58,7 @@ impl Window for TitleBar {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().handle();
+        let hwnd = self.base().hwnd();
         match msg {
             WM_NCHITTEST => HTTRANSPARENT as LRESULT,
             WM_PAINT => unsafe {
@@ -136,7 +136,7 @@ impl Window for ScrollArea {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().handle();
+        let hwnd = self.base().hwnd();
         match msg {
             WM_NCHITTEST => unsafe {
                 let res = DefWindowProcW(hwnd, msg, wparam, lparam);
@@ -278,8 +278,8 @@ impl Fence {
             std::ptr::null_mut(),
             h_instance,
             |base| {
-                let title_bar = TitleBar::new(base.handle(), title_u16.as_ptr(), &state.area)?;
-                let scroll_area = ScrollArea::new(base.handle(), &state.area)?;
+                let title_bar = TitleBar::new(base.hwnd(), title_u16.as_ptr(), &state.area)?;
+                let scroll_area = ScrollArea::new(base.hwnd(), &state.area)?;
 
                 let fence = Arc::new(Self {
                     base,
@@ -348,7 +348,7 @@ impl Fence {
                     let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
                     si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
                     si.fMask = SIF_POS;
-                    unsafe { GetScrollInfo(self.scroll_area.base().handle(), SB_VERT, &mut si) };
+                    unsafe { GetScrollInfo(self.scroll_area.base().hwnd(), SB_VERT, &mut si) };
 
                     let rel_x = x - rect.left;
                     let rel_y = y - (rect.top + TITLE_BAR_HEIGHT) + si.nPos;
@@ -379,7 +379,7 @@ impl Fence {
     pub fn add_icon_with_path(&self, title: &str, path: Option<&str>) {
         let mut inner = self.inner.lock().unwrap();
         inner.icons.push(Icon::new(
-            self.scroll_area.base().handle(),
+            self.scroll_area.base().hwnd(),
             title,
             path,
             0,
@@ -530,7 +530,7 @@ impl Fence {
 
     pub fn update_scroll_info(&self) {
         let mut rect: RECT = unsafe { std::mem::zeroed() };
-        unsafe { GetClientRect(self.scroll_area.base().handle(), &mut rect) };
+        unsafe { GetClientRect(self.scroll_area.base().hwnd(), &mut rect) };
         let view_height = rect.bottom - rect.top;
 
         let inner = self.inner.lock().unwrap();
@@ -549,7 +549,7 @@ impl Fence {
         si.nMin = 0;
         si.nMax = content_height;
         si.nPage = view_height as u32;
-        unsafe { SetScrollInfo(self.scroll_area.base().handle(), SB_VERT, &si, TRUE) };
+        unsafe { SetScrollInfo(self.scroll_area.base().hwnd(), SB_VERT, &si, TRUE) };
         drop(inner);
     }
 }
@@ -560,7 +560,7 @@ impl Window for Fence {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().handle();
+        let hwnd = self.base().hwnd();
         match msg {
             WM_NCHITTEST => HTTRANSPARENT as LRESULT,
             WM_PAINT => unsafe {

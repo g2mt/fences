@@ -63,7 +63,7 @@ impl DesktopCover {
             std::ptr::null_mut(),
             h_instance,
             |base| {
-                let hwnd = base.handle();
+                let hwnd = base.hwnd();
                 unsafe {
                     let mut nid: NOTIFYICONDATAW = std::mem::zeroed();
                     nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
@@ -153,14 +153,14 @@ impl DesktopCover {
         info!("Loading state from {:?}", path);
         let mut inner = self.inner.lock().unwrap();
         for f_state in state.fences {
-            let fence = Fence::from_state(self.base.handle(), f_state)?;
+            let fence = Fence::from_state(self.base.hwnd(), f_state)?;
             inner.fences.push(fence);
         }
         Ok(())
     }
 
     fn on_destroy(&self) -> LRESULT {
-        let hwnd = self.base().handle();
+        let hwnd = self.base().hwnd();
         let mut nid: NOTIFYICONDATAW = unsafe { std::mem::zeroed() };
         nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
         nid.hWnd = hwnd;
@@ -173,7 +173,7 @@ impl DesktopCover {
     }
 
     fn on_window_pos_changing(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().handle();
+        let hwnd = self.base().hwnd();
         let pos = lparam as *mut WINDOWPOS;
         unsafe {
             (*pos).hwndInsertAfter = HWND_BOTTOM;
@@ -182,7 +182,7 @@ impl DesktopCover {
     }
 
     fn on_paint(&self) -> LRESULT {
-        let hwnd = self.base().handle();
+        let hwnd = self.base().hwnd();
         unsafe {
             let mut ps: PAINTSTRUCT = std::mem::zeroed();
             let hdc = BeginPaint(hwnd, &mut ps);
@@ -197,7 +197,7 @@ impl DesktopCover {
     }
 
     fn on_set_cursor(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().handle();
+        let hwnd = self.base().hwnd();
         let mut pt = POINT { x: 0, y: 0 };
         unsafe { GetCursorPos(&mut pt) };
         unsafe { ScreenToClient(hwnd, &mut pt) };
@@ -245,7 +245,7 @@ impl DesktopCover {
     }
 
     fn on_lbutton_down(&self, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().handle();
+        let hwnd = self.base().hwnd();
         let x = (lparam & 0xFFFF) as i16 as i32;
         let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
@@ -332,7 +332,7 @@ impl DesktopCover {
     }
 
     fn on_rbutton_up(&self, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().handle();
+        let hwnd = self.base().hwnd();
         let x = (lparam & 0xFFFF) as i16 as i32;
         let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
@@ -392,7 +392,7 @@ impl DesktopCover {
     }
 
     fn on_shell_icon(&self, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().handle();
+        let hwnd = self.base().hwnd();
         if lparam as u32 == WM_RBUTTONUP || lparam as u32 == WM_LBUTTONUP {
             let mut pt = POINT { x: 0, y: 0 };
             unsafe { GetCursorPos(&mut pt) };
@@ -423,7 +423,7 @@ impl DesktopCover {
     }
 
     fn on_command(&self, wparam: WPARAM) -> LRESULT {
-        let hwnd = self.base().handle();
+        let hwnd = self.base().hwnd();
         let command = wparam & 0xFFFF;
         let hit_type;
         {
@@ -502,7 +502,7 @@ impl Window for DesktopCover {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().handle();
+        let hwnd = self.base().hwnd();
         match msg {
             WM_CLOSE => 0,
             WM_DESTROY => self.on_destroy(),

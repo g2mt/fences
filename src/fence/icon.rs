@@ -57,7 +57,7 @@ impl Icon {
     pub fn set_selected(&self, selected: bool) {
         self.selected.store(selected, Ordering::SeqCst);
         unsafe {
-            InvalidateRect(self.base.handle(), std::ptr::null(), TRUE);
+            InvalidateRect(self.base.hwnd(), std::ptr::null(), TRUE);
         }
     }
 
@@ -73,7 +73,7 @@ impl Icon {
     pub fn set_title(&mut self, title: String) {
         self.title = title;
         unsafe {
-            InvalidateRect(self.base.handle(), std::ptr::null(), TRUE);
+            InvalidateRect(self.base.hwnd(), std::ptr::null(), TRUE);
         }
     }
 
@@ -88,7 +88,7 @@ impl Window for Icon {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().handle();
+        let hwnd = self.base().hwnd();
         match msg {
             WM_NCHITTEST => HTTRANSPARENT as LRESULT,
             WM_PAINT => unsafe {
