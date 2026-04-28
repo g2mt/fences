@@ -596,14 +596,16 @@ impl Fence {
     }
 
     pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Option<Arc<Self>>> {
-        use std::sync::mpsc;
-        let (tx, rx) = mpsc::channel();
-        prompt::browse_for_folder(parent_hwnd, move |opt, _| {
-            tx.send(opt);
-        });
-        let path_str = match rx.recv() {
-            Ok(Some(s)) => s,
-            _ => return Ok(None),
+        let path_str = {
+            use std::sync::mpsc;
+            let (tx, rx) = mpsc::channel();
+            prompt::browse_for_folder(parent_hwnd, move |opt, _| {
+                tx.send(opt).unwrap();
+            });
+            match rx.recv() {
+                Ok(Some(s)) => s,
+                _ => return Ok(None),
+            }
         };
         let folder_path = std::path::Path::new(&path_str);
         let title = folder_path
