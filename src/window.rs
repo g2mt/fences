@@ -57,7 +57,9 @@ pub fn register_classname_ex(name: PCWSTR, mut wc: WNDCLASSW) -> ClassName {
         wc.hInstance = h_instance;
         wc.lpszClassName = name;
         wc.lpfnWndProc = Some(base_wndproc);
-        RegisterClassW(&wc);
+        if RegisterClassW(&wc) == 0 {
+            panic!("RegisterClassW returned 0");
+        }
     }
     registered.insert(class_name.clone());
     class_name
