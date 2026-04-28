@@ -502,15 +502,7 @@ impl Fence {
         self.inner.lock().unwrap().imported_from = imported_from;
     }
 
-    pub fn show_import_from_dialog(&self) {
-        todo!()
-    }
-
-    pub fn import_existing(&self) {
-        todo!()
-    }
-
-    pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Arc<Self>> {
+    fn browse_for_folder(parent_hwnd: HWND) -> Option<String> {
         unsafe {
             let mut path_buf = [0u16; MAX_PATH as usize];
             let mut bi = BROWSEINFOW {
@@ -526,40 +518,72 @@ impl Fence {
 
             let pidl = SHBrowseForFolderW(&mut bi);
             if pidl.is_null() {
-                return Err(anyhow::anyhow!("Dialog cancelled"));
+                return None;
             }
 
             let mut path_str_buf = [0u16; MAX_PATH as usize];
             SHGetPathFromIDListW(pidl, path_str_buf.as_mut_ptr());
             CoTaskMemFree(pidl as _);
 
-            let path_str = String::from_utf16_lossy(
+            Some(String::from_utf16_lossy(
                 &path_str_buf[..path_str_buf.iter().position(|&c| c == 0).unwrap_or(0)],
-            );
+            ))
+        }
+    }
 
-            let folder_path = std::path::Path::new(&path_str);
-            let title = folder_path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("Folder Fence");
+    pub fn show_import_from_dialog(&self) {
+        let parent_hwnd = unsafe { GetParent(self.base().hwnd()) };
+        let path_str = match Self::browse_for_folder(parent_hwnd) {
+            Some(s) => s,
+            None => return,
+        };
 
-            let width = GetSystemMetrics(SM_CXSCREEN);
-            let height = GetSystemMetrics(SM_CYSCREEN);
-            let fence = Self::new(parent_hwnd, width / 2 - 150, height / 2 - 75, title)?;
-            fence.set_imported_from(Some(Arc::from(path_str.as_str())));
-            if let Ok(entries) = std::fs::read_dir(folder_path) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.extension().and_then(|s| s.to_str()) == Some("lnk") {
-                        if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                            fence.add_icon_with_path(name, path.to_str());
-                        }
+        self.set_imported_from(Some(Arc::from(path_str.as_str())));
+
+        if let Ok(entries) = std::fs::read_dir(std::path::Path::new(&path_str)) {
+            for entry in entries.flatten() {
+                let entry_path = entry.path();
+                if entry_path.extension().and_then(|s| s.to_str()) == Some("lnk") {
+                    if let Some(name) = entry_path.file_stem().and_then(|s| s.to_str()) {
+                        self.add_icon_with_path(name, entry_path.to_str());
                     }
                 }
             }
-
-            Ok(fence)
         }
+    }
+
+    pub fn import_existing(&self) {
+        todo!()
+    }
+
+    pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Arc<Self>> {
+        let path_str = match Self::browse_for_folder(parent_hwnd) {
+            Some(s) => s,
+            None => return Err(anyhow::anyhow!("Dialog cancelled")),
+        };
+        let folder_path = std::path::Path::new(&path_str);
+        let title = folder_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("Folder Fence");
+
+        let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+        let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+        let fence = Self::new(parent_hwnd, width / 2 - 150, height / 2 - 75, title)?;
+        fence.set_imported_from(Some(Arc::from(path_str.as_str())));
+
+        if let Ok(entries) = std::fs::read_dir(folder_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("lnk") {
+                    if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
+                        fence.add_icon_with_path(name, path.to_str());
+                    }
+                }
+            }
+        }
+
+        Ok(fence)
     }
 
     pub fn add_area(&self, dl: i32, dt: i32, dw: i32, dh: i32) {
