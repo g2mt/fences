@@ -1,0 +1,10 @@
+[package]
+name = "copy-desktop-alpha"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[dependencies.windows-sys]
+version = ">=0.61"
+
