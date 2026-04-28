@@ -552,7 +552,7 @@ impl Fence {
         }
     }
 
-    pub fn import_existing(&self) {
+    pub fn import_existing() {
         todo!()
     }
 
