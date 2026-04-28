@@ -438,7 +438,7 @@ impl DesktopCover {
                     std::thread::spawn(move || {
                         let current_title = fence.title();
                         let new_title =
-                            prompt::prompt_input("Rename fence", "Enter new name:", &current_title);
+                            prompt::input("Rename fence", "Enter new name:", &current_title);
                         if let Some(new_title) = new_title {
                             if !new_title.is_empty() {
                                 fence.set_title(new_title.into());
@@ -481,7 +481,7 @@ impl DesktopCover {
                             let icon = icon.clone();
                             std::thread::spawn(move || {
                                 let current_title = icon.title();
-                                let new_title = prompt::prompt_input(
+                                let new_title = prompt::input(
                                     "Rename icon",
                                     "Enter new icon name:",
                                     &current_title,

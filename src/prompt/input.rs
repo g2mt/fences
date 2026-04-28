@@ -140,7 +140,7 @@ unsafe extern "system" fn input_wndproc(
 static CLASS_REGISTERED: AtomicBool = AtomicBool::new(false);
 
 /// Shows a modal input dialog. Returns `None` if the user cancelled, otherwise `Some(String)`.
-pub fn prompt_input(title: &str, message: &str, default: &str) -> Option<String> {
+pub fn input(title: &str, message: &str, default: &str) -> Option<String> {
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
 
