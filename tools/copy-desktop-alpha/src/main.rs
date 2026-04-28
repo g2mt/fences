@@ -1,4 +1,5 @@
 use std::ptr::{null, null_mut};
+
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -10,21 +11,21 @@ unsafe fn capture_desktop(width: i32, height: i32, left: i32, top: i32) -> HDC {
     let desktop_dc = GetDC(null_mut());
     let mem_dc = CreateCompatibleDC(desktop_dc);
     let mem_bmp = CreateCompatibleBitmap(desktop_dc, width, height);
-    
+
     SelectObject(mem_dc, mem_bmp as HGDIOBJ);
     BitBlt(mem_dc, 0, 0, width, height, desktop_dc, left, top, SRCCOPY);
-    
+
     ReleaseDC(null_mut(), desktop_dc);
-    
+
     // Return the memory DC containing the captured desktop
     mem_dc
 }
 
 unsafe fn draw_overlay(hdc: HDC, screen_w: i32, screen_h: i32) {
-    let rect_w = 300;
-    let rect_h = 200;
-    let rect_x = (screen_w - rect_w) / 2;
-    let rect_y = (screen_h - rect_h) / 2;
+    let rect_w = 1920;
+    let rect_h = 1080;
+    let rect_x = 0;
+    let rect_y = 0;
 
     let mem_dc = CreateCompatibleDC(hdc);
     let mem_bmp = CreateCompatibleBitmap(hdc, rect_w, rect_h);
@@ -33,7 +34,12 @@ unsafe fn draw_overlay(hdc: HDC, screen_w: i32, screen_h: i32) {
     // Fill the memory DC with RGB(0, 0, 33)
     // COLORREF format is 0x00bbggrr. R=0, G=0, B=33 (0x21) -> 0x00210000
     let brush = CreateSolidBrush(0x00210000);
-    let rect = RECT { left: 0, top: 0, right: rect_w, bottom: rect_h };
+    let rect = RECT {
+        left: 0,
+        top: 0,
+        right: rect_w,
+        bottom: rect_h,
+    };
     FillRect(mem_dc, &rect, brush);
     DeleteObject(brush as HGDIOBJ);
 
@@ -46,16 +52,19 @@ unsafe fn draw_overlay(hdc: HDC, screen_w: i32, screen_h: i32) {
     };
 
     GdiAlphaBlend(
-        hdc, rect_x, rect_y, rect_w, rect_h,
-        mem_dc, 0, 0, rect_w, rect_h,
-        blend
+        hdc, rect_x, rect_y, rect_w, rect_h, mem_dc, 0, 0, rect_w, rect_h, blend,
     );
 
     DeleteObject(mem_bmp as HGDIOBJ);
     DeleteDC(mem_dc);
 }
 
-unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+unsafe extern "system" fn wnd_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     static mut DESKTOP_DC: HDC = null_mut();
     static mut SCREEN_W: i32 = 0;
     static mut SCREEN_H: i32 = 0;
@@ -130,7 +139,10 @@ fn main() {
             class_name,
             windows_sys::w!("Desktop Cover"),
             WS_POPUP | WS_VISIBLE,
-            left, top, width, height,
+            left,
+            top,
+            width,
+            height,
             null_mut(),
             null_mut(),
             h_instance,
