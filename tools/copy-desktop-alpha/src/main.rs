@@ -1,6 +1,7 @@
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use std::ptr::null_mut;
 
 fn main() {
@@ -108,5 +109,5 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lpar
 }
 
 fn RGB(r: u8, g: u8, b: u8) -> u32 {
-    r as u32 | (g as u32 << 8) | (b as u32 << 16)
+    (r as u32) | ((g as u32) << 8) | ((b as u32) << 16)
 }
