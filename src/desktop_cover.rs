@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -442,16 +443,18 @@ impl DesktopCover {
                 let inner = self.inner.lock().unwrap();
                 if let Some(fence) = inner.fences.last() {
                     let fence = fence.clone();
-                    std::thread::spawn(move || {
-                        let current_title = fence.title();
-                        let new_title =
-                            prompt::input("Rename fence", "Enter new name:", &current_title);
-                        if let Some(new_title) = new_title {
-                            if !new_title.is_empty() {
-                                fence.set_title(new_title.into());
+                    prompt::input(
+                        "Rename icon".into(),
+                        "Enter new icon name:".into(),
+                        Cow::Owned(String::from(&fence.title() as &str)),
+                        move |new_title| {
+                            if let Some(new_title) = new_title {
+                                if !new_title.is_empty() {
+                                    fence.set_title(new_title.into());
+                                }
                             }
-                        }
-                    });
+                        },
+                    );
                 }
                 should_save = true;
             }
@@ -485,20 +488,18 @@ impl DesktopCover {
                     let inner = self.inner.lock().unwrap();
                     if let Some(fence) = inner.fences.last() {
                         if let Some(icon) = fence.icon_by_index(icon_idx) {
-                            let icon = icon.clone();
-                            std::thread::spawn(move || {
-                                let current_title = icon.title();
-                                let new_title = prompt::input(
-                                    "Rename icon",
-                                    "Enter new icon name:",
-                                    &current_title,
-                                );
-                                if let Some(new_title) = new_title {
-                                    if !new_title.is_empty() {
-                                        icon.set_title(new_title.into());
+                            prompt::input(
+                                "Rename icon".into(),
+                                "Enter new icon name:".into(),
+                                Cow::Owned(String::from(&icon.title() as &str)),
+                                move |new_title| {
+                                    if let Some(new_title) = new_title {
+                                        if !new_title.is_empty() {
+                                            icon.set_title(new_title.into());
+                                        }
                                     }
-                                }
-                            });
+                                },
+                            );
                         }
                     }
                 }

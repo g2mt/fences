@@ -1,4 +1,5 @@
 use anyhow::Result;
+use tracing::info;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -590,15 +591,15 @@ impl Fence {
         } else {
             return;
         };
-
         self.set_imported_from(Some(Arc::from(path_str.as_str())));
         self.show_import_existing_dialog(parent_hwnd);
     }
 
     pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Option<Arc<Self>>> {
-        let path_str = match prompt::browse_for_folder(parent_hwnd) {
-            Some(s) => s,
-            None => return Ok(None),
+        let path_str = if let Some(s) = prompt::browse_for_folder(parent_hwnd) {
+            s
+        } else {
+            return Ok(None);
         };
         let folder_path = std::path::Path::new(&path_str);
         let title = folder_path
