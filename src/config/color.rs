@@ -7,7 +7,9 @@ use windows_sys::Win32::Graphics::Gdi::*;
 /// The generic const `ACCEPTS_ALPHA` indicates whether the color variant
 /// permits an explicit alpha component. When `true`, the color can be
 /// serialized/deserialized from `#AARRGGBB` strings; otherwise only `#RRGGBB`
-/// strings are accepted. Internally the value is always stored in the
+/// strings are accepted.
+///
+/// Internally the value is always stored in the
 /// Windows `COLORREF` format with an optional alpha byte in the most‑significant
 /// position.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
