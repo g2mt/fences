@@ -586,20 +586,24 @@ impl Fence {
     }
 
     pub fn show_import_from_dialog(self: &Arc<Self>, parent_hwnd: HWND) {
-        let path_str = if let Some(s) = prompt::browse_for_folder(parent_hwnd) {
-            s
-        } else {
-            return;
-        };
-        self.set_imported_from(Some(Arc::from(path_str.as_str())));
-        self.show_import_existing_dialog(parent_hwnd);
+        let self_arc = self.clone();
+        prompt::browse_for_folder(parent_hwnd, move |opt| {
+            if let Some(path_str) = opt {
+                self_arc.set_imported_from(Some(Arc::from(path_str.as_str())));
+                self_arc.show_import_existing_dialog(parent_hwnd);
+            }
+        });
     }
 
     pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Option<Arc<Self>>> {
-        let path_str = if let Some(s) = prompt::browse_for_folder(parent_hwnd) {
-            s
-        } else {
-            return Ok(None);
+        use std::sync::mpsc;
+        let (tx, rx) = mpsc::channel();
+        prompt::browse_for_folder(parent_hwnd, move |opt| {
+            let _ = tx.send(opt);
+        });
+        let path_str = match rx.recv() {
+            Ok(Some(s)) => s,
+            _ => return Ok(None),
         };
         let folder_path = std::path::Path::new(&path_str);
         let title = folder_path
