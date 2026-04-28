@@ -7,10 +7,12 @@ use crate::config::config::Config;
 use crate::config::save_thread::SaveThread;
 use crate::config::state::AppState;
 use crate::desktop_cover::DesktopCover;
+use crate::desktop_mirror::DesktopMirror;
 use crate::paths::{app_file, STATE_PATH};
 
 pub struct App {
     pub cover: OnceLock<Arc<DesktopCover>>,
+    pub mirror: OnceLock<Arc<DesktopMirror>>,
     pub save_thread: OnceLock<SaveThread>,
     pub config: OnceLock<Arc<Config>>,
 }
