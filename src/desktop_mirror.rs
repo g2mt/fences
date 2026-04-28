@@ -1,20 +1,14 @@
-use std::sync::Mutex;
-
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 pub struct DesktopMirror {
-    inner: Mutex<DesktopMirrorInner>,
-}
-unsafe impl Send for DesktopMirror {}
-unsafe impl Sync for DesktopMirror {}
-
-struct DesktopMirrorInner {
     hdc: HDC,
     mem_bmp: HBITMAP,
     width: i32,
     height: i32,
 }
+unsafe impl Send for DesktopMirror {}
+unsafe impl Sync for DesktopMirror {}
 
 impl DesktopMirror {
     pub fn new() -> Self {
@@ -28,28 +22,25 @@ impl DesktopMirror {
             ReleaseDC(std::ptr::null_mut(), desktop_dc);
 
             Self {
-                inner: Mutex::new(DesktopMirrorInner {
-                    hdc: mem_dc,
-                    mem_bmp,
-                    width,
-                    height,
-                }),
+                hdc: mem_dc,
+                mem_bmp,
+                width,
+                height,
             }
         }
     }
 
     pub fn update(&self) {
-        let inner = self.inner.lock().unwrap();
         unsafe {
             let left = GetSystemMetrics(SM_XVIRTUALSCREEN);
             let top = GetSystemMetrics(SM_YVIRTUALSCREEN);
             let desktop_dc = GetDC(std::ptr::null_mut());
             BitBlt(
-                inner.hdc,
+                self.hdc,
                 0,
                 0,
-                inner.width,
-                inner.height,
+                self.width,
+                self.height,
                 desktop_dc,
                 left,
                 top,
@@ -60,16 +51,15 @@ impl DesktopMirror {
     }
 
     pub fn hdc(&self) -> HDC {
-        self.inner.lock().unwrap().hdc
+        self.hdc
     }
 }
 
 impl Drop for DesktopMirror {
     fn drop(&mut self) {
-        let inner = self.inner.lock().unwrap();
         unsafe {
-            DeleteObject(inner.mem_bmp as HGDIOBJ);
-            DeleteDC(inner.hdc);
+            DeleteObject(self.mem_bmp as HGDIOBJ);
+            DeleteDC(self.hdc);
         }
     }
 }
