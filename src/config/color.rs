@@ -150,3 +150,13 @@ impl Color<true> {
         }
     }
 }
+
+impl Color<false> {
+    pub unsafe fn paint_background(&self, hdc: HDC, rect: &RECT) {
+        unsafe {
+            let brush = CreateSolidBrush(self.0 & 0xFFFFFF);
+            FillRect(hdc, rect, brush);
+            DeleteObject(brush);
+        }
+    }
+}

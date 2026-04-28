@@ -79,10 +79,7 @@ impl Window for TitleBar {
                 GetClientRect(hwnd, &mut rect);
 
                 let config = App::config();
-                let brush = CreateSolidBrush(config.fence.title_bar_bg_color.0 & 0xFFFFFF);
-                FillRect(hdc, &rect, brush);
-                DeleteObject(brush);
-
+                config.fence.title_bar_bg_color.paint_background(hdc, &rect);
                 SetBkMode(hdc, TRANSPARENT as _);
                 SetTextColor(hdc, config.fence.title_text_color.0);
 
@@ -631,9 +628,7 @@ impl Window for Fence {
                 GetClientRect(hwnd, &mut rect);
 
                 let config = App::config();
-                let brush = CreateSolidBrush(config.fence.fence_bg_color.0 & 0xFFFFFF);
-                FillRect(hdc, &rect, brush);
-                DeleteObject(brush);
+                config.fence.fence_bg_color.paint_background(hdc, &rect);
 
                 EndPaint(hwnd, &ps);
                 0
