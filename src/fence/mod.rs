@@ -6,6 +6,8 @@ use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
+mod import_dialog;
+use import_dialog::{ImportDialog, ImportItem};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
@@ -502,7 +504,81 @@ impl Fence {
     }
 
     pub fn import_existing(self: &Arc<Self>) {
-        todo!()
+        let imported_from = match self.imported_from() {
+            Some(p) => p,
+            None => return,
+        };
+
+        let folder_path = std::path::Path::new(imported_from.as_ref());
+
+        // Read all .lnk files from the directory
+        let mut dir_items: Vec<(String, String)> = Vec::new(); // (title, path)
+        if let Ok(entries) = std::fs::read_dir(folder_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("lnk") {
+                    if let (Some(name), Some(path_str)) = (
+                        path.file_stem().and_then(|s| s.to_str()).map(|s| s.to_string()),
+                        path.to_str().map(|s| s.to_string()),
+                    ) {
+                        dir_items.push((name, path_str));
+                    }
+                }
+            }
+        }
+
+        // Build import items: existing icons get Keep/Remove based on whether
+        // they still exist in the directory; new items from directory get Keep.
+        let mut import_items: Vec<ImportItem> = Vec::new();
+
+        {
+            let inner = self.inner.lock().unwrap();
+            for icon in &inner.icons {
+                let icon_path = icon.path().map(|p| p.to_string()).unwrap_or_default();
+                let still_present = dir_items.iter().any(|(_, dp)| *dp == icon_path);
+                import_items.push(ImportItem {
+                    title: icon.title(),
+                    path: Arc::from(icon_path.as_str()),
+                    action: if still_present {
+                        import_dialog::ACTION_KEEP
+                    } else {
+                        import_dialog::ACTION_REMOVE
+                    },
+                });
+            }
+        }
+
+        // Add new items from directory not already in the fence
+        {
+            let inner = self.inner.lock().unwrap();
+            for (name, path_str) in &dir_items {
+                let already_present = inner
+                    .icons
+                    .iter()
+                    .any(|i| i.path().map(|p| p.to_string()).unwrap_or_default() == *path_str);
+                if !already_present {
+                    import_items.push(ImportItem {
+                        title: Arc::from(name.as_str()),
+                        path: Arc::from(path_str.as_str()),
+                        action: import_dialog::ACTION_KEEP,
+                    });
+                }
+            }
+        }
+
+        let fence = self.clone();
+        let parent_hwnd = unsafe { GetParent(self.base().hwnd()) };
+        ImportDialog::show(parent_hwnd, import_items, move |kept_items| {
+            // Remove all existing icons
+            let count = fence.icon_count();
+            for _ in 0..count {
+                fence.remove_icon(0);
+            }
+            // Add kept items
+            for item in kept_items {
+                fence.add_icon_with_path(&item.title, Some(&item.path));
+            }
+        });
     }
 
     pub fn show_import_from_dialog(self: &Arc<Self>) {
