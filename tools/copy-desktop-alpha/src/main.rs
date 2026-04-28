@@ -15,9 +15,9 @@ fn main() {
             cbClsExtra: 0,
             cbWndExtra: 0,
             hInstance: instance,
-            hIcon: 0,
-            hCursor: LoadCursorW(0, IDC_ARROW),
-            hbrBackground: 0,
+            hIcon: null_mut(),
+            hCursor: LoadCursorW(null_mut(), IDC_ARROW),
+            hbrBackground: null_mut(),
             lpszMenuName: null_mut(),
             lpszClassName: class_name.as_ptr(),
         };
@@ -36,14 +36,14 @@ fn main() {
             0,
             screen_width,
             screen_height,
-            0,
-            0,
+            null_mut(),
+            null_mut(),
             instance,
             null_mut(),
         );
 
         let mut msg = std::mem::zeroed();
-        while GetMessageW(&mut msg, 0, 0, 0) > 0 {
+        while GetMessageW(&mut msg, null_mut(), 0, 0) > 0 {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
@@ -60,9 +60,9 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lpar
             let screen_height = GetSystemMetrics(SM_CYSCREEN);
 
             // Copy desktop to background
-            let hdc_screen = GetDC(0);
+            let hdc_screen = GetDC(null_mut());
             BitBlt(hdc, 0, 0, screen_width, screen_height, hdc_screen, 0, 0, SRCCOPY);
-            ReleaseDC(0, hdc_screen);
+            ReleaseDC(null_mut(), hdc_screen);
 
             // Draw 300x200 rgba(0,0,33,0.4) rectangle at center
             // Note: Gdi AlphaBlend is used for transparency. 0.4 alpha is approx 102/255.
