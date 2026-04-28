@@ -501,7 +501,11 @@ impl Fence {
         self.inner.lock().unwrap().imported_from = imported_from;
     }
 
-    pub fn show_import_from_dialog(&self) {
+    pub fn import_existing(self: &Arc<Self>) {
+        todo!()
+    }
+
+    pub fn show_import_from_dialog(self: &Arc<Self>) {
         let parent_hwnd = unsafe { GetParent(self.base().hwnd()) };
         let path_str = match prompt::browse_for_folder(parent_hwnd) {
             Some(s) => s,
@@ -509,21 +513,7 @@ impl Fence {
         };
 
         self.set_imported_from(Some(Arc::from(path_str.as_str())));
-
-        if let Ok(entries) = std::fs::read_dir(std::path::Path::new(&path_str)) {
-            for entry in entries.flatten() {
-                let entry_path = entry.path();
-                if entry_path.extension().and_then(|s| s.to_str()) == Some("lnk") {
-                    if let Some(name) = entry_path.file_stem().and_then(|s| s.to_str()) {
-                        self.add_icon_with_path(name, entry_path.to_str());
-                    }
-                }
-            }
-        }
-    }
-
-    pub fn import_existing(&self) {
-        todo!()
+        self.import_existing();
     }
 
     pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Arc<Self>> {
