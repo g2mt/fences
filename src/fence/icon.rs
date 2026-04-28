@@ -177,11 +177,8 @@ impl Window for Icon {
                     config.icon.selected_bg_color
                 } else {
                     config.icon.unselected_bg_color
-                }
-                .0;
-                let brush = CreateSolidBrush(bg_color);
-                FillRect(hdc, &rect, brush);
-                DeleteObject(brush);
+                };
+                bg_color.paint_background(hdc, &rect);
 
                 let icon_draw_size = config.icon.icon_size_draw;
                 let width = rect.right - rect.left;
