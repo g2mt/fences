@@ -142,12 +142,10 @@ impl DesktopCover {
         let pos = lparam as *mut WINDOWPOS;
         unsafe {
             (*pos).hwndInsertAfter = HWND_BOTTOM;
-            
+
             if ((*pos).flags & SWP_NOSIZE) == 0 {
                 if let Some(app) = APP.get() {
-                    if let Some(mirror) = app.mirror.get() {
-                        mirror.update();
-                    }
+                    app.mirror.lock().unwrap().update();
                 }
             }
 

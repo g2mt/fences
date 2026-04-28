@@ -1,4 +1,4 @@
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use anyhow::{anyhow, Result};
 use tracing::{info, warn};
@@ -12,7 +12,7 @@ use crate::paths::{app_file, STATE_PATH};
 
 pub struct App {
     pub cover: OnceLock<Arc<DesktopCover>>,
-    pub mirror: OnceLock<Arc<DesktopMirror>>,
+    pub mirror: Mutex<DesktopMirror>,
     pub save_thread: OnceLock<SaveThread>,
     pub config: OnceLock<Arc<Config>>,
 }

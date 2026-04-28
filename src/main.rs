@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 use anyhow::Result;
 use tracing::{error, info};
@@ -8,6 +8,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 mod app;
 mod config;
 mod desktop_cover;
+mod desktop_mirror;
 mod fence;
 mod geo;
 mod paths;
@@ -17,13 +18,15 @@ mod window;
 use crate::app::{App, APP};
 use crate::config::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
+use crate::desktop_mirror::DesktopMirror;
 use crate::paths::{app_file, LOG_PATH};
 
 fn main() -> Result<()> {
-    APP.get_or_init(|| app::App {
+    APP.get_or_init(|| App {
         cover: OnceLock::new(),
         save_thread: OnceLock::new(),
         config: OnceLock::new(),
+        mirror: Mutex::new(DesktopMirror::new()),
     });
 
     let log_path = app_file(LOG_PATH)?;
