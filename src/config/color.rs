@@ -15,6 +15,7 @@ use windows_sys::Win32::Graphics::Gdi::*;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Color<const ACCEPTS_ALPHA: bool = false>(pub u32);
 
+#[allow(dead_code)]
 impl<const ACCEPTS_ALPHA: bool> Color<ACCEPTS_ALPHA> {
     pub fn r(&self) -> u8 {
         (self.0 & 0xFF) as u8
@@ -114,7 +115,7 @@ impl Color<true> {
     pub unsafe fn paint_background(&self, hdc: HDC, rect: &RECT) {
         unsafe {
             let color = self.0;
-            let alpha = (color >> 24) as u8;
+            let alpha = self.a();
             if alpha == 255 {
                 let brush = CreateSolidBrush(color & 0xFFFFFF);
                 FillRect(hdc, rect, brush);

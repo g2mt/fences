@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use std::sync::{Mutex, OnceLock};
 
 use anyhow::Result;

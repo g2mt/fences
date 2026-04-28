@@ -29,10 +29,6 @@ impl App {
         Self::get().config.get().expect("Config not loaded").clone()
     }
 
-    pub fn is_config_loaded() -> bool {
-        Self::get().config.get().is_some()
-    }
-
     pub fn save_state(&self) -> Result<()> {
         let cover = self.cover.get().unwrap();
         let state = cover.state();
