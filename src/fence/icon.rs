@@ -170,6 +170,9 @@ impl Window for Icon {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
+                let mut pt = POINT { x: 0, y: 0 };
+                ClientToScreen(hwnd, &mut pt);
+
                 let config = App::config();
                 let selected = self.selected.load(Ordering::SeqCst);
 
@@ -178,6 +181,23 @@ impl Window for Icon {
                 } else {
                     config.icon.unselected_bg_color
                 };
+
+                if bg_color.a() < 255 {
+                    let mirror = App::get().mirror.lock().unwrap();
+                    let screen_left = GetSystemMetrics(SM_XVIRTUALSCREEN);
+                    let screen_top = GetSystemMetrics(SM_YVIRTUALSCREEN);
+                    BitBlt(
+                        hdc,
+                        0,
+                        0,
+                        rect.right - rect.left,
+                        rect.bottom - rect.top,
+                        mirror.hdc(),
+                        pt.x - screen_left,
+                        pt.y - screen_top,
+                        SRCCOPY,
+                    );
+                }
                 bg_color.paint_background(hdc, &rect);
 
                 let icon_draw_size = config.icon.icon_size_draw;
