@@ -437,6 +437,63 @@ impl Fence {
         self.reflow_icons();
     }
 
+    pub fn remove_icon(&self, index: usize) {
+        let mut inner = self.inner.lock().unwrap();
+        if index < inner.icons.len() {
+            inner.icons.remove(index);
+        }
+        drop(inner);
+        self.reflow_icons();
+    }
+
+    pub fn icon_count(&self) -> usize {
+        self.inner.lock().unwrap().icons.len()
+    }
+
+    pub fn clear_selection(&self) {
+        let inner = self.inner.lock().unwrap();
+        for icon in &inner.icons {
+            icon.set_selected(false);
+        }
+    }
+
+    pub fn select_icon(&self, index: usize) {
+        let inner = self.inner.lock().unwrap();
+        if let Some(icon) = inner.icons.get(index) {
+            icon.set_selected(true);
+        }
+    }
+
+    pub fn icon_by_index(&self, index: usize) -> Option<Arc<Icon>> {
+        self.inner.lock().unwrap().icons.get(index).cloned()
+    }
+
+    pub fn reflow_icons(&self) {
+        let config = App::config();
+        let icon_size = config.icon.size;
+        let fence_padding = config.fence.padding;
+        let fence_spacing = config.fence.spacing;
+
+        let rect = self.base.rect();
+        let width = rect.right - rect.left;
+
+        let available_width = width - (fence_padding * 2);
+        let cols = (available_width / (icon_size + fence_spacing)).max(1);
+
+        let inner = self.inner.lock().unwrap();
+        for (i, icon) in inner.icons.iter().enumerate() {
+            let col = i as i32 % cols;
+            let row = i as i32 / cols;
+
+            let x = fence_padding + col * (icon_size + fence_spacing);
+            let y = fence_padding + row * (icon_size + fence_spacing);
+
+            icon.base().resize_to(x, y, icon_size, icon_size);
+        }
+        drop(inner);
+        self.update_scroll_info();
+    }
+
     pub fn imported_from(&self) -> Option<Arc<str>> {
         self.inner.lock().unwrap().imported_from.clone()
     }
@@ -503,63 +560,6 @@ impl Fence {
 
             Ok(fence)
         }
-    }
-
-    pub fn remove_icon(&self, index: usize) {
-        let mut inner = self.inner.lock().unwrap();
-        if index < inner.icons.len() {
-            inner.icons.remove(index);
-        }
-        drop(inner);
-        self.reflow_icons();
-    }
-
-    pub fn icon_count(&self) -> usize {
-        self.inner.lock().unwrap().icons.len()
-    }
-
-    pub fn clear_selection(&self) {
-        let inner = self.inner.lock().unwrap();
-        for icon in &inner.icons {
-            icon.set_selected(false);
-        }
-    }
-
-    pub fn select_icon(&self, index: usize) {
-        let inner = self.inner.lock().unwrap();
-        if let Some(icon) = inner.icons.get(index) {
-            icon.set_selected(true);
-        }
-    }
-
-    pub fn icon_by_index(&self, index: usize) -> Option<Arc<Icon>> {
-        self.inner.lock().unwrap().icons.get(index).cloned()
-    }
-
-    pub fn reflow_icons(&self) {
-        let config = App::config();
-        let icon_size = config.icon.size;
-        let fence_padding = config.fence.padding;
-        let fence_spacing = config.fence.spacing;
-
-        let rect = self.base.rect();
-        let width = rect.right - rect.left;
-
-        let available_width = width - (fence_padding * 2);
-        let cols = (available_width / (icon_size + fence_spacing)).max(1);
-
-        let inner = self.inner.lock().unwrap();
-        for (i, icon) in inner.icons.iter().enumerate() {
-            let col = i as i32 % cols;
-            let row = i as i32 / cols;
-
-            let x = fence_padding + col * (icon_size + fence_spacing);
-            let y = fence_padding + row * (icon_size + fence_spacing);
-
-            icon.base().resize_to(x, y, icon_size, icon_size);
-        }
-        drop(inner);
-        self.update_scroll_info();
     }
 
     pub fn add_area(&self, dl: i32, dt: i32, dw: i32, dh: i32) {
