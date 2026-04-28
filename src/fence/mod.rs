@@ -620,6 +620,10 @@ impl Window for Fence {
         let hwnd = self.base().hwnd();
         match msg {
             WM_NCHITTEST => HTTRANSPARENT as LRESULT,
+            WM_MOVE => unsafe {
+                InvalidateRect(self.scroll_area.base().hwnd(), std::ptr::null(), TRUE);
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            },
             WM_PAINT => unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
