@@ -1,5 +1,5 @@
 use anyhow::Result;
-use tracing::info;
+use tracing::{error, info};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -7,7 +7,7 @@ use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
-mod import_dialog;
+pub mod import_dialog;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
@@ -506,6 +506,7 @@ impl Fence {
     }
 
     pub fn show_import_existing_dialog(self: &Arc<Self>, parent_hwnd: HWND) {
+        App::get().import_dialog.lock().unwrap().take();
         let imported_from = if let Some(p) = self.imported_from() {
             p
         } else {
@@ -572,17 +573,25 @@ impl Fence {
         }
 
         let fence = self.clone();
-        ImportDialog::show(parent_hwnd, import_items, move |kept_items| {
-            // Remove all existing icons
-            let count = fence.icon_count();
-            for _ in 0..count {
-                fence.remove_icon(0);
-            }
-            // Add kept items
-            for item in kept_items {
-                fence.add_icon_with_path(&item.title, Some(&item.path));
-            }
-        });
+        let import_dialog =
+            match ImportDialog::create_window(parent_hwnd, import_items, move |kept_items| {
+                // Remove all existing icons
+                let count = fence.icon_count();
+                for _ in 0..count {
+                    fence.remove_icon(0);
+                }
+                // Add kept items
+                for item in kept_items {
+                    fence.add_icon_with_path(&item.title, Some(&item.path));
+                }
+            }) {
+                Ok(import_dialog) => import_dialog,
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
+            };
+        *App::get().import_dialog.lock().unwrap() = Some(import_dialog);
     }
 
     pub fn show_import_from_dialog(self: &Arc<Self>, parent_hwnd: HWND) {

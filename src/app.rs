@@ -8,6 +8,7 @@ use crate::config::save_thread::SaveThread;
 use crate::config::state::AppState;
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
+use crate::fence::import_dialog::ImportDialog;
 use crate::paths::{app_file, STATE_PATH};
 
 pub struct App {
@@ -15,6 +16,7 @@ pub struct App {
     pub mirror: Mutex<DesktopMirror>,
     pub save_thread: OnceLock<SaveThread>,
     pub config: OnceLock<Arc<Config>>,
+    pub import_dialog: Mutex<Option<Arc<ImportDialog>>>,
 }
 
 /// Assume that the APP is always initialized and the [App::get()] api to access.

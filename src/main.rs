@@ -30,6 +30,7 @@ fn main() -> Result<()> {
         save_thread: OnceLock::new(),
         config: OnceLock::new(),
         mirror: Mutex::new(DesktopMirror::new()),
+        import_dialog: Mutex::new(None),
     });
 
     let log_path = app_file(LOG_PATH)?;

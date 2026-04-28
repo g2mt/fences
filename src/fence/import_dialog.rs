@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use anyhow::Result;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -40,11 +41,11 @@ pub struct ImportDialog {
 }
 
 impl ImportDialog {
-    pub fn show(
+    pub fn create_window(
         parent_hwnd: HWND,
         items: Vec<ImportItem>,
         on_import: impl Fn(Vec<ImportItem>) + Send + Sync + 'static,
-    ) {
+    ) -> Result<Arc<Self>> {
         let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
 
         // Center dialog on screen
@@ -269,7 +270,6 @@ impl ImportDialog {
                 }))
             },
         )
-        .expect("Failed to create ImportDialog window");
     }
 
     fn get_listview_hwnd(&self) -> HWND {
