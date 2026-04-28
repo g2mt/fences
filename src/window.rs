@@ -22,7 +22,7 @@ static REGISTERED_CLASSNAMES: LazyLock<Mutex<HashSet<ClassName>>> =
 pub struct ClassName(Arc<PCWSTR>);
 unsafe impl Send for ClassName {}
 
-pub fn register_classname(name: PCWSTR) -> ClassName {
+pub fn register_classname_ex(name: PCWSTR, mut wc: WNDCLASSW) -> ClassName {
     pub unsafe extern "system" fn base_wndproc(
         hwnd: HWND,
         msg: u32,
@@ -54,16 +54,22 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
     }
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
-        let mut wc: WNDCLASSW = std::mem::zeroed();
-        wc.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
         wc.hInstance = h_instance;
-        wc.hCursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
         wc.lpszClassName = name;
         wc.lpfnWndProc = Some(base_wndproc);
         RegisterClassW(&wc);
     }
     registered.insert(class_name.clone());
     class_name
+}
+
+pub fn register_classname(name: PCWSTR) -> ClassName {
+    register_classname_ex(name, unsafe {
+        let mut wc: WNDCLASSW = std::mem::zeroed();
+        wc.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
+        wc.hCursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
+        wc
+    })
 }
 
 // Base

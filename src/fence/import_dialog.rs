@@ -1,15 +1,16 @@
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
+use tracing::debug;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-use crate::app::App;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{register_classname, register_classname_ex, Base, BaseRef, Window};
 
 const ID_LISTVIEW: u32 = 1001;
 const ID_IMPORT_BTN: u32 = 1002;
@@ -42,11 +43,10 @@ pub struct ImportDialog {
 
 impl ImportDialog {
     pub fn create_window(
-        parent_hwnd: HWND,
         items: Vec<ImportItem>,
         on_import: impl Fn(Vec<ImportItem>) + Send + Sync + 'static,
     ) -> Result<Arc<Self>> {
-        let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        let h_instance = unsafe { GetModuleHandleW(std::ptr::null()) };
 
         // Center dialog on screen
         let screen_w = unsafe { GetSystemMetrics(SM_CXSCREEN) };
@@ -62,15 +62,20 @@ impl ImportDialog {
             .collect();
 
         Base::create_window(
-            WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
-            register_classname(w!("FenceImportDialog")),
+            0,
+            register_classname_ex(w!("FenceImportDialog"), unsafe {
+                let mut wc: WNDCLASSW = std::mem::zeroed();
+                wc.hbrBackground = (COLOR_WINDOW + 1) as HBRUSH;
+                wc.hCursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
+                wc
+            }),
             title_u16.as_ptr(),
-            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_CLIPCHILDREN,
+            WS_OVERLAPPEDWINDOW | WS_VISIBLE,
             dlg_x,
             dlg_y,
             dlg_w,
             dlg_h,
-            parent_hwnd,
+            std::ptr::null_mut(),
             std::ptr::null_mut(),
             h_instance,
             |base| {
@@ -262,7 +267,6 @@ impl ImportDialog {
                         std::ptr::null_mut(),
                     );
                 }
-
                 Ok(Arc::new(Self {
                     base,
                     inner: Mutex::new(ImportDialogInner { items, himagelist }),
@@ -333,6 +337,7 @@ impl Window for ImportDialog {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        debug!("{:?} {:?} {:?}", msg, wparam, lparam);
         let hwnd = self.base().hwnd();
         match msg {
             WM_COMMAND => {
@@ -357,16 +362,6 @@ impl Window for ImportDialog {
                 }
                 unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
-            WM_PAINT => unsafe {
-                let mut ps: PAINTSTRUCT = std::mem::zeroed();
-                let hdc = BeginPaint(hwnd, &mut ps);
-                let mut rect: RECT = std::mem::zeroed();
-                GetClientRect(hwnd, &mut rect);
-                let config = App::config();
-                config.fence.fence_bg_color.paint_background(hdc, &rect);
-                EndPaint(hwnd, &ps);
-                0
-            },
             WM_DESTROY => {
                 let inner = self.inner.lock().unwrap();
                 unsafe { ImageList_Destroy(inner.himagelist) };

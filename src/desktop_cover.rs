@@ -529,7 +529,7 @@ impl DesktopCover {
                 let inner = self.inner.lock().unwrap();
                 if let Some(fence) = inner.fences.last() {
                     if fence.imported_from().is_some() {
-                        fence.show_import_existing_dialog(hwnd);
+                        fence.show_import_existing_dialog();
                     } else {
                         fence.show_import_from_dialog(hwnd);
                     }

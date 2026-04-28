@@ -505,7 +505,7 @@ impl Fence {
         self.inner.lock().unwrap().imported_from = imported_from;
     }
 
-    pub fn show_import_existing_dialog(self: &Arc<Self>, parent_hwnd: HWND) {
+    pub fn show_import_existing_dialog(self: &Arc<Self>) {
         App::get().import_dialog.lock().unwrap().take();
         let imported_from = if let Some(p) = self.imported_from() {
             p
@@ -573,33 +573,32 @@ impl Fence {
         }
 
         let fence = self.clone();
-        let import_dialog =
-            match ImportDialog::create_window(parent_hwnd, import_items, move |kept_items| {
-                // Remove all existing icons
-                let count = fence.icon_count();
-                for _ in 0..count {
-                    fence.remove_icon(0);
-                }
-                // Add kept items
-                for item in kept_items {
-                    fence.add_icon_with_path(&item.title, Some(&item.path));
-                }
-            }) {
-                Ok(import_dialog) => import_dialog,
-                Err(e) => {
-                    error!("{}", e);
-                    return;
-                }
-            };
+        let import_dialog = match ImportDialog::create_window(import_items, move |kept_items| {
+            // Remove all existing icons
+            let count = fence.icon_count();
+            for _ in 0..count {
+                fence.remove_icon(0);
+            }
+            // Add kept items
+            for item in kept_items {
+                fence.add_icon_with_path(&item.title, Some(&item.path));
+            }
+        }) {
+            Ok(import_dialog) => import_dialog,
+            Err(e) => {
+                error!("{}", e);
+                return;
+            }
+        };
         *App::get().import_dialog.lock().unwrap() = Some(import_dialog);
     }
 
     pub fn show_import_from_dialog(self: &Arc<Self>, parent_hwnd: HWND) {
         let self_ = self.clone();
-        prompt::browse_for_folder(parent_hwnd, move |opt, parent_hwnd| {
+        prompt::browse_for_folder(parent_hwnd, move |opt, _| {
             if let Some(path_str) = opt {
                 self_.set_imported_from(Some(Arc::from(path_str.as_str())));
-                self_.show_import_existing_dialog(parent_hwnd);
+                self_.show_import_existing_dialog();
             }
         });
     }
