@@ -1,3 +1,4 @@
+use tracing::info;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
@@ -31,6 +32,7 @@ impl DesktopMirror {
     }
 
     pub fn update(&self) {
+        info!("updating DesktopMirror");
         unsafe {
             let left = GetSystemMetrics(SM_XVIRTUALSCREEN);
             let top = GetSystemMetrics(SM_YVIRTUALSCREEN);

@@ -144,9 +144,7 @@ impl DesktopCover {
             (*pos).hwndInsertAfter = HWND_BOTTOM;
 
             if ((*pos).flags & SWP_NOSIZE) == 0 {
-                if let Some(app) = APP.get() {
-                    app.mirror.lock().unwrap().update();
-                }
+                App::get().mirror.lock().unwrap().update();
             }
 
             DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -154,8 +152,10 @@ impl DesktopCover {
     }
 
     fn on_paint(&self) -> LRESULT {
-        let hwnd = self.base().hwnd();
+        App::get().mirror.lock().unwrap().update();
+
         unsafe {
+            let hwnd = self.base().hwnd();
             let mut ps: PAINTSTRUCT = std::mem::zeroed();
             let hdc = BeginPaint(hwnd, &mut ps);
 
