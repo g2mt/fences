@@ -586,11 +586,11 @@ impl Fence {
     }
 
     pub fn show_import_from_dialog(self: &Arc<Self>, parent_hwnd: HWND) {
-        let self_arc = self.clone();
-        prompt::browse_for_folder(parent_hwnd, move |opt| {
+        let self_ = self.clone();
+        prompt::browse_for_folder(parent_hwnd, move |opt, parent_hwnd| {
             if let Some(path_str) = opt {
-                self_arc.set_imported_from(Some(Arc::from(path_str.as_str())));
-                self_arc.show_import_existing_dialog(parent_hwnd);
+                self_.set_imported_from(Some(Arc::from(path_str.as_str())));
+                self_.show_import_existing_dialog(parent_hwnd);
             }
         });
     }
@@ -598,8 +598,8 @@ impl Fence {
     pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Option<Arc<Self>>> {
         use std::sync::mpsc;
         let (tx, rx) = mpsc::channel();
-        prompt::browse_for_folder(parent_hwnd, move |opt| {
-            let _ = tx.send(opt);
+        prompt::browse_for_folder(parent_hwnd, move |opt, _| {
+            tx.send(opt);
         });
         let path_str = match rx.recv() {
             Ok(Some(s)) => s,

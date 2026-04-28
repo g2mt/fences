@@ -15,6 +15,7 @@ mod fence;
 mod geo;
 mod paths;
 mod prompt;
+mod utils;
 mod window;
 
 use crate::app::{App, APP};
