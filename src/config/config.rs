@@ -18,7 +18,7 @@ pub struct FenceConfig {
     pub spacing: i32,
     pub title_text_color: Color,
     pub title_bar_bg_color: Color,
-    pub scroll_area_bg_color: Color,
+    pub scroll_area_bg_color: Color<true>,
     /// Alpha is not enabled, because there is a limitation where LWA_COLORKEY doesn't work with full rendering
     ///
     /// See:
@@ -36,7 +36,7 @@ impl Default for FenceConfig {
             spacing: 10,
             title_text_color: Color(0x00FFFFFF),
             title_bar_bg_color: Color(0x00323232),
-            scroll_area_bg_color: Color(0x007D7D7D),
+            scroll_area_bg_color: Color(0xFF7D7D7D),
             fence_bg_color: Color(0x00323232),
         }
     }

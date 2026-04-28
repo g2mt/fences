@@ -233,10 +233,28 @@ impl Window for ScrollArea {
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
 
+                let mut pt = POINT { x: 0, y: 0 };
+                ClientToScreen(hwnd, &mut pt);
+
+                let mirror = App::get().mirror.lock().unwrap();
+                let screen_left = GetSystemMetrics(SM_XVIRTUALSCREEN);
+                let screen_top = GetSystemMetrics(SM_YVIRTUALSCREEN);
+
+                BitBlt(
+                    hdc,
+                    0,
+                    0,
+                    rect.right - rect.left,
+                    rect.bottom - rect.top,
+                    mirror.hdc(),
+                    pt.x - screen_left,
+                    pt.y - screen_top,
+                    SRCCOPY,
+                );
+                drop(mirror);
+
                 let config = App::config();
-                let brush = CreateSolidBrush(config.fence.scroll_area_bg_color.0 & 0xFFFFFF);
-                FillRect(hdc, &rect, brush);
-                DeleteObject(brush);
+                config.fence.scroll_area_bg_color.paint_background(hdc, &rect);
 
                 EndPaint(hwnd, &ps);
                 0
