@@ -46,8 +46,8 @@ impl Default for FenceConfig {
 #[serde(default)]
 pub struct IconConfig {
     pub size: i32,
-    pub selected_bg_color: Color,
-    pub unselected_bg_color: Color,
+    pub selected_bg_color: Color<true>,
+    pub unselected_bg_color: Color<true>,
     pub text_color: Color,
     pub icon_size_draw: i32,
 }
