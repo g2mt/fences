@@ -14,7 +14,6 @@ pub struct FenceState {
     pub title: Arc<str>,
     pub area: Area<i32>,
     pub icons: Vec<IconState>,
-    #[serde(default)]
     pub imported_from: Option<Arc<str>>,
 }
 

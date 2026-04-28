@@ -299,6 +299,7 @@ impl Fence {
                 title: Arc::from(title),
                 area: Area::new(x, y, 300, 150),
                 icons: Vec::new(),
+                imported_from: None,
             },
         )
     }
@@ -436,12 +437,12 @@ impl Fence {
         self.reflow_icons();
     }
 
-    pub fn set_imported_from(&self, imported_from: Option<Arc<str>>) {
-        self.inner.lock().unwrap().imported_from = imported_from;
-    }
-
     pub fn imported_from(&self) -> Option<Arc<str>> {
         self.inner.lock().unwrap().imported_from.clone()
+    }
+
+    pub fn set_imported_from(&self, imported_from: Option<Arc<str>>) {
+        self.inner.lock().unwrap().imported_from = imported_from;
     }
 
     pub fn show_import_from_dialog(&self) {
