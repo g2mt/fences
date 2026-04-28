@@ -15,7 +15,23 @@ use windows_sys::Win32::Graphics::Gdi::*;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Color<const ACCEPTS_ALPHA: bool = false>(pub u32);
 
-impl<const ACCEPTS_ALPHA: bool> Color<ACCEPTS_ALPHA> {}
+impl<const ACCEPTS_ALPHA: bool> Color<ACCEPTS_ALPHA> {
+    pub fn r(&self) -> u8 {
+        (self.0 & 0xFF) as u8
+    }
+
+    pub fn g(&self) -> u8 {
+        ((self.0 >> 8) & 0xFF) as u8
+    }
+
+    pub fn b(&self) -> u8 {
+        ((self.0 >> 16) & 0xFF) as u8
+    }
+
+    pub fn a(&self) -> u8 {
+        ((self.0 >> 24) & 0xFF) as u8
+    }
+}
 
 impl<const ACCEPTS_ALPHA: bool> Serialize for Color<ACCEPTS_ALPHA> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
