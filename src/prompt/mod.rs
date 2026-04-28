@@ -1,4 +1,5 @@
-mod input;
 mod folder;
-pub use input::prompt_input;
+mod input;
+
 pub use folder::browse_for_folder;
+pub use input::prompt_input;

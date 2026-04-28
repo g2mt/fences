@@ -2,9 +2,7 @@ use anyhow::Result;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
-use windows_sys::Win32::System::Com::CoTaskMemFree;
 use windows_sys::Win32::UI::Controls::*;
-use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
@@ -15,6 +13,7 @@ use crate::app::App;
 use crate::config::state::{FenceState, IconState};
 use crate::fence::icon::Icon;
 use crate::geo::Area;
+use crate::prompt;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub struct TitleBar {
@@ -502,38 +501,9 @@ impl Fence {
         self.inner.lock().unwrap().imported_from = imported_from;
     }
 
-    fn browse_for_folder(parent_hwnd: HWND) -> Option<String> {
-        unsafe {
-            let mut path_buf = [0u16; MAX_PATH as usize];
-            let mut bi = BROWSEINFOW {
-                hwndOwner: parent_hwnd,
-                pidlRoot: std::ptr::null_mut(),
-                pszDisplayName: path_buf.as_mut_ptr(),
-                lpszTitle: w!("Select a folder to create a fence"),
-                ulFlags: BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE,
-                lpfn: None,
-                lParam: 0,
-                iImage: 0,
-            };
-
-            let pidl = SHBrowseForFolderW(&mut bi);
-            if pidl.is_null() {
-                return None;
-            }
-
-            let mut path_str_buf = [0u16; MAX_PATH as usize];
-            SHGetPathFromIDListW(pidl, path_str_buf.as_mut_ptr());
-            CoTaskMemFree(pidl as _);
-
-            Some(String::from_utf16_lossy(
-                &path_str_buf[..path_str_buf.iter().position(|&c| c == 0).unwrap_or(0)],
-            ))
-        }
-    }
-
     pub fn show_import_from_dialog(&self) {
         let parent_hwnd = unsafe { GetParent(self.base().hwnd()) };
-        let path_str = match Self::browse_for_folder(parent_hwnd) {
+        let path_str = match prompt::browse_for_folder(parent_hwnd) {
             Some(s) => s,
             None => return,
         };
@@ -552,12 +522,12 @@ impl Fence {
         }
     }
 
-    pub fn import_existing() {
+    pub fn import_existing(&self) {
         todo!()
     }
 
     pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Arc<Self>> {
-        let path_str = match Self::browse_for_folder(parent_hwnd) {
+        let path_str = match prompt::browse_for_folder(parent_hwnd) {
             Some(s) => s,
             None => return Err(anyhow::anyhow!("Dialog cancelled")),
         };

@@ -1,7 +1,7 @@
 use windows_sys::core::w;
 use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::System::Com::CoTaskMemFree;
 use windows_sys::Win32::UI::Shell::*;
-use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 pub fn browse_for_folder(parent_hwnd: HWND) -> Option<String> {
     unsafe {
