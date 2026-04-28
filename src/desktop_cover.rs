@@ -152,8 +152,6 @@ impl DesktopCover {
     }
 
     fn on_paint(&self) -> LRESULT {
-        App::get().mirror.lock().unwrap().update();
-
         unsafe {
             let hwnd = self.base().hwnd();
             let mut ps: PAINTSTRUCT = std::mem::zeroed();
