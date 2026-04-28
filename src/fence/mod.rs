@@ -288,6 +288,7 @@ pub struct Fence {
 struct FenceInner {
     title: Arc<str>,
     icons: Vec<Arc<Icon>>,
+    imported_from: Option<Arc<str>>,
 }
 
 impl Fence {
@@ -325,6 +326,7 @@ impl Fence {
                     inner: Mutex::new(FenceInner {
                         title: state.title.clone(),
                         icons: Vec::new(),
+                        imported_from: state.imported_from.clone(),
                     }),
                     title_bar,
                     scroll_area,
@@ -357,6 +359,7 @@ impl Fence {
                     path: i.path(),
                 })
                 .collect(),
+            imported_from: inner.imported_from.clone(),
         }
     }
 
@@ -433,6 +436,22 @@ impl Fence {
         self.reflow_icons();
     }
 
+    pub fn set_imported_from(&self, imported_from: Option<Arc<str>>) {
+        self.inner.lock().unwrap().imported_from = imported_from;
+    }
+
+    pub fn imported_from(&self) -> Option<Arc<str>> {
+        self.inner.lock().unwrap().imported_from.clone()
+    }
+
+    pub fn show_import_from_dialog(&self) {
+        todo!()
+    }
+
+    pub fn import_existing(&self) {
+        todo!()
+    }
+
     pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Arc<Self>> {
         unsafe {
             let mut path_buf = [0u16; MAX_PATH as usize];
@@ -469,7 +488,7 @@ impl Fence {
             let width = GetSystemMetrics(SM_CXSCREEN);
             let height = GetSystemMetrics(SM_CYSCREEN);
             let fence = Self::new(parent_hwnd, width / 2 - 150, height / 2 - 75, title)?;
-
+            fence.set_imported_from(Some(Arc::from(path_str.as_str())));
             if let Ok(entries) = std::fs::read_dir(folder_path) {
                 for entry in entries.flatten() {
                     let path = entry.path();

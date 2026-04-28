@@ -26,6 +26,8 @@ pub const IDM_DELETE_ICON: usize = 107;
 pub const IDM_RENAME_FENCE: usize = 108;
 pub const IDM_RENAME_ICON: usize = 109;
 pub const IDM_SET_ICON_PATH: usize = 110;
+pub const IDM_IMPORT: usize = 111;
+pub const IDM_IMPORT_FROM: usize = 112;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
@@ -337,6 +339,9 @@ impl DesktopCover {
                     AppendMenuW(h_menu, MF_STRING, IDM_SET_ICON_PATH, w!("Set &path"));
                     AppendMenuW(h_menu, MF_STRING, IDM_DELETE_ICON, w!("&Delete"));
                 } else {
+                    AppendMenuW(h_menu, MF_STRING, IDM_IMPORT, w!("&Import"));
+                    AppendMenuW(h_menu, MF_STRING, IDM_IMPORT_FROM, w!("Import &from..."));
+                    AppendMenuW(h_menu, MF_SEPARATOR, 0, std::ptr::null_mut() as *const u16);
                     AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
                     AppendMenuW(h_menu, MF_STRING, IDM_RENAME_FENCE, w!("Re&name fence"));
                     AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
@@ -509,6 +514,24 @@ impl DesktopCover {
                     if let Some(fence) = inner.fences.last() {
                         fence.remove_icon(icon_idx);
                     }
+                }
+                should_save = true;
+            }
+            IDM_IMPORT => {
+                let inner = self.inner.lock().unwrap();
+                if let Some(fence) = inner.fences.last() {
+                    if fence.imported_from().is_some() {
+                        fence.import_existing();
+                    } else {
+                        fence.show_import_from_dialog();
+                    }
+                }
+                should_save = true;
+            }
+            IDM_IMPORT_FROM => {
+                let inner = self.inner.lock().unwrap();
+                if let Some(fence) = inner.fences.last() {
+                    fence.show_import_from_dialog();
                 }
                 should_save = true;
             }
