@@ -45,8 +45,7 @@ impl ImportDialog {
         items: Vec<ImportItem>,
         on_import: impl Fn(Vec<ImportItem>) + Send + Sync + 'static,
     ) {
-        let h_instance =
-            unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
 
         // Center dialog on screen
         let screen_w = unsafe { GetSystemMetrics(SM_CXSCREEN) };
@@ -85,11 +84,7 @@ impl ImportDialog {
                         0,
                         w!("SysListView32"),
                         std::ptr::null(),
-                        WS_CHILD
-                            | WS_VISIBLE
-                            | WS_BORDER
-                            | LVS_REPORT
-                            | LVS_SINGLESEL,
+                        WS_CHILD | WS_VISIBLE | WS_BORDER | LVS_REPORT | LVS_SINGLESEL,
                         10,
                         10,
                         dlg_w - 20,
@@ -119,14 +114,18 @@ impl ImportDialog {
                     );
 
                     // Column 0: Icon
-                    let col0_text: Vec<u16> =
-                        "".encode_utf16().chain(std::iter::once(0)).collect();
+                    let col0_text: Vec<u16> = "".encode_utf16().chain(std::iter::once(0)).collect();
                     let mut col0: LVCOLUMNW = std::mem::zeroed();
                     col0.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
                     col0.cx = 40;
                     col0.pszText = col0_text.as_ptr() as *mut _;
                     col0.iSubItem = COL_ICON;
-                    SendMessageW(lv_hwnd, LVM_INSERTCOLUMNW, COL_ICON as WPARAM, &col0 as *const _ as LPARAM);
+                    SendMessageW(
+                        lv_hwnd,
+                        LVM_INSERTCOLUMNW,
+                        COL_ICON as WPARAM,
+                        &col0 as *const _ as LPARAM,
+                    );
 
                     // Column 1: Path
                     let col1_text: Vec<u16> =
@@ -136,7 +135,12 @@ impl ImportDialog {
                     col1.cx = 380;
                     col1.pszText = col1_text.as_ptr() as *mut _;
                     col1.iSubItem = COL_PATH;
-                    SendMessageW(lv_hwnd, LVM_INSERTCOLUMNW, COL_PATH as WPARAM, &col1 as *const _ as LPARAM);
+                    SendMessageW(
+                        lv_hwnd,
+                        LVM_INSERTCOLUMNW,
+                        COL_PATH as WPARAM,
+                        &col1 as *const _ as LPARAM,
+                    );
 
                     // Column 2: Action
                     let col2_text: Vec<u16> =
@@ -146,18 +150,20 @@ impl ImportDialog {
                     col2.cx = 140;
                     col2.pszText = col2_text.as_ptr() as *mut _;
                     col2.iSubItem = COL_ACTION;
-                    SendMessageW(lv_hwnd, LVM_INSERTCOLUMNW, COL_ACTION as WPARAM, &col2 as *const _ as LPARAM);
+                    SendMessageW(
+                        lv_hwnd,
+                        LVM_INSERTCOLUMNW,
+                        COL_ACTION as WPARAM,
+                        &col2 as *const _ as LPARAM,
+                    );
                 }
 
                 // Populate rows
                 for (i, item) in items.iter().enumerate() {
                     // Load icon for this item
                     let icon_index = unsafe {
-                        let path_u16: Vec<u16> = item
-                            .path
-                            .encode_utf16()
-                            .chain(std::iter::once(0))
-                            .collect();
+                        let path_u16: Vec<u16> =
+                            item.path.encode_utf16().chain(std::iter::once(0)).collect();
                         let mut shfi: SHFILEINFOW = std::mem::zeroed();
                         SHGetFileInfoW(
                             path_u16.as_ptr(),
@@ -167,10 +173,10 @@ impl ImportDialog {
                             SHGFI_ICON | SHGFI_SMALLICON,
                         );
                         let idx = if !shfi.hIcon.is_null() {
-                            ImageList_AddIcon(himagelist, shfi.hIcon)
+                            ImageList_ReplaceIcon(himagelist, -1, shfi.hIcon)
                         } else {
                             let hicon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
-                            ImageList_AddIcon(himagelist, hicon)
+                            ImageList_ReplaceIcon(himagelist, -1, hicon)
                         };
                         if !shfi.hIcon.is_null() {
                             DestroyIcon(shfi.hIcon);
@@ -188,11 +194,8 @@ impl ImportDialog {
                         SendMessageW(lv_hwnd, LVM_INSERTITEMW, 0, &lvi as *const _ as LPARAM);
 
                         // Column 1: path text
-                        let path_u16: Vec<u16> = item
-                            .path
-                            .encode_utf16()
-                            .chain(std::iter::once(0))
-                            .collect();
+                        let path_u16: Vec<u16> =
+                            item.path.encode_utf16().chain(std::iter::once(0)).collect();
                         let mut lvi_path: LVITEMW = std::mem::zeroed();
                         lvi_path.mask = LVIF_TEXT;
                         lvi_path.iItem = i as i32;
@@ -206,8 +209,10 @@ impl ImportDialog {
                         } else {
                             "Remove"
                         };
-                        let action_u16: Vec<u16> =
-                            action_str.encode_utf16().chain(std::iter::once(0)).collect();
+                        let action_u16: Vec<u16> = action_str
+                            .encode_utf16()
+                            .chain(std::iter::once(0))
+                            .collect();
                         let mut lvi_action: LVITEMW = std::mem::zeroed();
                         lvi_action.mask = LVIF_TEXT;
                         lvi_action.iItem = i as i32;
@@ -225,7 +230,7 @@ impl ImportDialog {
                         0,
                         w!("BUTTON"),
                         import_text.as_ptr(),
-                        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+                        WS_CHILD | WS_VISIBLE | (BS_PUSHBUTTON as u32),
                         dlg_w - 200,
                         dlg_h - 40,
                         90,
@@ -245,7 +250,7 @@ impl ImportDialog {
                         0,
                         w!("BUTTON"),
                         cancel_text.as_ptr(),
-                        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+                        WS_CHILD | WS_VISIBLE | (BS_PUSHBUTTON as u32),
                         dlg_w - 100,
                         dlg_h - 40,
                         90,
@@ -259,10 +264,7 @@ impl ImportDialog {
 
                 Ok(Arc::new(Self {
                     base,
-                    inner: Mutex::new(ImportDialogInner {
-                        items,
-                        himagelist,
-                    }),
+                    inner: Mutex::new(ImportDialogInner { items, himagelist }),
                     on_import: Box::new(on_import),
                 }))
             },
@@ -277,9 +279,7 @@ impl ImportDialog {
     /// Toggle the action of the selected row between Keep and Remove.
     fn toggle_selected_action(&self) {
         let lv = self.get_listview_hwnd();
-        let sel = unsafe {
-            SendMessageW(lv, LVM_GETNEXTITEM, usize::MAX, LVNI_SELECTED as LPARAM)
-        };
+        let sel = unsafe { SendMessageW(lv, LVM_GETNEXTITEM, usize::MAX, LVNI_SELECTED as LPARAM) };
         if sel < 0 {
             return;
         }
