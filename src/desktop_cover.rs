@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
+use tracing::error;
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -417,9 +418,15 @@ impl DesktopCover {
                 should_save = true;
             }
             IDM_ADD_FENCE_FROM_FOLDER => {
-                if let Ok(fence) = Fence::from_folder_selector(hwnd) {
-                    let mut inner = self.inner.lock().unwrap();
-                    inner.fences.push(fence);
+                match Fence::from_folder_selector(hwnd) {
+                    Ok(Some(fence)) => {
+                        let mut inner = self.inner.lock().unwrap();
+                        inner.fences.push(fence);
+                    }
+                    Err(e) => {
+                        error!("Error adding fence: {:?}", e);
+                    }
+                    _ => (),
                 }
                 should_save = true;
             }
@@ -521,9 +528,9 @@ impl DesktopCover {
                 let inner = self.inner.lock().unwrap();
                 if let Some(fence) = inner.fences.last() {
                     if fence.imported_from().is_some() {
-                        fence.import_existing();
+                        fence.show_import_existing_dialog(hwnd);
                     } else {
-                        fence.show_import_from_dialog();
+                        fence.show_import_from_dialog(hwnd);
                     }
                 }
                 should_save = true;
@@ -531,7 +538,7 @@ impl DesktopCover {
             IDM_IMPORT_FROM => {
                 let inner = self.inner.lock().unwrap();
                 if let Some(fence) = inner.fences.last() {
-                    fence.show_import_from_dialog();
+                    fence.show_import_from_dialog(hwnd);
                 }
                 should_save = true;
             }

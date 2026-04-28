@@ -7,9 +7,10 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
 mod import_dialog;
-use import_dialog::{ImportDialog, ImportItem};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
+
+use import_dialog::{ImportDialog, ImportItem};
 
 use crate::app::App;
 use crate::config::state::{FenceState, IconState};
@@ -503,10 +504,11 @@ impl Fence {
         self.inner.lock().unwrap().imported_from = imported_from;
     }
 
-    pub fn import_existing(self: &Arc<Self>) {
-        let imported_from = match self.imported_from() {
-            Some(p) => p,
-            None => return,
+    pub fn show_import_existing_dialog(self: &Arc<Self>, parent_hwnd: HWND) {
+        let imported_from = if let Some(p) = self.imported_from() {
+            p
+        } else {
+            return;
         };
 
         let folder_path = std::path::Path::new(imported_from.as_ref());
@@ -518,7 +520,9 @@ impl Fence {
                 let path = entry.path();
                 if path.extension().and_then(|s| s.to_str()) == Some("lnk") {
                     if let (Some(name), Some(path_str)) = (
-                        path.file_stem().and_then(|s| s.to_str()).map(|s| s.to_string()),
+                        path.file_stem()
+                            .and_then(|s| s.to_str())
+                            .map(|s| s.to_string()),
                         path.to_str().map(|s| s.to_string()),
                     ) {
                         dir_items.push((name, path_str));
@@ -567,7 +571,6 @@ impl Fence {
         }
 
         let fence = self.clone();
-        let parent_hwnd = unsafe { GetParent(self.base().hwnd()) };
         ImportDialog::show(parent_hwnd, import_items, move |kept_items| {
             // Remove all existing icons
             let count = fence.icon_count();
@@ -581,21 +584,21 @@ impl Fence {
         });
     }
 
-    pub fn show_import_from_dialog(self: &Arc<Self>) {
-        let parent_hwnd = unsafe { GetParent(self.base().hwnd()) };
-        let path_str = match prompt::browse_for_folder(parent_hwnd) {
-            Some(s) => s,
-            None => return,
+    pub fn show_import_from_dialog(self: &Arc<Self>, parent_hwnd: HWND) {
+        let path_str = if let Some(s) = prompt::browse_for_folder(parent_hwnd) {
+            s
+        } else {
+            return;
         };
 
         self.set_imported_from(Some(Arc::from(path_str.as_str())));
-        self.import_existing();
+        self.show_import_existing_dialog(parent_hwnd);
     }
 
-    pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Arc<Self>> {
+    pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Option<Arc<Self>>> {
         let path_str = match prompt::browse_for_folder(parent_hwnd) {
             Some(s) => s,
-            None => return Err(anyhow::anyhow!("Dialog cancelled")),
+            None => return Ok(None),
         };
         let folder_path = std::path::Path::new(&path_str);
         let title = folder_path
@@ -619,7 +622,7 @@ impl Fence {
             }
         }
 
-        Ok(fence)
+        Ok(Some(fence))
     }
 
     pub fn add_area(&self, dl: i32, dt: i32, dw: i32, dh: i32) {
