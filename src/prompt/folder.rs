@@ -8,7 +8,43 @@ use crate::app::App;
 use crate::utils::HWNDWrapper;
 use crate::window::Window;
 
-pub fn browse_for_folder_sync() -> Option<String> {}
+pub fn browse_for_folder_sync() -> Option<String> {
+    let mut browse_info = BROWSEINFOW {
+        hwndOwner: HWND(std::ptr::null_mut()),
+        pidlRoot: std::ptr::null(),
+        pszDisplayName: windows::core::PWSTR(std::ptr::null_mut()),
+        lpszTitle: w!("Select a folder"),
+        ulFlags: BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE,
+        lpfn: None,
+        lParam: LPARAM(0),
+        iImage: 0,
+    };
+
+    let pidl = unsafe { SHBrowseForFolderW(&mut browse_info) };
+
+    if pidl.is_null() {
+        info!("User cancelled folder browse dialog");
+        return None;
+    }
+
+    let mut path = [0u16; MAX_PATH as usize];
+    let success = unsafe { SHGetPathFromIDListW(pidl, &mut path) };
+
+    unsafe {
+        CoTaskMemFree(Some(pidl as *mut _));
+    }
+
+    if success.as_bool() {
+        let path_str = String::from_utf16_lossy(
+            &path[..path.iter().position(|&c| c == 0).unwrap_or(path.len())],
+        );
+        info!("User selected folder: {}", path_str);
+        Some(path_str)
+    } else {
+        info!("Failed to get path from folder browse dialog");
+        None
+    }
+}
 
 pub fn browse_for_folder<F>(f: F)
 where
