@@ -3,13 +3,13 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use tracing::error;
-use windows_sys::core::*;
-use windows_sys::Win32::Foundation::*;
-use windows_sys::Win32::Graphics::Gdi::*;
-use windows_sys::Win32::System::LibraryLoader::*;
-use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
-use windows_sys::Win32::UI::Shell::*;
-use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
+use windows::Win32::Foundation::*;
+use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::System::LibraryLoader::*;
+use windows::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
+use windows::Win32::UI::Shell::*;
+use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::app::{App, APP};
 use crate::config::state::AppState;
@@ -50,7 +50,7 @@ struct DesktopCoverInner {
 
 impl DesktopCover {
     pub fn new() -> Result<Arc<Self>> {
-        let h_instance = unsafe { GetModuleHandleW(std::ptr::null()) };
+        let h_instance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
         let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
 
@@ -63,8 +63,8 @@ impl DesktopCover {
             0,
             width,
             height,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
+            HWND::default(),
+            None,
             h_instance,
             |base| {
                 let hwnd = base.hwnd();
@@ -75,7 +75,7 @@ impl DesktopCover {
                     nid.uID = 1;
                     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
                     nid.uCallbackMessage = WM_USER_SHELLICON;
-                    nid.hIcon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
+                    nid.hIcon = LoadIconW(None, IDI_APPLICATION).unwrap_or_default();
                     let tip: Vec<u16> = "Desktop Cover"
                         .encode_utf16()
                         .chain(std::iter::once(0))
@@ -84,7 +84,7 @@ impl DesktopCover {
                     nid.szTip[..len].copy_from_slice(&tip[..len]);
                     Shell_NotifyIconW(NIM_ADD, &nid);
 
-                    SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
+                    SetLayeredWindowAttributes(hwnd, COLORREF(0x00000000), 0, LWA_COLORKEY);
                     SetWindowPos(
                         hwnd,
                         HWND_BOTTOM,
@@ -138,16 +138,16 @@ impl DesktopCover {
             Shell_NotifyIconW(NIM_DELETE, &nid);
             PostQuitMessage(0);
         }
-        0
+        LRESULT(0)
     }
 
     fn on_window_pos_changing(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
-        let pos = lparam as *mut WINDOWPOS;
+        let pos = lparam.0 as *mut WINDOWPOS;
         unsafe {
             (*pos).hwndInsertAfter = HWND_BOTTOM;
 
-            if ((*pos).flags & SWP_NOSIZE) == 0 {
+            if ((*pos).flags & SWP_NOSIZE) == SET_WINDOW_POS_FLAGS(0) {
                 App::get().mirror.lock().unwrap().update();
             }
 
@@ -161,13 +161,13 @@ impl DesktopCover {
             let mut ps: PAINTSTRUCT = std::mem::zeroed();
             let hdc = BeginPaint(hwnd, &mut ps);
 
-            let brush = CreateSolidBrush(0x00000000);
+            let brush = CreateSolidBrush(COLORREF(0x00000000));
             FillRect(hdc, &ps.rcPaint, brush);
             DeleteObject(brush);
 
             EndPaint(hwnd, &ps);
         }
-        0
+        LRESULT(0)
     }
 
     fn on_set_cursor(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -188,35 +188,35 @@ impl DesktopCover {
                     HitTest::TopRight | HitTest::BottomLeft => IDC_SIZENESW,
                 };
                 unsafe {
-                    let cursor = LoadCursorW(std::ptr::null_mut(), cursor_id);
+                    let cursor = LoadCursorW(None, cursor_id).unwrap_or_default();
                     SetCursor(cursor);
                 }
-                return TRUE as LRESULT;
+                return LRESULT(TRUE.0 as isize);
             }
         }
         unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
     }
 
     fn on_lbutton_dblclk(&self, lparam: LPARAM) -> LRESULT {
-        let x = (lparam & 0xFFFF) as i16 as i32;
-        let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
+        let x = (lparam.0 & 0xFFFF) as i16 as i32;
+        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
         let mut inner = self.inner.lock().unwrap();
         for fence in inner.fences.iter().rev() {
             if let Some(hit @ HitTest::Icon(_)) = fence.hit_test(x, y) {
                 inner.hit_type = Some(hit);
                 drop(inner);
-                self.on_command(IDM_RUN_ICON);
-                return 0;
+                self.on_command(WPARAM(IDM_RUN_ICON));
+                return LRESULT(0);
             }
         }
-        0
+        LRESULT(0)
     }
 
     fn on_lbutton_down(&self, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
-        let x = (lparam & 0xFFFF) as i16 as i32;
-        let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
+        let x = (lparam.0 & 0xFFFF) as i16 as i32;
+        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
         let mut inner = self.inner.lock().unwrap();
         let mut hit_idx = None;
@@ -254,14 +254,14 @@ impl DesktopCover {
                 }
             }
         }
-        0
+        LRESULT(0)
     }
 
     fn on_mouse_move(&self, lparam: LPARAM) -> LRESULT {
         let mut inner = self.inner.lock().unwrap();
         if let Some(hit_type) = inner.hit_type {
-            let x = (lparam & 0xFFFF) as i16 as i32;
-            let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
+            let x = (lparam.0 & 0xFFFF) as i16 as i32;
+            let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
             let dx = x - inner.last_mouse_pos.x;
             let dy = y - inner.last_mouse_pos.y;
@@ -286,7 +286,7 @@ impl DesktopCover {
             APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
             inner.last_mouse_pos = POINT { x, y };
         }
-        0
+        LRESULT(0)
     }
 
     fn on_lbutton_up(&self) -> LRESULT {
@@ -295,13 +295,13 @@ impl DesktopCover {
             inner.hit_type = None;
             unsafe { ReleaseCapture() };
         }
-        0
+        LRESULT(0)
     }
 
     fn on_rbutton_up(&self, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
-        let x = (lparam & 0xFFFF) as i16 as i32;
-        let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
+        let x = (lparam.0 & 0xFFFF) as i16 as i32;
+        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
         let mut hit_idx = None;
         {
@@ -332,7 +332,7 @@ impl DesktopCover {
 
             let mut pt = POINT { x, y };
             unsafe { ClientToScreen(hwnd, &mut pt) };
-            let h_menu = unsafe { CreatePopupMenu() };
+            let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
 
             unsafe {
                 if let HitTest::Icon(_) = hit {
@@ -343,7 +343,7 @@ impl DesktopCover {
                 } else {
                     AppendMenuW(h_menu, MF_STRING, IDM_IMPORT, w!("&Import"));
                     AppendMenuW(h_menu, MF_STRING, IDM_IMPORT_FROM, w!("Import &from..."));
-                    AppendMenuW(h_menu, MF_SEPARATOR, 0, std::ptr::null_mut() as *const u16);
+                    AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR::null());
                     AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
                     AppendMenuW(h_menu, MF_STRING, IDM_RENAME_FENCE, w!("Re&name fence"));
                     AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
@@ -356,20 +356,20 @@ impl DesktopCover {
                     pt.y,
                     0,
                     hwnd,
-                    std::ptr::null(),
+                    None,
                 );
                 DestroyMenu(h_menu);
             }
         }
-        0
+        LRESULT(0)
     }
 
     fn on_shell_icon(&self, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
-        if lparam as u32 == WM_RBUTTONUP || lparam as u32 == WM_LBUTTONUP {
+        if lparam.0 as u32 == WM_RBUTTONUP || lparam.0 as u32 == WM_LBUTTONUP {
             let mut pt = POINT { x: 0, y: 0 };
             unsafe { GetCursorPos(&mut pt) };
-            let h_menu = unsafe { CreatePopupMenu() };
+            let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
             unsafe {
                 AppendMenuW(h_menu, MF_STRING, IDM_ADD_FENCE, w!("&Add fence"));
                 AppendMenuW(
@@ -387,17 +387,17 @@ impl DesktopCover {
                     pt.y,
                     0,
                     hwnd,
-                    std::ptr::null(),
+                    None,
                 );
                 DestroyMenu(h_menu);
             }
         }
-        0
+        LRESULT(0)
     }
 
     fn on_command(&self, wparam: WPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
-        let command = wparam & 0xFFFF;
+        let command = wparam.0 & 0xFFFF;
         let hit_type;
         {
             let mut inner = self.inner.lock().unwrap();
@@ -548,7 +548,7 @@ impl DesktopCover {
         if should_save {
             APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
         }
-        0
+        LRESULT(0)
     }
 }
 
@@ -560,10 +560,10 @@ impl Window for DesktopCover {
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         match msg {
-            WM_CLOSE => 0,
+            WM_CLOSE => LRESULT(0),
             WM_DESTROY => self.on_destroy(),
             WM_WINDOWPOSCHANGING => self.on_window_pos_changing(msg, wparam, lparam),
-            WM_MOUSEACTIVATE => MA_NOACTIVATE as LRESULT,
+            WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),
             WM_PAINT => self.on_paint(),
             WM_SETCURSOR => self.on_set_cursor(msg, wparam, lparam),
             WM_LBUTTONDBLCLK => self.on_lbutton_dblclk(lparam),

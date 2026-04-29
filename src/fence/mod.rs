@@ -1,10 +1,10 @@
 use anyhow::Result;
 use tracing::{error, info};
-use windows_sys::core::*;
-use windows_sys::Win32::Foundation::*;
-use windows_sys::Win32::Graphics::Gdi::*;
-use windows_sys::Win32::UI::Controls::*;
-use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
+use windows::Win32::Foundation::*;
+use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::UI::Controls::*;
+use windows::Win32::UI::WindowsAndMessaging::*;
 
 mod icon;
 pub mod import_dialog;
@@ -27,23 +27,27 @@ pub struct TitleBar {
 
 impl TitleBar {
     pub fn new(parent_hwnd: HWND, title: Arc<str>, fence_area: &Area<i32>) -> Result<Arc<Self>> {
-        let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        let h_instance = unsafe {
+            HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
+        };
         let area = Self::area_from_fence_area(fence_area);
         Base::create_window(
-            0,
+            WINDOW_EX_STYLE(0),
             register_classname(w!("FenceTitleBar")),
-            title
-                .encode_utf16()
-                .chain(std::iter::once(0))
-                .collect::<Vec<_>>()
-                .as_ptr(),
+            PCWSTR(
+                title
+                    .encode_utf16()
+                    .chain(std::iter::once(0))
+                    .collect::<Vec<_>>()
+                    .as_ptr(),
+            ),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
             area.x,
             area.y,
             area.width,
             area.height,
             parent_hwnd,
-            std::ptr::null_mut(),
+            None,
             h_instance,
             |base| {
                 Ok(Arc::new(Self {
@@ -73,7 +77,7 @@ impl Window for TitleBar {
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         match msg {
-            WM_NCHITTEST => HTTRANSPARENT as LRESULT,
+            WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
             WM_PAINT => unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
@@ -83,22 +87,21 @@ impl Window for TitleBar {
 
                 let config = App::config();
                 config.fence.title_bar_bg_color.paint_background(hdc, &rect);
-                SetBkMode(hdc, TRANSPARENT as _);
-                SetTextColor(hdc, config.fence.title_text_color.0);
+                SetBkMode(hdc, TRANSPARENT);
+                SetTextColor(hdc, COLORREF(config.fence.title_text_color.0));
 
                 let title_utf16: Vec<u16> = self.title.lock().unwrap().encode_utf16().collect();
                 let mut text_rect = rect;
                 text_rect.left += 5;
                 DrawTextW(
                     hdc,
-                    title_utf16.as_ptr(),
-                    title_utf16.len() as _,
+                    &title_utf16,
                     &mut text_rect,
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE,
                 );
 
                 EndPaint(hwnd, &ps);
-                0
+                LRESULT(0)
             },
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
@@ -111,7 +114,9 @@ pub struct ScrollArea {
 
 impl ScrollArea {
     pub fn new(parent_hwnd: HWND, fence_area: &Area<i32>) -> Result<Arc<Self>> {
-        let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        let h_instance = unsafe {
+            HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
+        };
         let config = App::config();
         let border = config.fence.border_thickness;
         let title_h = config.fence.title_bar_height;
@@ -122,16 +127,16 @@ impl ScrollArea {
             fence_area.height - title_h - border,
         );
         Base::create_window(
-            0,
+            WINDOW_EX_STYLE(0),
             register_classname(w!("FenceScrollArea")),
-            std::ptr::null(),
+            PCWSTR::null(),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_VSCROLL,
             area.x,
             area.y,
             area.width,
             area.height,
             parent_hwnd,
-            std::ptr::null_mut(),
+            None,
             h_instance,
             |base| Ok(Arc::new(Self { base })),
         )
@@ -160,8 +165,8 @@ impl Window for ScrollArea {
         match msg {
             WM_NCHITTEST => unsafe {
                 let res = DefWindowProcW(hwnd, msg, wparam, lparam);
-                if res == HTCLIENT as LRESULT {
-                    HTTRANSPARENT as LRESULT
+                if res == LRESULT(HTCLIENT as isize) {
+                    LRESULT(HTTRANSPARENT as isize)
                 } else {
                     res
                 }
@@ -173,14 +178,14 @@ impl Window for ScrollArea {
                 GetScrollInfo(hwnd, SB_VERT, &mut si);
 
                 let cur_pos = si.nPos;
-                match (wparam & 0xFFFF) as i32 {
+                match (wparam.0 & 0xFFFF) as i32 {
                     SB_TOP => si.nPos = si.nMin,
                     SB_BOTTOM => si.nPos = si.nMax,
                     SB_LINEUP => si.nPos -= 10,
                     SB_LINEDOWN => si.nPos += 10,
                     SB_PAGEUP => si.nPos -= si.nPage as i32,
                     SB_PAGEDOWN => si.nPos += si.nPage as i32,
-                    SB_THUMBTRACK => si.nPos = (wparam >> 16) as i16 as i32,
+                    SB_THUMBTRACK => si.nPos = (wparam.0 >> 16) as i16 as i32,
                     _ => {}
                 }
 
@@ -193,21 +198,21 @@ impl Window for ScrollArea {
                         hwnd,
                         0,
                         cur_pos - si.nPos,
-                        std::ptr::null(),
-                        std::ptr::null(),
-                        std::ptr::null_mut(),
-                        std::ptr::null_mut(),
+                        None,
+                        None,
+                        None,
+                        None,
                         SW_ERASE | SW_INVALIDATE | SW_SCROLLCHILDREN,
                     );
                     let parent = GetParent(hwnd);
-                    if parent != std::ptr::null_mut() {
-                        InvalidateRect(parent, std::ptr::null(), TRUE);
+                    if let Ok(parent) = parent {
+                        InvalidateRect(parent, None, TRUE);
                     }
                 }
-                0
+                LRESULT(0)
             },
             WM_MOUSEWHEEL => unsafe {
-                let delta = (wparam >> 16) as i16 as i32;
+                let delta = (wparam.0 >> 16) as i16 as i32;
                 let mut si: SCROLLINFO = std::mem::zeroed();
                 si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
                 si.fMask = SIF_ALL;
@@ -220,11 +225,11 @@ impl Window for ScrollArea {
                     SendMessageW(
                         hwnd,
                         WM_VSCROLL,
-                        ((new_pos as usize) << 16) | SB_THUMBTRACK as usize,
-                        0,
+                        WPARAM(((new_pos as usize) << 16) | SB_THUMBTRACK as usize),
+                        LPARAM(0),
                     );
                 }
-                0
+                LRESULT(0)
             },
             WM_PAINT => unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
@@ -259,7 +264,7 @@ impl Window for ScrollArea {
                     .paint_background(hdc, &rect);
 
                 EndPaint(hwnd, &ps);
-                0
+                LRESULT(0)
             },
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
@@ -308,18 +313,20 @@ impl Fence {
     }
 
     pub fn from_state(parent_hwnd: HWND, state: FenceState) -> Result<Arc<Self>> {
-        let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        let h_instance = unsafe {
+            HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
+        };
         Base::create_window(
-            0,
+            WINDOW_EX_STYLE(0),
             register_classname(w!("Fence")),
-            std::ptr::null(),
+            PCWSTR::null(),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
             state.area.x,
             state.area.y,
             state.area.width,
             state.area.height,
             parent_hwnd,
-            std::ptr::null_mut(),
+            None,
             h_instance,
             |base| {
                 let title_bar = TitleBar::new(base.hwnd(), state.title.clone(), &state.area)?;
@@ -656,17 +663,18 @@ impl Fence {
 
         unsafe {
             let mut hdwp = BeginDeferWindowPos(2);
-            if hdwp.is_null() {
+            if hdwp.is_err() {
                 panic!("hdwp is null");
             }
-            hdwp = self.title_bar.base().resize_to_deferred(
+            let hdwp = hdwp.unwrap();
+            let hdwp = self.title_bar.base().resize_to_deferred(
                 title_area.x,
                 title_area.y,
                 title_area.width,
                 title_area.height,
                 hdwp,
             );
-            hdwp = self.scroll_area.base().resize_to_deferred(
+            let hdwp = self.scroll_area.base().resize_to_deferred(
                 scroll_area.x,
                 scroll_area.y,
                 scroll_area.width,
@@ -713,9 +721,9 @@ impl Window for Fence {
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         match msg {
-            WM_NCHITTEST => HTTRANSPARENT as LRESULT,
+            WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
             WM_MOVE => unsafe {
-                InvalidateRect(self.scroll_area.base().hwnd(), std::ptr::null(), TRUE);
+                InvalidateRect(self.scroll_area.base().hwnd(), None, TRUE);
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             },
             WM_PAINT => unsafe {
@@ -729,7 +737,7 @@ impl Window for Fence {
                 config.fence.fence_bg_color.paint_background(hdc, &rect);
 
                 EndPaint(hwnd, &ps);
-                0
+                LRESULT(0)
             },
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }

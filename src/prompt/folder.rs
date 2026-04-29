@@ -1,8 +1,8 @@
 use tracing::info;
-use windows_sys::core::w;
-use windows_sys::Win32::Foundation::*;
-use windows_sys::Win32::System::Com::CoTaskMemFree;
-use windows_sys::Win32::UI::Shell::*;
+use windows::core::w;
+use windows::Win32::Foundation::*;
+use windows::Win32::System::Com::CoTaskMemFree;
+use windows::Win32::UI::Shell::*;
 
 use crate::utils::HWNDWrapper;
 
@@ -12,11 +12,11 @@ fn browse_for_folder_sync(parent_hwnd_w: HWNDWrapper) -> Option<String> {
         let mut bi = BROWSEINFOW {
             hwndOwner: parent_hwnd_w.0,
             pidlRoot: std::ptr::null_mut(),
-            pszDisplayName: path_buf.as_mut_ptr(),
+            pszDisplayName: windows::core::PWSTR(path_buf.as_mut_ptr()),
             lpszTitle: w!("Select a folder"),
-            ulFlags: BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE,
+            ulFlags: (BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE) as u32,
             lpfn: None,
-            lParam: 0,
+            lParam: LPARAM(0),
             iImage: 0,
         };
 
@@ -25,8 +25,8 @@ fn browse_for_folder_sync(parent_hwnd_w: HWNDWrapper) -> Option<String> {
             None
         } else {
             let mut path_str_buf = [0u16; MAX_PATH as usize];
-            SHGetPathFromIDListW(pidl, path_str_buf.as_mut_ptr());
-            CoTaskMemFree(pidl as _);
+            SHGetPathFromIDListW(pidl, windows::core::PWSTR(path_str_buf.as_mut_ptr()));
+            CoTaskMemFree(Some(pidl as *const core::ffi::c_void));
             Some(String::from_utf16_lossy(
                 &path_str_buf[..path_str_buf.iter().position(|&c| c == 0).unwrap_or(0)],
             ))

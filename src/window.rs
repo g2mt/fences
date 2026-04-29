@@ -5,11 +5,11 @@ use std::sync::{Arc, LazyLock, Mutex, MutexGuard, OnceLock, Weak};
 
 use anyhow::{anyhow, Result};
 use tracing::debug;
-use windows_sys::core::*;
-use windows_sys::Win32::Foundation::*;
-use windows_sys::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
-use windows_sys::Win32::System::LibraryLoader::*;
-use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
+use windows::Win32::Foundation::*;
+use windows::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
+use windows::Win32::System::LibraryLoader::*;
+use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::geo::Area;
 
@@ -31,7 +31,7 @@ pub fn register_classname_ex(name: PCWSTR, mut wc: WNDCLASSW) -> ClassName {
     ) -> LRESULT {
         unsafe {
             if msg == WM_NCCREATE {
-                let cs = lparam as *const CREATESTRUCTW;
+                let cs = lparam.0 as *const CREATESTRUCTW;
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, (*cs).lpCreateParams as isize);
                 return DefWindowProcW(hwnd, msg, wparam, lparam);
             }
@@ -53,7 +53,7 @@ pub fn register_classname_ex(name: PCWSTR, mut wc: WNDCLASSW) -> ClassName {
         return existing.clone();
     }
     unsafe {
-        let h_instance = GetModuleHandleW(std::ptr::null());
+        let h_instance = GetModuleHandleW(None).unwrap_or_default();
         wc.hInstance = h_instance;
         wc.lpszClassName = name;
         wc.lpfnWndProc = Some(base_wndproc);
@@ -69,7 +69,7 @@ pub fn register_classname(name: PCWSTR) -> ClassName {
     register_classname_ex(name, unsafe {
         let mut wc: WNDCLASSW = std::mem::zeroed();
         wc.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
-        wc.hCursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
+        wc.hCursor = LoadCursorW(None, IDC_ARROW).unwrap_or_default();
         wc
     })
 }
@@ -97,7 +97,7 @@ impl Base {
         nwidth: i32,
         nheight: i32,
         hwndparent: HWND,
-        hmenu: HMENU,
+        hmenu: Option<HMENU>,
         hinstance: HINSTANCE,
         f: F,
     ) -> Result<Arc<W>>
@@ -136,11 +136,11 @@ impl Base {
         nwidth: i32,
         nheight: i32,
         hwndparent: HWND,
-        hmenu: HMENU,
+        hmenu: Option<HMENU>,
         hinstance: HINSTANCE,
     ) -> Result<BaseRef> {
         let mut self_ref = Box::into_pin(Box::new(Self {
-            hwnd: std::ptr::null_mut(),
+            hwnd: HWND::default(),
             window: OnceLock::new(),
             area: Area::new(x, y, nwidth, nheight),
         }));
@@ -157,12 +157,13 @@ impl Base {
                 hwndparent,
                 hmenu,
                 hinstance,
-                &*self_ref as *const Base as *const _,
+                Some(&*self_ref as *const Base as *const _),
             )
         };
-        if hwnd.is_null() {
+        if hwnd.is_err() {
             return Err(anyhow!("CreateWindowExW failed"));
         }
+        let hwnd = hwnd.unwrap();
         unsafe {
             let mut_ref = Pin::get_unchecked_mut(self_ref.as_mut());
             mut_ref.hwnd = hwnd;
@@ -176,7 +177,7 @@ impl Base {
 
     pub fn redraw(&self) {
         unsafe {
-            InvalidateRect(self.hwnd, std::ptr::null(), TRUE);
+            InvalidateRect(self.hwnd, None, TRUE);
             UpdateWindow(self.hwnd);
         }
     }
@@ -197,7 +198,7 @@ impl Base {
         unsafe {
             SetWindowPos(
                 self.hwnd,
-                std::ptr::null_mut(),
+                None,
                 x,
                 y,
                 width,
@@ -245,13 +246,14 @@ impl Base {
             DeferWindowPos(
                 hwinposinfo,
                 self.hwnd,
-                std::ptr::null_mut(),
+                None,
                 left,
                 top,
                 width,
                 height,
                 SWP_NOZORDER | SWP_NOACTIVATE,
             )
+            .unwrap_or(hwinposinfo)
         }
     }
 
@@ -266,10 +268,10 @@ impl Drop for Base {
     fn drop(&mut self) {
         unsafe {
             debug!("DestroyWindow({:?})", self.hwnd);
-            if self.hwnd != std::ptr::null_mut() {
+            if self.hwnd != HWND::default() {
                 DestroyWindow(self.hwnd);
             }
-            self.hwnd = std::ptr::null_mut();
+            self.hwnd = HWND::default();
         }
     }
 }

@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use windows_sys::Win32::Foundation::*;
-use windows_sys::Win32::UI::Shell::*;
+use windows::Win32::Foundation::*;
+use windows::Win32::UI::Shell::*;
 
 pub static LOG_PATH: &'static str = "log.txt";
 pub static STATE_PATH: &'static str = "state.json";
@@ -11,11 +11,13 @@ pub fn app_dir() -> Result<PathBuf> {
     let mut path = vec![0u16; MAX_PATH as usize];
     unsafe {
         if SHGetSpecialFolderPathW(
-            std::ptr::null_mut(),
-            path.as_mut_ptr(),
-            CSIDL_PERSONAL as _,
+            None,
+            windows::core::PWSTR(path.as_mut_ptr()),
+            CSIDL_PERSONAL as i32,
             FALSE,
-        ) == FALSE
+        )
+        .as_bool()
+            == false
         {
             return Err(anyhow::anyhow!("Failed to get Documents folder"));
         }

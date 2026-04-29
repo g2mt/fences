@@ -1,6 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use windows_sys::Win32::Foundation::RECT;
-use windows_sys::Win32::Graphics::Gdi::*;
+use windows::Win32::Foundation::RECT;
+use windows::Win32::Graphics::Gdi::*;
 
 /// Represents a color value stored as **AABBGGRR** (alpha, blue, green, red).
 ///
@@ -117,7 +117,7 @@ impl Color<true> {
             let color = self.0;
             let alpha = self.a();
             if alpha == 255 {
-                let brush = CreateSolidBrush(color & 0xFFFFFF);
+                let brush = CreateSolidBrush(COLORREF(color & 0xFFFFFF));
                 FillRect(hdc, rect, brush);
                 DeleteObject(brush);
             } else if alpha > 0 {
@@ -127,7 +127,7 @@ impl Color<true> {
                 let bitmap = CreateCompatibleBitmap(hdc, width, height);
                 SelectObject(mem_dc, bitmap);
 
-                let brush = CreateSolidBrush(color & 0xFFFFFF);
+                let brush = CreateSolidBrush(COLORREF(color & 0xFFFFFF));
                 let local_rect = RECT {
                     left: 0,
                     top: 0,
@@ -155,7 +155,7 @@ impl Color<true> {
 impl Color<false> {
     pub unsafe fn paint_background(&self, hdc: HDC, rect: &RECT) {
         unsafe {
-            let brush = CreateSolidBrush(self.0 & 0xFFFFFF);
+            let brush = CreateSolidBrush(COLORREF(self.0 & 0xFFFFFF));
             FillRect(hdc, rect, brush);
             DeleteObject(brush);
         }

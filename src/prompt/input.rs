@@ -2,11 +2,11 @@ use std::borrow::Cow;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use tracing::error;
-use windows_sys::core::*;
-use windows_sys::Win32::Foundation::*;
-use windows_sys::Win32::Graphics::Gdi::*;
-use windows_sys::Win32::System::LibraryLoader::*;
-use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
+use windows::Win32::Foundation::*;
+use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::System::LibraryLoader::*;
+use windows::Win32::UI::WindowsAndMessaging::*;
 
 const ID_EDIT: u32 = 101;
 const ID_OK: u32 = 1;
@@ -28,62 +28,63 @@ unsafe extern "system" fn input_wndproc(
     match msg {
         WM_NCCREATE => unsafe {
             // Store the InputDialogData pointer passed through lParam
-            let cs = lparam as *const CREATESTRUCTW;
+            let cs = lparam.0 as *const CREATESTRUCTW;
             let data = &mut *((*cs).lpCreateParams as *mut InputDialogData);
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, data as *mut InputDialogData as isize);
 
             // Create a static message label
             CreateWindowExW(
-                0,
+                WINDOW_EX_STYLE(0),
                 w!("STATIC"),
-                data.message_utf16.as_ptr(),
+                PCWSTR(data.message_utf16.as_ptr()),
                 WS_VISIBLE | WS_CHILD,
                 10,
                 10,
                 200,
                 20,
                 hwnd,
-                std::ptr::null_mut(),
-                GetModuleHandleW(std::ptr::null()),
-                std::ptr::null(),
+                None,
+                GetModuleHandleW(None).unwrap_or_default(),
+                None,
             );
 
             // Create edit control
             let edit = CreateWindowExW(
                 WS_EX_CLIENTEDGE,
                 w!("EDIT"),
-                std::ptr::null(),
-                WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL as u32,
+                None,
+                WS_VISIBLE | WS_CHILD | WS_BORDER | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
                 10,
                 40,
                 200,
                 20,
                 hwnd,
-                ID_EDIT as HMENU,
-                GetModuleHandleW(std::ptr::null()),
-                std::ptr::null(),
-            );
+                Some(HMENU(ID_EDIT as *mut core::ffi::c_void)),
+                GetModuleHandleW(None).unwrap_or_default(),
+                None,
+            )
+            .unwrap_or_default();
             data.edit_hwnd = edit;
 
             // Create OK button
             CreateWindowExW(
-                0,
+                WINDOW_EX_STYLE(0),
                 w!("BUTTON"),
                 w!("OK"),
-                WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON as u32,
+                WS_VISIBLE | WS_CHILD | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                 50,
                 80,
                 60,
                 25,
                 hwnd,
-                ID_OK as HMENU,
-                GetModuleHandleW(std::ptr::null()),
-                std::ptr::null(),
+                Some(HMENU(ID_OK as *mut core::ffi::c_void)),
+                GetModuleHandleW(None).unwrap_or_default(),
+                None,
             );
 
             // Create Cancel button
             CreateWindowExW(
-                0,
+                WINDOW_EX_STYLE(0),
                 w!("BUTTON"),
                 w!("Cancel"),
                 WS_VISIBLE | WS_CHILD,
@@ -92,26 +93,26 @@ unsafe extern "system" fn input_wndproc(
                 60,
                 25,
                 hwnd,
-                ID_CANCEL as HMENU,
-                GetModuleHandleW(std::ptr::null()),
-                std::ptr::null(),
+                Some(HMENU(ID_CANCEL as *mut core::ffi::c_void)),
+                GetModuleHandleW(None).unwrap_or_default(),
+                None,
             );
 
             // Set the edit's initial text
             if let Some(default) = &data.result {
                 let default_utf16: Vec<u16> =
                     default.encode_utf16().chain(std::iter::once(0)).collect();
-                SetWindowTextW(edit, default_utf16.as_ptr());
+                SetWindowTextW(hwnd, PCWSTR(default_utf16.as_ptr()));
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
         },
         WM_DESTROY => unsafe {
             PostQuitMessage(0);
-            0
+            LRESULT(0)
         },
         WM_COMMAND => unsafe {
-            let id = (wparam as u32) & 0xFFFF;
-            let hi = ((wparam as u32) >> 16) as u16;
+            let id = (wparam.0 as u32) & 0xFFFF;
+            let hi = ((wparam.0 as u32) >> 16) as u16;
             if hi == BN_CLICKED as u16 {
                 let data_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut InputDialogData;
                 let data = &mut *data_ptr;
@@ -119,10 +120,11 @@ unsafe extern "system" fn input_wndproc(
                     ID_OK => {
                         let len = GetWindowTextLengthW(data.edit_hwnd);
                         let mut buf: Vec<u16> = vec![0; (len + 1) as usize];
-                        GetWindowTextW(data.edit_hwnd, buf.as_mut_ptr(), len + 1);
+                        GetWindowTextW(data.edit_hwnd, &mut buf);
                         let s = String::from_utf16_lossy(&buf[..len as usize]);
                         data.result = Some(s);
                         data.ok_clicked.store(true, Ordering::SeqCst);
+                        DestroyWindow(data.edit_hwnd);
                         DestroyWindow(hwnd);
                     }
                     ID_CANCEL => {
@@ -132,7 +134,7 @@ unsafe extern "system" fn input_wndproc(
                     _ => {}
                 }
             }
-            0
+            LRESULT(0)
         },
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
@@ -142,7 +144,7 @@ static CLASS_REGISTERED: AtomicBool = AtomicBool::new(false);
 
 fn input_sync(title: &str, message: &str, default: &str) -> Option<String> {
     unsafe {
-        let h_instance = GetModuleHandleW(std::ptr::null());
+        let h_instance = GetModuleHandleW(None).unwrap_or_default();
 
         // Register a window class for the dialog
         if CLASS_REGISTERED
@@ -153,7 +155,7 @@ fn input_sync(title: &str, message: &str, default: &str) -> Option<String> {
             wc.style = CS_HREDRAW | CS_VREDRAW;
             wc.lpfnWndProc = Some(input_wndproc);
             wc.hInstance = h_instance;
-            wc.hbrBackground = (COLOR_BTNFACE + 1) as HBRUSH;
+            wc.hbrBackground = HBRUSH((COLOR_BTNFACE.0 + 1) as *mut core::ffi::c_void);
             wc.lpszClassName = w!("InputDialogClass");
             let atom = RegisterClassW(&wc);
             if atom == 0 {
@@ -166,7 +168,7 @@ fn input_sync(title: &str, message: &str, default: &str) -> Option<String> {
         // Prepare data
         let data_ptr = Box::into_raw(Box::new(InputDialogData {
             message_utf16: message.encode_utf16().chain(std::iter::once(0)).collect(),
-            edit_hwnd: std::ptr::null_mut(),
+            edit_hwnd: HWND::default(),
             result: Some(default.to_string()),
             ok_clicked: AtomicBool::new(false),
         }));
@@ -176,28 +178,29 @@ fn input_sync(title: &str, message: &str, default: &str) -> Option<String> {
         let hwnd = CreateWindowExW(
             WS_EX_CLIENTEDGE,
             w!("InputDialogClass"),
-            title_utf16.as_ptr(),
+            PCWSTR(title_utf16.as_ptr()),
             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             240,
             150,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
+            None,
+            None,
             h_instance,
-            data_ptr as *mut std::ffi::c_void,
+            Some(data_ptr as *mut core::ffi::c_void),
         );
-        if hwnd == std::ptr::null_mut() {
-            error!("hwnd == null, {}", GetLastError());
+        if hwnd.is_err() {
+            error!("hwnd == null, {}", GetLastError().0);
             return Some(default.to_string());
         }
+        let hwnd = hwnd.unwrap();
 
         // Show and run modal loop
         ShowWindow(hwnd, SW_SHOWNORMAL);
         UpdateWindow(hwnd);
 
         let mut msg: MSG = std::mem::zeroed();
-        while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
+        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }

@@ -5,7 +5,7 @@ use std::sync::{Mutex, OnceLock};
 use anyhow::Result;
 use tracing::{error, info};
 use tracing_subscriber::prelude::*;
-use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows::Win32::UI::WindowsAndMessaging::*;
 
 mod app;
 mod config;
@@ -64,7 +64,7 @@ fn main() -> Result<()> {
         }
         unsafe {
             let mut msg = std::mem::zeroed();
-            while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
+            while GetMessageW(&mut msg, None, 0, 0).as_bool() {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }

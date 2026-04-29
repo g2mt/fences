@@ -3,12 +3,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use tracing::{error, info};
-use windows_sys::core::*;
-use windows_sys::Win32::Foundation::*;
-use windows_sys::Win32::Graphics::Gdi::*;
-use windows_sys::Win32::UI::Controls::Dialogs::*;
-use windows_sys::Win32::UI::Shell::*;
-use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
+use windows::Win32::Foundation::*;
+use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::UI::Controls::Dialogs::*;
+use windows::Win32::UI::Shell::*;
+use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::app::App;
 use crate::config::state::IconState;
@@ -22,7 +22,9 @@ pub struct Icon {
 
 impl Icon {
     pub fn new(parent_hwnd: HWND, title: &str, path: Option<&str>, x: i32, y: i32) -> Arc<Self> {
-        let h_instance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
+        let h_instance = unsafe {
+            HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
+        };
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
 
         let state = Mutex::new(IconState {
@@ -33,16 +35,16 @@ impl Icon {
         let icon_size = App::config().icon.size;
 
         Base::create_window(
-            0,
+            WINDOW_EX_STYLE(0),
             register_classname(w!("FenceIcon")),
-            title_u16.as_ptr(),
+            PCWSTR(title_u16.as_ptr()),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
             x,
             y,
             icon_size,
             icon_size,
             parent_hwnd,
-            std::ptr::null_mut(),
+            None,
             h_instance,
             |base| {
                 Ok(Arc::new(Self {
@@ -58,7 +60,7 @@ impl Icon {
     pub fn set_selected(&self, selected: bool) {
         self.selected.store(selected, Ordering::SeqCst);
         unsafe {
-            InvalidateRect(self.base.hwnd(), std::ptr::null(), TRUE);
+            InvalidateRect(self.base.hwnd(), None, TRUE);
         }
     }
 
@@ -79,7 +81,7 @@ impl Icon {
         let hwnd = self.base.hwnd();
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
         unsafe {
-            SetWindowTextW(hwnd, title_u16.as_ptr());
+            SetWindowTextW(hwnd, PCWSTR(title_u16.as_ptr()));
         }
         self.base.redraw();
     }
@@ -103,14 +105,14 @@ impl Icon {
         use std::os::windows::process::CommandExt;
 
         #[cfg(windows)]
-        use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
+        use windows::Win32::System::Threading::CREATE_NO_WINDOW;
 
         if let Some(path) = self.path() {
             info!("Running {}", path);
             let mut command = Command::new("cmd");
             command.args(["/C", &path]);
             #[cfg(windows)]
-            command.creation_flags(CREATE_NO_WINDOW);
+            command.creation_flags(CREATE_NO_WINDOW.0);
             let _ = command.spawn();
         } else {
             error!("No path specified for {}", self.title());
@@ -122,13 +124,13 @@ impl Icon {
         let mut ofn: OPENFILENAMEW = unsafe { std::mem::zeroed() };
         ofn.lStructSize = std::mem::size_of::<OPENFILENAMEW>() as u32;
         ofn.hwndOwner = self.base.hwnd();
-        ofn.lpstrFile = file_buf.as_mut_ptr();
+        ofn.lpstrFile = windows::core::PWSTR(file_buf.as_mut_ptr());
         ofn.nMaxFile = MAX_PATH;
         ofn.lpstrFilter = w!("All Files\0*.*\0\0");
         ofn.nFilterIndex = 1;
         ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
-        if unsafe { GetOpenFileNameW(&mut ofn) } != 0 {
+        if unsafe { GetOpenFileNameW(&mut ofn) }.as_bool() {
             let path_str = String::from_utf16_lossy(
                 &file_buf[..file_buf.iter().position(|&c| c == 0).unwrap_or(0)],
             );
@@ -162,7 +164,7 @@ impl Window for Icon {
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         match msg {
-            WM_NCHITTEST => HTTRANSPARENT as LRESULT,
+            WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
             WM_PAINT => unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
@@ -206,23 +208,23 @@ impl Window for Icon {
                 let state = self.state.lock().unwrap();
                 let path = state.path.clone();
 
-                let mut hicon = std::ptr::null_mut();
+                let mut hicon = HICON::default();
                 if let Some(ref path) = path {
                     let path_u16: Vec<u16> =
                         path.encode_utf16().chain(std::iter::once(0)).collect();
                     let mut shfi: SHFILEINFOW = std::mem::zeroed();
                     SHGetFileInfoW(
-                        path_u16.as_ptr(),
-                        0,
-                        &mut shfi,
+                        PCWSTR(path_u16.as_ptr()),
+                        FILE_FLAGS_AND_ATTRIBUTES(0),
+                        Some(&mut shfi),
                         std::mem::size_of::<SHFILEINFOW>() as u32,
                         SHGFI_ICON | SHGFI_LARGEICON,
                     );
                     hicon = shfi.hIcon;
                 }
 
-                if hicon.is_null() {
-                    hicon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
+                if hicon.is_invalid() {
+                    hicon = LoadIconW(None, IDI_APPLICATION).unwrap_or_default();
                 }
 
                 DrawIconEx(
@@ -233,7 +235,7 @@ impl Window for Icon {
                     icon_draw_size,
                     icon_draw_size,
                     0,
-                    std::ptr::null_mut(),
+                    None,
                     DI_NORMAL,
                 );
 
@@ -241,22 +243,21 @@ impl Window for Icon {
                     DestroyIcon(hicon);
                 }
 
-                SetBkMode(hdc, TRANSPARENT as _);
-                SetTextColor(hdc, config.icon.text_color.0);
+                SetBkMode(hdc, TRANSPARENT);
+                SetTextColor(hdc, COLORREF(config.icon.text_color.0));
 
                 let title_utf16: Vec<u16> = state.title.encode_utf16().collect();
                 let mut text_rect = rect;
                 text_rect.top += icon_draw_size;
                 DrawTextW(
                     hdc,
-                    title_utf16.as_ptr(),
-                    title_utf16.len() as _,
+                    &title_utf16,
                     &mut text_rect,
                     DT_CENTER | DT_WORDBREAK | DT_NOPREFIX,
                 );
 
                 EndPaint(hwnd, &ps);
-                0
+                LRESULT(0)
             },
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }

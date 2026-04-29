@@ -2,13 +2,13 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use tracing::debug;
-use windows_sys::core::*;
-use windows_sys::Win32::Foundation::*;
-use windows_sys::Win32::Graphics::Gdi::*;
-use windows_sys::Win32::System::LibraryLoader::*;
-use windows_sys::Win32::UI::Controls::*;
-use windows_sys::Win32::UI::Shell::*;
-use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
+use windows::Win32::Foundation::*;
+use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::System::LibraryLoader::*;
+use windows::Win32::UI::Controls::*;
+use windows::Win32::UI::Shell::*;
+use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::window::{register_classname, register_classname_ex, Base, BaseRef, Window};
 
@@ -46,7 +46,7 @@ impl ImportDialog {
         items: Vec<ImportItem>,
         on_import: impl Fn(Vec<ImportItem>) + Send + Sync + 'static,
     ) -> Result<Arc<Self>> {
-        let h_instance = unsafe { GetModuleHandleW(std::ptr::null()) };
+        let h_instance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
 
         // Center dialog on screen
         let screen_w = unsafe { GetSystemMetrics(SM_CXSCREEN) };
@@ -62,21 +62,21 @@ impl ImportDialog {
             .collect();
 
         Base::create_window(
-            0,
+            WINDOW_EX_STYLE(0),
             register_classname_ex(w!("FenceImportDialog"), unsafe {
                 let mut wc: WNDCLASSW = std::mem::zeroed();
-                wc.hbrBackground = (COLOR_WINDOW + 1) as HBRUSH;
-                wc.hCursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
+                wc.hbrBackground = HBRUSH((COLOR_WINDOW.0 + 1) as *mut core::ffi::c_void);
+                wc.hCursor = LoadCursorW(None, IDC_ARROW).unwrap_or_default();
                 wc
             }),
-            title_u16.as_ptr(),
+            PCWSTR(title_u16.as_ptr()),
             WS_OVERLAPPEDWINDOW | WS_VISIBLE,
             dlg_x,
             dlg_y,
             dlg_w,
             dlg_h,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
+            HWND::default(),
+            None,
             h_instance,
             |base| {
                 let hwnd = base.hwnd();
@@ -87,19 +87,20 @@ impl ImportDialog {
                 // Create ListView
                 let lv_hwnd = unsafe {
                     CreateWindowExW(
-                        0,
+                        WINDOW_EX_STYLE(0),
                         w!("SysListView32"),
-                        std::ptr::null(),
-                        WS_CHILD | WS_VISIBLE | WS_BORDER | LVS_REPORT | LVS_SINGLESEL,
+                        None,
+                        WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(LVS_REPORT | LVS_SINGLESEL),
                         10,
                         10,
                         dlg_w - 20,
                         dlg_h - 60,
                         hwnd,
-                        ID_LISTVIEW as _,
+                        Some(HMENU(ID_LISTVIEW as *mut core::ffi::c_void)),
                         h_instance,
-                        std::ptr::null_mut(),
+                        None,
                     )
+                    .unwrap_or_default()
                 };
 
                 unsafe {
@@ -107,16 +108,16 @@ impl ImportDialog {
                     SendMessageW(
                         lv_hwnd,
                         LVM_SETEXTENDEDLISTVIEWSTYLE,
-                        0,
-                        (LVS_EX_FULLROWSELECT | LVS_EX_SUBITEMIMAGES) as LPARAM,
+                        WPARAM(0),
+                        LPARAM((LVS_EX_FULLROWSELECT | LVS_EX_SUBITEMIMAGES) as isize),
                     );
 
                     // Assign image list
                     SendMessageW(
                         lv_hwnd,
                         LVM_SETIMAGELIST,
-                        LVSIL_SMALL as WPARAM,
-                        himagelist as LPARAM,
+                        WPARAM(LVSIL_SMALL.0 as usize),
+                        LPARAM(himagelist.0 as isize),
                     );
 
                     // Column 0: Icon
@@ -124,13 +125,13 @@ impl ImportDialog {
                     let mut col0: LVCOLUMNW = std::mem::zeroed();
                     col0.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
                     col0.cx = 40;
-                    col0.pszText = col0_text.as_ptr() as *mut _;
+                    col0.pszText = windows::core::PWSTR(col0_text.as_ptr() as *mut _);
                     col0.iSubItem = COL_ICON;
                     SendMessageW(
                         lv_hwnd,
                         LVM_INSERTCOLUMNW,
-                        COL_ICON as WPARAM,
-                        &col0 as *const _ as LPARAM,
+                        WPARAM(COL_ICON as usize),
+                        LPARAM(&col0 as *const _ as isize),
                     );
 
                     // Column 1: Path
@@ -139,13 +140,13 @@ impl ImportDialog {
                     let mut col1: LVCOLUMNW = std::mem::zeroed();
                     col1.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
                     col1.cx = 380;
-                    col1.pszText = col1_text.as_ptr() as *mut _;
+                    col1.pszText = windows::core::PWSTR(col1_text.as_ptr() as *mut _);
                     col1.iSubItem = COL_PATH;
                     SendMessageW(
                         lv_hwnd,
                         LVM_INSERTCOLUMNW,
-                        COL_PATH as WPARAM,
-                        &col1 as *const _ as LPARAM,
+                        WPARAM(COL_PATH as usize),
+                        LPARAM(&col1 as *const _ as isize),
                     );
 
                     // Column 2: Action
@@ -154,13 +155,13 @@ impl ImportDialog {
                     let mut col2: LVCOLUMNW = std::mem::zeroed();
                     col2.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
                     col2.cx = 140;
-                    col2.pszText = col2_text.as_ptr() as *mut _;
+                    col2.pszText = windows::core::PWSTR(col2_text.as_ptr() as *mut _);
                     col2.iSubItem = COL_ACTION;
                     SendMessageW(
                         lv_hwnd,
                         LVM_INSERTCOLUMNW,
-                        COL_ACTION as WPARAM,
-                        &col2 as *const _ as LPARAM,
+                        WPARAM(COL_ACTION as usize),
+                        LPARAM(&col2 as *const _ as isize),
                     );
                 }
 
@@ -172,19 +173,19 @@ impl ImportDialog {
                             item.path.encode_utf16().chain(std::iter::once(0)).collect();
                         let mut shfi: SHFILEINFOW = std::mem::zeroed();
                         SHGetFileInfoW(
-                            path_u16.as_ptr(),
-                            0,
-                            &mut shfi,
+                            PCWSTR(path_u16.as_ptr()),
+                            FILE_FLAGS_AND_ATTRIBUTES(0),
+                            Some(&mut shfi),
                             std::mem::size_of::<SHFILEINFOW>() as u32,
                             SHGFI_ICON | SHGFI_SMALLICON,
                         );
-                        let idx = if !shfi.hIcon.is_null() {
+                        let idx = if !shfi.hIcon.is_invalid() {
                             ImageList_ReplaceIcon(himagelist, -1, shfi.hIcon)
                         } else {
-                            let hicon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
+                            let hicon = LoadIconW(None, IDI_APPLICATION).unwrap_or_default();
                             ImageList_ReplaceIcon(himagelist, -1, hicon)
                         };
-                        if !shfi.hIcon.is_null() {
+                        if !shfi.hIcon.is_invalid() {
                             DestroyIcon(shfi.hIcon);
                         }
                         idx
@@ -197,7 +198,7 @@ impl ImportDialog {
                         lvi.iItem = i as i32;
                         lvi.iSubItem = COL_ICON;
                         lvi.iImage = icon_index;
-                        SendMessageW(lv_hwnd, LVM_INSERTITEMW, 0, &lvi as *const _ as LPARAM);
+                        SendMessageW(lv_hwnd, LVM_INSERTITEMW, WPARAM(0), LPARAM(&lvi as *const _ as isize));
 
                         // Column 1: path text
                         let path_u16: Vec<u16> =
@@ -206,8 +207,8 @@ impl ImportDialog {
                         lvi_path.mask = LVIF_TEXT;
                         lvi_path.iItem = i as i32;
                         lvi_path.iSubItem = COL_PATH;
-                        lvi_path.pszText = path_u16.as_ptr() as *mut _;
-                        SendMessageW(lv_hwnd, LVM_SETITEMW, 0, &lvi_path as *const _ as LPARAM);
+                        lvi_path.pszText = windows::core::PWSTR(path_u16.as_ptr() as *mut _);
+                        SendMessageW(lv_hwnd, LVM_SETITEMW, WPARAM(0), LPARAM(&lvi_path as *const _ as isize));
 
                         // Column 2: action text
                         let action_str = if item.action == ACTION_KEEP {
@@ -223,8 +224,8 @@ impl ImportDialog {
                         lvi_action.mask = LVIF_TEXT;
                         lvi_action.iItem = i as i32;
                         lvi_action.iSubItem = COL_ACTION;
-                        lvi_action.pszText = action_u16.as_ptr() as *mut _;
-                        SendMessageW(lv_hwnd, LVM_SETITEMW, 0, &lvi_action as *const _ as LPARAM);
+                        lvi_action.pszText = windows::core::PWSTR(action_u16.as_ptr() as *mut _);
+                        SendMessageW(lv_hwnd, LVM_SETITEMW, WPARAM(0), LPARAM(&lvi_action as *const _ as isize));
                     }
                 }
 
@@ -233,18 +234,18 @@ impl ImportDialog {
                     "Import".encode_utf16().chain(std::iter::once(0)).collect();
                 unsafe {
                     CreateWindowExW(
-                        0,
+                        WINDOW_EX_STYLE(0),
                         w!("BUTTON"),
-                        import_text.as_ptr(),
-                        WS_CHILD | WS_VISIBLE | (BS_PUSHBUTTON as u32),
+                        PCWSTR(import_text.as_ptr()),
+                        WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
                         dlg_w - 200,
                         dlg_h - 40,
                         90,
                         30,
                         hwnd,
-                        ID_IMPORT_BTN as _,
+                        Some(HMENU(ID_IMPORT_BTN as *mut core::ffi::c_void)),
                         h_instance,
-                        std::ptr::null_mut(),
+                        None,
                     );
                 }
 
@@ -253,18 +254,18 @@ impl ImportDialog {
                     "Cancel".encode_utf16().chain(std::iter::once(0)).collect();
                 unsafe {
                     CreateWindowExW(
-                        0,
+                        WINDOW_EX_STYLE(0),
                         w!("BUTTON"),
-                        cancel_text.as_ptr(),
-                        WS_CHILD | WS_VISIBLE | (BS_PUSHBUTTON as u32),
+                        PCWSTR(cancel_text.as_ptr()),
+                        WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
                         dlg_w - 100,
                         dlg_h - 40,
                         90,
                         30,
                         hwnd,
-                        ID_CANCEL_BTN as _,
+                        Some(HMENU(ID_CANCEL_BTN as *mut core::ffi::c_void)),
                         h_instance,
-                        std::ptr::null_mut(),
+                        None,
                     );
                 }
                 Ok(Arc::new(Self {
@@ -277,17 +278,24 @@ impl ImportDialog {
     }
 
     fn get_listview_hwnd(&self) -> HWND {
-        unsafe { GetDlgItem(self.base.hwnd(), ID_LISTVIEW as i32) }
+        unsafe { GetDlgItem(self.base.hwnd(), ID_LISTVIEW as i32).unwrap_or_default() }
     }
 
     /// Toggle the action of the selected row between Keep and Remove.
     fn toggle_selected_action(&self) {
         let lv = self.get_listview_hwnd();
-        let sel = unsafe { SendMessageW(lv, LVM_GETNEXTITEM, usize::MAX, LVNI_SELECTED as LPARAM) };
-        if sel < 0 {
+        let sel = unsafe {
+            SendMessageW(
+                lv,
+                LVM_GETNEXTITEM,
+                WPARAM(usize::MAX),
+                LPARAM(LVNI_SELECTED as isize),
+            )
+        };
+        if sel.0 < 0 {
             return;
         }
-        let idx = sel as usize;
+        let idx = sel.0 as usize;
         let mut inner = self.inner.lock().unwrap();
         if idx >= inner.items.len() {
             return;
@@ -312,8 +320,8 @@ impl ImportDialog {
             lvi.mask = LVIF_TEXT;
             lvi.iItem = idx as i32;
             lvi.iSubItem = COL_ACTION;
-            lvi.pszText = action_u16.as_ptr() as *mut _;
-            SendMessageW(lv, LVM_SETITEMW, 0, &lvi as *const _ as LPARAM);
+            lvi.pszText = windows::core::PWSTR(action_u16.as_ptr() as *mut _);
+            SendMessageW(lv, LVM_SETITEMW, WPARAM(0), LPARAM(&lvi as *const _ as isize));
         }
     }
 
@@ -341,31 +349,31 @@ impl Window for ImportDialog {
         let hwnd = self.base().hwnd();
         match msg {
             WM_COMMAND => {
-                let id = (wparam & 0xFFFF) as u32;
+                let id = (wparam.0 & 0xFFFF) as u32;
                 match id {
                     ID_IMPORT_BTN => {
                         self.do_import();
-                        0
+                        LRESULT(0)
                     }
                     ID_CANCEL_BTN => {
                         unsafe { DestroyWindow(hwnd) };
-                        0
+                        LRESULT(0)
                     }
                     _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
                 }
             }
             WM_NOTIFY => {
-                let nmhdr = unsafe { &*(lparam as *const NMHDR) };
-                if nmhdr.idFrom == ID_LISTVIEW as usize && nmhdr.code == NM_DBLCLK {
+                let nmhdr = unsafe { &*(lparam.0 as *const NMHDR) };
+                if nmhdr.idFrom == ID_LISTVIEW as usize && nmhdr.code == NM_DBLCLK as u32 {
                     self.toggle_selected_action();
-                    return 0;
+                    return LRESULT(0);
                 }
                 unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
             WM_DESTROY => {
                 let inner = self.inner.lock().unwrap();
                 unsafe { ImageList_Destroy(inner.himagelist) };
-                0
+                LRESULT(0)
             }
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
