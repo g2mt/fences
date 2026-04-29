@@ -485,73 +485,80 @@ impl DesktopCover {
             IDM_RUN_ICON => {
                 if let Some(HitTest::Icon(icon_idx)) = hit_type {
                     let inner = self.inner.lock();
-                    if let Some(fence) = inner.fences.last() {
-                        if let Some(icon) = fence.icon_by_index(icon_idx) {
-                            icon.run();
-                        }
-                    }
+                    let icon = inner
+                        .fences
+                        .last()
+                        .unwrap()
+                        .icon_by_index(icon_idx)
+                        .unwrap();
+                    icon.run();
+                } else {
+                    error!("IDM_RUN_ICON: invalid state");
                 }
             }
             IDM_RENAME_ICON => {
                 if let Some(HitTest::Icon(icon_idx)) = hit_type {
                     let inner = self.inner.lock();
-                    if let Some(fence) = inner.fences.last() {
-                        if let Some(icon) = fence.icon_by_index(icon_idx) {
-                            let current_title = String::from(&icon.title() as &str);
-                            self.executor.spawn(self, async move {
-                                if let Some(new_title) = prompt::input(
-                                    "Rename icon",
-                                    "Enter new icon name:",
-                                    &current_title,
-                                )
+                    let icon = inner
+                        .fences
+                        .last()
+                        .unwrap()
+                        .icon_by_index(icon_idx)
+                        .unwrap();
+                    let current_title = String::from(&icon.title() as &str);
+                    self.executor.spawn(self, async move {
+                        if let Some(new_title) =
+                            prompt::input("Rename icon", "Enter new icon name:", &current_title)
                                 .await
-                                {
-                                    if !new_title.is_empty() {
-                                        icon.set_title(new_title.into());
-                                        APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
-                                    }
-                                }
-                            });
+                        {
+                            if !new_title.is_empty() {
+                                icon.set_title(new_title.into());
+                                APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
+                            }
                         }
-                    }
+                    });
+                } else {
+                    error!("IDM_RENAME_ICON: invalid state");
                 }
             }
             IDM_SET_ICON_PATH => {
                 if let Some(HitTest::Icon(icon_idx)) = hit_type {
                     let inner = self.inner.lock();
-                    if let Some(fence) = inner.fences.last() {
-                        if let Some(icon) = fence.icon_by_index(icon_idx) {
-                            icon.set_info_from_selector();
-                        }
-                    }
+                    let icon = inner
+                        .fences
+                        .last()
+                        .unwrap()
+                        .icon_by_index(icon_idx)
+                        .unwrap();
+                    icon.set_info_from_selector();
+                } else {
+                    error!("IDM_SET_ICON_PATH: invalid state");
                 }
                 should_save = true;
             }
             IDM_DELETE_ICON => {
                 if let Some(HitTest::Icon(icon_idx)) = hit_type {
                     let inner = self.inner.lock();
-                    if let Some(fence) = inner.fences.last() {
-                        fence.remove_icon(icon_idx);
-                    }
+                    let fence = inner.fences.last().unwrap();
+                    fence.remove_icon(icon_idx);
+                } else {
+                    error!("IDM_DELETE_ICON: invalid state");
                 }
                 should_save = true;
             }
             IDM_IMPORT => {
                 let inner = self.inner.lock();
-                if let Some(fence) = inner.fences.last() {
-                    if fence.imported_from().is_some() {
-                        fence.show_import_existing_dialog();
-                    } else {
-                        fence.show_import_from_dialog(hwnd);
-                    }
+                let fence = inner.fences.last().unwrap();
+                if fence.imported_from().is_some() {
+                    fence.show_import_existing_dialog();
+                } else {
+                    fence.show_import_from_dialog(hwnd);
                 }
                 should_save = true;
             }
             IDM_IMPORT_FROM => {
                 let inner = self.inner.lock();
-                if let Some(fence) = inner.fences.last() {
-                    fence.show_import_from_dialog(hwnd);
-                }
+                inner.fences.last().unwrap().show_import_from_dialog(hwnd);
                 should_save = true;
             }
             _ => {}
