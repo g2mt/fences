@@ -1,10 +1,10 @@
 use tracing::info;
 use windows::core::w;
 use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::Storage::Xps::PrintWindow;
+use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
-const PW_RENDERFULLCONTENT: u32 = 0x00000002;
+const PW_RENDERFULLCONTENT: PRINT_WINDOW_FLAGS = PRINT_WINDOW_FLAGS(0x00000002);
 
 #[allow(dead_code)]
 pub struct DesktopMirror {
