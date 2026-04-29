@@ -25,6 +25,13 @@ const COL_ACTION: i32 = 2;
 pub const ACTION_KEEP: u32 = 0;
 pub const ACTION_REMOVE: u32 = 1;
 
+const DLG_DEFAULT_WIDTH: i32 = 600;
+const DLG_DEFAULT_HEIGHT: i32 = 450;
+const MARGIN: i32 = 10;
+const BUTTON_WIDTH: i32 = 90;
+const BUTTON_HEIGHT: i32 = 30;
+const BOTTOM_PANEL_HEIGHT: i32 = 50;
+
 #[derive(Clone)]
 pub struct ImportItem {
     pub title: Arc<str>,
@@ -53,8 +60,8 @@ impl ImportDialog {
         // Center dialog on screen
         let screen_w = unsafe { GetSystemMetrics(SM_CXSCREEN) };
         let screen_h = unsafe { GetSystemMetrics(SM_CYSCREEN) };
-        let dlg_w = 600;
-        let dlg_h = 450;
+        let dlg_w = DLG_DEFAULT_WIDTH;
+        let dlg_h = DLG_DEFAULT_HEIGHT;
         let dlg_x = (screen_w - dlg_w) / 2;
         let dlg_y = (screen_h - dlg_h) / 2;
 
@@ -96,10 +103,10 @@ impl ImportDialog {
                             | WS_VISIBLE
                             | WS_BORDER
                             | WINDOW_STYLE(LVS_REPORT | LVS_SINGLESEL),
-                        10,
-                        10,
-                        dlg_w - 20,
-                        dlg_h - 60,
+                        0,
+                        0,
+                        0,
+                        0,
                         Some(hwnd),
                         Some(HMENU(ID_LISTVIEW as *mut core::ffi::c_void)),
                         Some(h_instance.into()),
@@ -260,10 +267,10 @@ impl ImportDialog {
                         w!("BUTTON"),
                         PCWSTR(import_text.as_ptr()),
                         WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-                        dlg_w - 200,
-                        dlg_h - 40,
-                        90,
-                        30,
+                        0,
+                        0,
+                        0,
+                        0,
                         Some(hwnd),
                         Some(HMENU(ID_IMPORT_BTN as *mut core::ffi::c_void)),
                         Some(h_instance.into()),
@@ -280,27 +287,85 @@ impl ImportDialog {
                         w!("BUTTON"),
                         PCWSTR(cancel_text.as_ptr()),
                         WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-                        dlg_w - 100,
-                        dlg_h - 40,
-                        90,
-                        30,
+                        0,
+                        0,
+                        0,
+                        0,
                         Some(hwnd),
                         Some(HMENU(ID_CANCEL_BTN as *mut core::ffi::c_void)),
                         Some(h_instance.into()),
                         None,
                     );
                 }
-                Ok(Arc::new(Self {
+
+                let dialog = Arc::new(Self {
                     base,
                     inner: Mutex::new(ImportDialogInner { items, himagelist }),
                     on_import: Box::new(on_import),
-                }))
+                });
+
+                dialog.layout_widgets();
+
+                Ok(dialog)
             },
         )
     }
 
     fn get_listview_hwnd(&self) -> HWND {
         unsafe { GetDlgItem(Some(self.base.hwnd()), ID_LISTVIEW as i32).unwrap_or_default() }
+    }
+
+    fn get_import_btn_hwnd(&self) -> HWND {
+        unsafe { GetDlgItem(Some(self.base.hwnd()), ID_IMPORT_BTN as i32).unwrap_or_default() }
+    }
+
+    fn get_cancel_btn_hwnd(&self) -> HWND {
+        unsafe { GetDlgItem(Some(self.base.hwnd()), ID_CANCEL_BTN as i32).unwrap_or_default() }
+    }
+
+    fn layout_widgets(&self) {
+        let hwnd = self.base.hwnd();
+        let mut rect = RECT::default();
+        unsafe { GetClientRect(hwnd, &mut rect) };
+
+        let width = rect.right - rect.left;
+        let height = rect.bottom - rect.top;
+
+        let lv_hwnd = self.get_listview_hwnd();
+        let import_btn_hwnd = self.get_import_btn_hwnd();
+        let cancel_btn_hwnd = self.get_cancel_btn_hwnd();
+
+        unsafe {
+            // ListView takes most of the space
+            MoveWindow(
+                lv_hwnd,
+                MARGIN,
+                MARGIN,
+                width - 2 * MARGIN,
+                height - BOTTOM_PANEL_HEIGHT - MARGIN,
+                true,
+            );
+
+            // Cancel button on the right
+            MoveWindow(
+                cancel_btn_hwnd,
+                width - MARGIN - BUTTON_WIDTH,
+                height - MARGIN - BUTTON_HEIGHT,
+                BUTTON_WIDTH,
+                BUTTON_HEIGHT,
+                true,
+            );
+
+            // Import button to the left of Cancel
+            MoveWindow(
+                import_btn_hwnd,
+                width - 2 * MARGIN - 2 * BUTTON_WIDTH,
+                height - MARGIN - BUTTON_HEIGHT,
+                BUTTON_WIDTH,
+                BUTTON_HEIGHT,
+                true,
+            );
+        }
     }
 
     /// Toggle the action of the selected row between Keep and Remove.
@@ -374,6 +439,10 @@ impl Window for ImportDialog {
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         match msg {
+            WM_SIZE => {
+                self.layout_widgets();
+                LRESULT(0)
+            }
             WM_COMMAND => {
                 let id = (wparam.0 & 0xFFFF) as u32;
                 match id {
