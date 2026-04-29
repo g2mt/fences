@@ -142,7 +142,8 @@ unsafe extern "system" fn input_wndproc(
 
 static CLASS_REGISTERED: AtomicBool = AtomicBool::new(false);
 
-fn input_sync(title: &str, message: &str, default: &str) -> Option<String> {
+/// Shows a modal input dialog. Returns `None` if the user cancelled, otherwise `Some(String)`.
+pub fn input_sync(title: &str, message: &str, default: &str) -> Option<String> {
     unsafe {
         let h_instance = GetModuleHandleW(None).unwrap_or_default();
 
@@ -214,16 +215,4 @@ fn input_sync(title: &str, message: &str, default: &str) -> Option<String> {
             None
         }
     }
-}
-
-/// Shows a modal input dialog. Returns `None` if the user cancelled, otherwise `Some(String)`.
-pub fn input<F>(
-    title: Cow<'static, str>,
-    message: Cow<'static, str>,
-    default: Cow<'static, str>,
-    f: F,
-) where
-    F: FnOnce(Option<String>) + Send + 'static,
-{
-    std::thread::spawn(move || f(input_sync(&title, &message, &default)));
 }

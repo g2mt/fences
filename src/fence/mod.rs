@@ -603,44 +603,14 @@ impl Fence {
         *App::get().import_dialog.lock() = Some(import_dialog);
     }
 
-    pub fn show_import_from_dialog(self: &Arc<Self>, parent_hwnd: HWND) {
-        /* let self_ = self.clone();
-        prompt::browse_for_folder(move |opt, _| {
-            if let Some(path_str) = opt {
-                self_.set_imported_from(Some(Arc::from(path_str.as_str())));
-                self_.show_import_existing_dialog();
-            }
-        }); */
-
-        /* let path_str = {
-            use std::sync::mpsc;
-            let (tx, rx) = mpsc::channel();
-            prompt::browse_for_folder(move |opt, _| {
-                tx.send(opt).unwrap();
-            });
-            match rx.recv() {
-                Ok(Some(s)) => s,
-                _ => return,
-            }
-        };
+    pub async fn show_import_from_dialog(self: &Arc<Self>, parent_hwnd: HWND) {
+        let path_str = prompt::browse_for_folder().await;
         self.set_imported_from(Some(Arc::from(path_str.as_str())));
-        self.show_import_existing_dialog();*/
-
-        prompt::folder::browse_for_folder_sync();
+        self.show_import_existing_dialog();
     }
 
-    pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Option<Arc<Self>>> {
-        let path_str = {
-            use std::sync::mpsc;
-            let (tx, rx) = mpsc::channel();
-            prompt::browse_for_folder(move |opt, _| {
-                tx.send(opt).unwrap();
-            });
-            match rx.recv() {
-                Ok(Some(s)) => s,
-                _ => return Ok(None),
-            }
-        };
+    pub async fn from_folder_selector(parent_hwnd: HWND) -> Result<Option<Arc<Self>>> {
+        let path_str = prompt::browse_for_folder().await;
         let folder_path = std::path::Path::new(&path_str);
         let title = folder_path
             .file_name()

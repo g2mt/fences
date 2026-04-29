@@ -45,13 +45,3 @@ pub fn browse_for_folder_sync() -> Option<String> {
         None
     }
 }
-
-pub fn browse_for_folder<F>(f: F)
-where
-    F: FnOnce(Option<String>, HWND) + Send + 'static,
-{
-    std::thread::spawn(move || {
-        let result = browse_for_folder_sync();
-        f(result, HWND(std::ptr::null_mut()));
-    });
-}
