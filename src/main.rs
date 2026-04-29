@@ -1,8 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 
 use anyhow::Result;
+use parking_lot::Mutex;
 use tracing::{error, info};
 use tracing_subscriber::prelude::*;
 use windows::Win32::UI::WindowsAndMessaging::*;

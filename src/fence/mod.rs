@@ -1,4 +1,9 @@
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+
 use anyhow::Result;
+use import_dialog::{ImportDialog, ImportItem};
+use parking_lot::Mutex;
 use tracing::{error, info};
 use windows::core::*;
 use windows::Win32::Foundation::*;
@@ -6,19 +11,15 @@ use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
-mod icon;
-pub mod import_dialog;
-use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex};
-
-use import_dialog::{ImportDialog, ImportItem};
-
 use crate::app::App;
 use crate::config::state::{FenceState, IconState};
 use crate::fence::icon::Icon;
 use crate::geo::Area;
 use crate::prompt;
 use crate::window::{register_classname, Base, BaseRef, Window};
+
+mod icon;
+pub mod import_dialog;
 
 pub struct TitleBar {
     base: BaseRef,
@@ -64,7 +65,7 @@ impl TitleBar {
     }
 
     pub fn set_title(&self, title: Arc<str>) {
-        *self.title.lock().unwrap() = title;
+        *self.title.lock() = title;
         self.base.redraw();
     }
 }
@@ -90,7 +91,7 @@ impl Window for TitleBar {
                 SetBkMode(hdc, TRANSPARENT);
                 SetTextColor(hdc, COLORREF(config.fence.title_text_color.0));
 
-                let mut title_utf16: Vec<u16> = self.title.lock().unwrap().encode_utf16().collect();
+                let mut title_utf16: Vec<u16> = self.title.lock().encode_utf16().collect();
                 let mut text_rect = rect;
                 text_rect.left += 5;
                 DrawTextW(
@@ -225,7 +226,9 @@ impl Window for ScrollArea {
                     SendMessageW(
                         hwnd,
                         WM_VSCROLL,
-                        Some(WPARAM(((new_pos as usize) << 16) | SB_THUMBTRACK.0 as usize)),
+                        Some(WPARAM(
+                            ((new_pos as usize) << 16) | SB_THUMBTRACK.0 as usize,
+                        )),
                         Some(LPARAM(0)),
                     );
                 }
@@ -243,7 +246,7 @@ impl Window for ScrollArea {
 
                 let config = App::config();
                 if config.fence.scroll_area_bg_color.a() < 255 {
-                    let mirror = App::get().mirror.lock().unwrap();
+                    let mirror = App::get().mirror.lock();
                     let screen_left = GetSystemMetrics(SM_XVIRTUALSCREEN);
                     let screen_top = GetSystemMetrics(SM_YVIRTUALSCREEN);
                     BitBlt(
@@ -352,7 +355,7 @@ impl Fence {
     }
 
     pub fn get_state(&self) -> FenceState {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         let area = self.base.area();
         FenceState {
             title: inner.title.clone(),
@@ -410,7 +413,7 @@ impl Fence {
                     let rel_x = x - rect.left;
                     let rel_y = y - (rect.top + title_h) + si.nPos;
                     let mut icon_hit = None;
-                    let inner = self.inner.lock().unwrap();
+                    let inner = self.inner.lock();
                     for (i, icon) in inner.icons.iter().enumerate() {
                         if icon.hit_test(rel_x, rel_y) {
                             icon_hit = Some(HitTest::Icon(i));
@@ -425,11 +428,11 @@ impl Fence {
     }
 
     pub fn title(&self) -> Arc<str> {
-        self.inner.lock().unwrap().title.clone()
+        self.inner.lock().title.clone()
     }
 
     pub fn set_title(&self, title: Arc<str>) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         self.title_bar.set_title(title.clone());
         inner.title = title;
     }
@@ -439,7 +442,7 @@ impl Fence {
     }
 
     pub fn add_icon_with_path(&self, title: &str, path: Option<&str>) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner
             .icons
             .push(Icon::new(self.scroll_area.base().hwnd(), title, path, 0, 0));
@@ -448,7 +451,7 @@ impl Fence {
     }
 
     pub fn remove_icon(&self, index: usize) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if index < inner.icons.len() {
             inner.icons.remove(index);
         }
@@ -457,25 +460,25 @@ impl Fence {
     }
 
     pub fn icon_count(&self) -> usize {
-        self.inner.lock().unwrap().icons.len()
+        self.inner.lock().icons.len()
     }
 
     pub fn clear_selection(&self) {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         for icon in &inner.icons {
             icon.set_selected(false);
         }
     }
 
     pub fn select_icon(&self, index: usize) {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         if let Some(icon) = inner.icons.get(index) {
             icon.set_selected(true);
         }
     }
 
     pub fn icon_by_index(&self, index: usize) -> Option<Arc<Icon>> {
-        self.inner.lock().unwrap().icons.get(index).cloned()
+        self.inner.lock().icons.get(index).cloned()
     }
 
     pub fn reflow_icons(&self) {
@@ -490,7 +493,7 @@ impl Fence {
         let available_width = width - (fence_padding * 2);
         let cols = (available_width / (icon_size + fence_spacing)).max(1);
 
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         for (i, icon) in inner.icons.iter().enumerate() {
             let col = i as i32 % cols;
             let row = i as i32 / cols;
@@ -505,15 +508,15 @@ impl Fence {
     }
 
     pub fn imported_from(&self) -> Option<Arc<str>> {
-        self.inner.lock().unwrap().imported_from.clone()
+        self.inner.lock().imported_from.clone()
     }
 
     pub fn set_imported_from(&self, imported_from: Option<Arc<str>>) {
-        self.inner.lock().unwrap().imported_from = imported_from;
+        self.inner.lock().imported_from = imported_from;
     }
 
     pub fn show_import_existing_dialog(self: &Arc<Self>) {
-        App::get().import_dialog.lock().unwrap().take();
+        App::get().import_dialog.lock().take();
         let imported_from = if let Some(p) = self.imported_from() {
             p
         } else {
@@ -545,7 +548,7 @@ impl Fence {
         let mut import_items: Vec<ImportItem> = Vec::new();
 
         {
-            let inner = self.inner.lock().unwrap();
+            let inner = self.inner.lock();
             for icon in &inner.icons {
                 let icon_path = icon.path().map(|p| p.to_string()).unwrap_or_default();
                 let still_present = dir_items.iter().any(|(_, dp)| *dp == icon_path);
@@ -563,7 +566,7 @@ impl Fence {
 
         // Add new items from directory not already in the fence
         {
-            let inner = self.inner.lock().unwrap();
+            let inner = self.inner.lock();
             for (name, path_str) in &dir_items {
                 let already_present = inner
                     .icons
@@ -597,24 +600,40 @@ impl Fence {
                 return;
             }
         };
-        *App::get().import_dialog.lock().unwrap() = Some(import_dialog);
+        *App::get().import_dialog.lock() = Some(import_dialog);
     }
 
     pub fn show_import_from_dialog(self: &Arc<Self>, parent_hwnd: HWND) {
-        let self_ = self.clone();
-        prompt::browse_for_folder(parent_hwnd, move |opt, _| {
+        /* let self_ = self.clone();
+        prompt::browse_for_folder(move |opt, _| {
             if let Some(path_str) = opt {
                 self_.set_imported_from(Some(Arc::from(path_str.as_str())));
                 self_.show_import_existing_dialog();
             }
-        });
+        }); */
+
+        /* let path_str = {
+            use std::sync::mpsc;
+            let (tx, rx) = mpsc::channel();
+            prompt::browse_for_folder(move |opt, _| {
+                tx.send(opt).unwrap();
+            });
+            match rx.recv() {
+                Ok(Some(s)) => s,
+                _ => return,
+            }
+        };
+        self.set_imported_from(Some(Arc::from(path_str.as_str())));
+        self.show_import_existing_dialog();*/
+
+        prompt::folder::browse_for_folder_sync();
     }
 
     pub fn from_folder_selector(parent_hwnd: HWND) -> Result<Option<Arc<Self>>> {
         let path_str = {
             use std::sync::mpsc;
             let (tx, rx) = mpsc::channel();
-            prompt::browse_for_folder(parent_hwnd, move |opt, _| {
+            prompt::browse_for_folder(move |opt, _| {
                 tx.send(opt).unwrap();
             });
             match rx.recv() {
@@ -692,7 +711,7 @@ impl Fence {
         unsafe { GetClientRect(self.scroll_area.base().hwnd(), &mut rect) };
         let view_height = rect.bottom - rect.top;
 
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         let mut max_y = 0;
         for icon in &inner.icons {
             let irect = icon.base().rect();

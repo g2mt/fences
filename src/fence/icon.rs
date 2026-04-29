@@ -1,7 +1,8 @@
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use parking_lot::Mutex;
 use tracing::{error, info};
 use windows::core::*;
 use windows::Win32::Foundation::*;
@@ -71,12 +72,12 @@ impl Icon {
     }
 
     pub fn title(&self) -> Arc<str> {
-        self.state.lock().unwrap().title.clone()
+        self.state.lock().title.clone()
     }
 
     pub fn set_title(&self, title: Arc<str>) {
         {
-            let mut s = self.state.lock().unwrap();
+            let mut s = self.state.lock();
             s.title = title.clone();
         }
         let hwnd = self.base.hwnd();
@@ -88,16 +89,11 @@ impl Icon {
     }
 
     pub fn path(&self) -> Option<Arc<str>> {
-        self.state
-            .lock()
-            .unwrap()
-            .path
-            .as_ref()
-            .map(|arc| arc.clone())
+        self.state.lock().path.as_ref().map(|arc| arc.clone())
     }
 
     pub fn set_path(&self, path: Option<Arc<str>>) {
-        let _ = std::mem::replace(&mut self.state.lock().unwrap().path, path);
+        let _ = std::mem::replace(&mut self.state.lock().path, path);
         self.base.redraw();
     }
 
@@ -186,7 +182,7 @@ impl Window for Icon {
                 };
 
                 if bg_color.a() < 255 {
-                    let mirror = App::get().mirror.lock().unwrap();
+                    let mirror = App::get().mirror.lock();
                     let screen_left = GetSystemMetrics(SM_XVIRTUALSCREEN);
                     let screen_top = GetSystemMetrics(SM_YVIRTUALSCREEN);
                     BitBlt(
@@ -206,7 +202,7 @@ impl Window for Icon {
                 let icon_draw_size = config.icon.icon_size_draw;
                 let width = rect.right - rect.left;
 
-                let state = self.state.lock().unwrap();
+                let state = self.state.lock();
                 let path = state.path.clone();
 
                 let mut hicon = HICON::default();

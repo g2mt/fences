@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::{Arc, LazyLock, Mutex, MutexGuard, OnceLock, Weak};
+use std::sync::{Arc, LazyLock, OnceLock, Weak};
 
 use anyhow::{anyhow, Result};
+use parking_lot::{Mutex, MutexGuard};
 use tracing::debug;
 use windows::core::*;
 use windows::Win32::Foundation::*;
@@ -47,7 +48,7 @@ pub fn register_classname_ex(name: &str, mut wc: WNDCLASSW) -> ClassName {
             }
         }
     }
-    let mut registered: MutexGuard<'_, HashSet<ClassName>> = REGISTERED_CLASSNAMES.lock().unwrap();
+    let mut registered: MutexGuard<'_, HashSet<ClassName>> = REGISTERED_CLASSNAMES.lock();
     let name_u16: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
     let class_name = ClassName(Arc::new(name_u16));
     if let Some(existing) = registered.get(&class_name) {

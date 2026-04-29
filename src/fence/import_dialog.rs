@@ -1,6 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use anyhow::Result;
+use parking_lot::Mutex;
 use tracing::debug;
 use windows::core::*;
 use windows::Win32::Foundation::*;
@@ -317,7 +318,7 @@ impl ImportDialog {
             return;
         }
         let idx = sel.0 as usize;
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if idx >= inner.items.len() {
             return;
         }
@@ -352,7 +353,7 @@ impl ImportDialog {
     }
 
     fn do_import(&self) {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         let kept: Vec<ImportItem> = inner
             .items
             .iter()
@@ -397,7 +398,7 @@ impl Window for ImportDialog {
                 unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
             WM_DESTROY => {
-                let inner = self.inner.lock().unwrap();
+                let inner = self.inner.lock();
                 unsafe { ImageList_Destroy(Some(inner.himagelist)) };
                 LRESULT(0)
             }

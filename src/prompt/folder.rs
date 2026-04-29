@@ -11,7 +11,7 @@ use crate::window::Window;
 pub fn browse_for_folder_sync() -> Option<String> {
     let mut browse_info = BROWSEINFOW {
         hwndOwner: HWND(std::ptr::null_mut()),
-        pidlRoot: std::ptr::null(),
+        pidlRoot: std::ptr::null_mut(),
         pszDisplayName: windows::core::PWSTR(std::ptr::null_mut()),
         lpszTitle: w!("Select a folder"),
         ulFlags: BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE,

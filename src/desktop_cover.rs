@@ -1,7 +1,8 @@
 use std::borrow::Cow;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use anyhow::Result;
+use parking_lot::Mutex;
 use tracing::{debug, error};
 use windows::core::*;
 use windows::Win32::Foundation::*;
@@ -111,7 +112,7 @@ impl DesktopCover {
     }
 
     pub fn state(&self) -> AppState {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         AppState {
             fences: inner.fences.iter().map(|f| f.get_state()).collect(),
         }
@@ -123,7 +124,7 @@ impl DesktopCover {
             let fence = Fence::from_state(self.base().hwnd(), f_state.clone())?;
             fences.push(fence);
         }
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.fences = fences;
         Ok(())
     }
@@ -148,7 +149,7 @@ impl DesktopCover {
             (*pos).hwndInsertAfter = HWND_BOTTOM;
 
             if ((*pos).flags & SWP_NOSIZE) == SET_WINDOW_POS_FLAGS(0) {
-                App::get().mirror.lock().unwrap().update();
+                App::get().mirror.lock().update();
             }
 
             DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -176,7 +177,7 @@ impl DesktopCover {
         unsafe { GetCursorPos(&mut pt) };
         unsafe { ScreenToClient(hwnd, &mut pt) };
 
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         for fence in inner.fences.iter().rev() {
             if let Some(hit) = fence.hit_test(pt.x, pt.y) {
                 let cursor_id = match hit {
@@ -201,7 +202,7 @@ impl DesktopCover {
         let x = (lparam.0 & 0xFFFF) as i16 as i32;
         let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         for fence in inner.fences.iter().rev() {
             if let Some(hit @ HitTest::Icon(_)) = fence.hit_test(x, y) {
                 inner.hit_type = Some(hit);
@@ -218,7 +219,7 @@ impl DesktopCover {
         let x = (lparam.0 & 0xFFFF) as i16 as i32;
         let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         let mut hit_idx = None;
         for (i, fence) in inner.fences.iter().enumerate().rev() {
             if let Some(hit) = fence.hit_test(x, y) {
@@ -258,7 +259,7 @@ impl DesktopCover {
     }
 
     fn on_mouse_move(&self, lparam: LPARAM) -> LRESULT {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if let Some(hit_type) = inner.hit_type {
             let x = (lparam.0 & 0xFFFF) as i16 as i32;
             let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
@@ -290,7 +291,7 @@ impl DesktopCover {
     }
 
     fn on_lbutton_up(&self) -> LRESULT {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if inner.hit_type.is_some() {
             inner.hit_type = None;
             unsafe { ReleaseCapture() };
@@ -305,7 +306,7 @@ impl DesktopCover {
 
         let mut hit_idx = None;
         {
-            let inner = self.inner.lock().unwrap();
+            let inner = self.inner.lock();
             for (i, fence) in inner.fences.iter().enumerate().rev() {
                 if let Some(hit) = fence.hit_test(x, y) {
                     hit_idx = Some((i, hit));
@@ -316,7 +317,7 @@ impl DesktopCover {
 
         if let Some((idx, hit)) = hit_idx {
             {
-                let mut inner = self.inner.lock().unwrap();
+                let mut inner = self.inner.lock();
                 let fence = inner.fences.remove(idx);
 
                 fence.clear_selection();
@@ -401,7 +402,7 @@ impl DesktopCover {
         debug!("command: {}", command);
         let hit_type;
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             hit_type = inner.hit_type.take();
         }
 
@@ -414,7 +415,7 @@ impl DesktopCover {
                 let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
                 let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
                 if let Ok(fence) = Fence::new(hwnd, width / 2 - 150, height / 2 - 75, "Untitled") {
-                    let mut inner = self.inner.lock().unwrap();
+                    let mut inner = self.inner.lock();
                     inner.fences.push(fence);
                 }
                 should_save = true;
@@ -422,7 +423,7 @@ impl DesktopCover {
             IDM_ADD_FENCE_FROM_FOLDER => {
                 match Fence::from_folder_selector(hwnd) {
                     Ok(Some(fence)) => {
-                        let mut inner = self.inner.lock().unwrap();
+                        let mut inner = self.inner.lock();
                         inner.fences.push(fence);
                     }
                     Err(e) => {
@@ -433,7 +434,7 @@ impl DesktopCover {
                 should_save = true;
             }
             IDM_ADD_ICON => {
-                let inner = self.inner.lock().unwrap();
+                let inner = self.inner.lock();
                 if let Some(fence) = inner.fences.last() {
                     let title = format!("Icon #{}", fence.icon_count());
                     fence.add_icon(&title);
@@ -441,7 +442,7 @@ impl DesktopCover {
                 should_save = true;
             }
             IDM_RENAME_FENCE => {
-                let inner = self.inner.lock().unwrap();
+                let inner = self.inner.lock();
                 if let Some(fence) = inner.fences.last() {
                     let fence = fence.clone();
                     prompt::input(
@@ -469,14 +470,14 @@ impl DesktopCover {
                     )
                 };
                 if result == IDYES {
-                    let mut inner = self.inner.lock().unwrap();
+                    let mut inner = self.inner.lock();
                     inner.fences.pop();
                 }
                 should_save = true;
             }
             IDM_RUN_ICON => {
                 if let Some(HitTest::Icon(icon_idx)) = hit_type {
-                    let inner = self.inner.lock().unwrap();
+                    let inner = self.inner.lock();
                     if let Some(fence) = inner.fences.last() {
                         if let Some(icon) = fence.icon_by_index(icon_idx) {
                             icon.run();
@@ -486,7 +487,7 @@ impl DesktopCover {
             }
             IDM_RENAME_ICON => {
                 if let Some(HitTest::Icon(icon_idx)) = hit_type {
-                    let inner = self.inner.lock().unwrap();
+                    let inner = self.inner.lock();
                     if let Some(fence) = inner.fences.last() {
                         if let Some(icon) = fence.icon_by_index(icon_idx) {
                             prompt::input(
@@ -508,7 +509,7 @@ impl DesktopCover {
             }
             IDM_SET_ICON_PATH => {
                 if let Some(HitTest::Icon(icon_idx)) = hit_type {
-                    let inner = self.inner.lock().unwrap();
+                    let inner = self.inner.lock();
                     if let Some(fence) = inner.fences.last() {
                         if let Some(icon) = fence.icon_by_index(icon_idx) {
                             icon.set_info_from_selector();
@@ -519,7 +520,7 @@ impl DesktopCover {
             }
             IDM_DELETE_ICON => {
                 if let Some(HitTest::Icon(icon_idx)) = hit_type {
-                    let inner = self.inner.lock().unwrap();
+                    let inner = self.inner.lock();
                     if let Some(fence) = inner.fences.last() {
                         fence.remove_icon(icon_idx);
                     }
@@ -527,7 +528,7 @@ impl DesktopCover {
                 should_save = true;
             }
             IDM_IMPORT => {
-                let inner = self.inner.lock().unwrap();
+                let inner = self.inner.lock();
                 if let Some(fence) = inner.fences.last() {
                     if fence.imported_from().is_some() {
                         fence.show_import_existing_dialog();
@@ -538,7 +539,7 @@ impl DesktopCover {
                 should_save = true;
             }
             IDM_IMPORT_FROM => {
-                let inner = self.inner.lock().unwrap();
+                let inner = self.inner.lock();
                 if let Some(fence) = inner.fences.last() {
                     fence.show_import_from_dialog(hwnd);
                 }

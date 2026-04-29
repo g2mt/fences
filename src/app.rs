@@ -1,6 +1,7 @@
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 
 use anyhow::{anyhow, Result};
+use parking_lot::Mutex;
 use tracing::{info, warn};
 
 use crate::config::config::Config;
