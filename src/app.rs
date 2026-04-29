@@ -1,8 +1,9 @@
+use std::path::PathBuf;
 use std::sync::{Arc, LazyLock, OnceLock};
 
 use anyhow::{anyhow, Result};
 use parking_lot::Mutex;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use crate::config::config::Config;
 use crate::config::save_thread::SaveThread;
@@ -10,7 +11,7 @@ use crate::config::state::AppState;
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
 use crate::fence::import_dialog::ImportDialog;
-use crate::paths::{app_file, STATE_PATH};
+use crate::paths::{app_file, ID_PATH, STATE_PATH};
 
 pub struct App {
     pub cover: OnceLock<Arc<DesktopCover>>,
@@ -18,6 +19,7 @@ pub struct App {
     pub save_thread: OnceLock<SaveThread>,
     pub config: OnceLock<Arc<Config>>,
     pub import_dialog: Mutex<Option<Arc<ImportDialog>>>,
+    pub id_path: OnceLock<PathBuf>,
 }
 
 /// Assume that the singleton is always initialized and the [App::get()] api to access.
@@ -27,6 +29,7 @@ static SINGLETON: LazyLock<App> = LazyLock::new(|| App {
     config: OnceLock::new(),
     mirror: Mutex::new(DesktopMirror::new()),
     import_dialog: Mutex::new(None),
+    id_path: OnceLock::new(),
 });
 
 impl App {
@@ -36,6 +39,15 @@ impl App {
 
     pub fn config() -> Arc<Config> {
         Self::get().config.get().expect("Config not loaded").clone()
+    }
+
+    pub fn remove_id_path(&self) {
+        let id_path = self.id_path.get().unwrap();
+        if let Err(e) = std::fs::remove_file(&id_path) {
+            error!("Failed to remove id file: {}", e);
+        } else {
+            info!("Removed id file {:?}", id_path);
+        }
     }
 
     pub fn save_state(&self) -> Result<()> {
