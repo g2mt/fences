@@ -8,6 +8,7 @@ use windows::Win32::UI::Shell::*;
 
 pub static LOG_PATH: &'static str = "log.txt";
 pub static STATE_PATH: &'static str = "state.json";
+pub static ID_PATH: &'static str = "id";
 
 pub static APP_DIR: OnceLock<PathBuf> = OnceLock::new();
 
