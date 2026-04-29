@@ -20,11 +20,11 @@ mod prompt;
 mod utils;
 mod window;
 
-use crate::app::{App, APP};
+use crate::app::{APP, App};
 use crate::config::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
-use crate::paths::{app_file, init_app_dir, LOG_PATH};
+use crate::paths::{LOG_PATH, app_file, init_app_dir};
 
 fn main() -> Result<()> {
     init_app_dir();

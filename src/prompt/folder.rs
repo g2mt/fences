@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 use tracing::{debug, info};
-use windows::core::w;
 use windows::Win32::Foundation::*;
 use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::UI::Shell::*;
+use windows::core::w;
 
 use crate::app::App;
 use crate::fut::{PromptFuture, PromptState};

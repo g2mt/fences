@@ -1,6 +1,6 @@
 use std::sync::{Arc, OnceLock};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use parking_lot::Mutex;
 use tracing::{info, warn};
 
@@ -10,7 +10,7 @@ use crate::config::state::AppState;
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
 use crate::fence::import_dialog::ImportDialog;
-use crate::paths::{app_file, STATE_PATH};
+use crate::paths::{STATE_PATH, app_file};
 
 pub struct App {
     pub cover: OnceLock<Arc<DesktopCover>>,

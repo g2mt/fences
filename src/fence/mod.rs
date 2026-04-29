@@ -1,15 +1,15 @@
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use anyhow::Result;
 use import_dialog::{ImportDialog, ImportItem};
 use parking_lot::Mutex;
 use tracing::{debug, error, info};
-use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
 
 use crate::app::App;
 use crate::config::state::{FenceState, IconState};
@@ -17,7 +17,7 @@ use crate::desktop_cover::DesktopCover;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
 use crate::prompt;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 mod icon;
 pub mod import_dialog;

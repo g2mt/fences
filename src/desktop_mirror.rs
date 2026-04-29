@@ -1,8 +1,8 @@
 use tracing::info;
-use windows::core::w;
 use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
+use windows::Win32::Storage::Xps::{PRINT_WINDOW_FLAGS, PrintWindow};
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::w;
 
 const PW_RENDERFULLCONTENT: PRINT_WINDOW_FLAGS = PRINT_WINDOW_FLAGS(0x00000002);
 
