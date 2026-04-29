@@ -33,7 +33,7 @@ impl TitleBar {
         let area = Self::area_from_fence_area(fence_area);
         Base::create_window(
             WINDOW_EX_STYLE(0),
-            register_classname(w!("FenceTitleBar")),
+            register_classname("FenceTitleBar"),
             PCWSTR(
                 title
                     .encode_utf16()
@@ -128,7 +128,7 @@ impl ScrollArea {
         );
         Base::create_window(
             WINDOW_EX_STYLE(0),
-            register_classname(w!("FenceScrollArea")),
+            register_classname("FenceScrollArea"),
             PCWSTR::null(),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_VSCROLL,
             area.x,
@@ -318,7 +318,7 @@ impl Fence {
         };
         Base::create_window(
             WINDOW_EX_STYLE(0),
-            register_classname(w!("Fence")),
+            register_classname("Fence"),
             PCWSTR::null(),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
             state.area.x,

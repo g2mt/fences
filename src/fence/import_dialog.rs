@@ -64,7 +64,7 @@ impl ImportDialog {
 
         Base::create_window(
             WINDOW_EX_STYLE(0),
-            register_classname_ex(w!("FenceImportDialog"), unsafe {
+            register_classname_ex("FenceImportDialog", unsafe {
                 let mut wc: WNDCLASSW = std::mem::zeroed();
                 wc.hbrBackground = HBRUSH((COLOR_WINDOW.0 + 1) as *mut core::ffi::c_void);
                 wc.hCursor = LoadCursorW(None, IDC_ARROW).unwrap_or_default();

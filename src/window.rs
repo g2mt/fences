@@ -19,10 +19,10 @@ static REGISTERED_CLASSNAMES: LazyLock<Mutex<HashSet<ClassName>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
 
 #[derive(Clone, Eq, PartialEq, Hash)]
-pub struct ClassName(Arc<PCWSTR>);
+pub struct ClassName(Arc<Vec<u16>>);
 unsafe impl Send for ClassName {}
 
-pub fn register_classname_ex(name: PCWSTR, mut wc: WNDCLASSW) -> ClassName {
+pub fn register_classname_ex(name: &str, mut wc: WNDCLASSW) -> ClassName {
     pub unsafe extern "system" fn base_wndproc(
         hwnd: HWND,
         msg: u32,
@@ -48,14 +48,15 @@ pub fn register_classname_ex(name: PCWSTR, mut wc: WNDCLASSW) -> ClassName {
         }
     }
     let mut registered: MutexGuard<'_, HashSet<ClassName>> = REGISTERED_CLASSNAMES.lock().unwrap();
-    let class_name = ClassName(Arc::new(name));
+    let name_u16: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
+    let class_name = ClassName(Arc::new(name_u16));
     if let Some(existing) = registered.get(&class_name) {
         return existing.clone();
     }
     unsafe {
         let h_instance = GetModuleHandleW(None).unwrap_or_default();
         wc.hInstance = h_instance.into();
-        wc.lpszClassName = name;
+        wc.lpszClassName = PCWSTR(class_name.0.as_ptr());
         wc.lpfnWndProc = Some(base_wndproc);
         if RegisterClassW(&wc) == 0 {
             panic!("RegisterClassW returned 0");
@@ -65,7 +66,7 @@ pub fn register_classname_ex(name: PCWSTR, mut wc: WNDCLASSW) -> ClassName {
     class_name
 }
 
-pub fn register_classname(name: PCWSTR) -> ClassName {
+pub fn register_classname(name: &str) -> ClassName {
     register_classname_ex(name, unsafe {
         let mut wc: WNDCLASSW = std::mem::zeroed();
         wc.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
@@ -147,7 +148,7 @@ impl Base {
         let hwnd = unsafe {
             CreateWindowExW(
                 dwexstyle,
-                *(classname.0),
+                PCWSTR(classname.0.as_ptr()),
                 lpwindowname,
                 dwstyle,
                 x,

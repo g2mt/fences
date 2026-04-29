@@ -37,7 +37,7 @@ impl Icon {
 
         Base::create_window(
             WINDOW_EX_STYLE(0),
-            register_classname(w!("FenceIcon")),
+            register_classname("FenceIcon"),
             PCWSTR(title_u16.as_ptr()),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
             x,

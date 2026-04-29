@@ -56,7 +56,7 @@ impl DesktopCover {
 
         Base::create_window(
             WS_EX_NOACTIVATE | WS_EX_LAYERED,
-            register_classname(w!("BottomWindowClass")),
+            register_classname("BottomWindowClass"),
             w!("Desktop Cover"),
             WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN,
             0,
