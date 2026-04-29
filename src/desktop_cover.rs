@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use tracing::error;
+use tracing::{debug, error};
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
@@ -397,7 +397,8 @@ impl DesktopCover {
 
     fn on_command(&self, wparam: WPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
-        let command = wparam.0 & 0xFFFF;
+        let command = (wparam.0 & 0xFFFF) as u16 as usize;
+        debug!("command: {}", command);
         let hit_type;
         {
             let mut inner = self.inner.lock().unwrap();
@@ -444,8 +445,8 @@ impl DesktopCover {
                 if let Some(fence) = inner.fences.last() {
                     let fence = fence.clone();
                     prompt::input(
-                        "Rename icon".into(),
-                        "Enter new icon name:".into(),
+                        "Rename fence".into(),
+                        "Enter new fence name:".into(),
                         Cow::Owned(String::from(&fence.title() as &str)),
                         move |new_title| {
                             if let Some(new_title) = new_title {

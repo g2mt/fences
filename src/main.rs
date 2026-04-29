@@ -22,9 +22,10 @@ use crate::app::{App, APP};
 use crate::config::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
-use crate::paths::{app_file, LOG_PATH};
+use crate::paths::{app_file, init_app_dir, LOG_PATH};
 
 fn main() -> Result<()> {
+    init_app_dir();
     APP.get_or_init(|| App {
         cover: OnceLock::new(),
         save_thread: OnceLock::new(),

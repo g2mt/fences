@@ -1,23 +1,20 @@
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
 use anyhow::Result;
+use tracing::debug;
 use windows::Win32::Foundation::*;
 use windows::Win32::UI::Shell::*;
 
 pub static LOG_PATH: &'static str = "log.txt";
 pub static STATE_PATH: &'static str = "state.json";
 
-pub fn app_dir() -> Result<PathBuf> {
-    let mut path = vec![0u16; MAX_PATH as usize];
+pub static APP_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+pub fn init_app_dir() -> Result<()> {
+    let mut path = [0u16; MAX_PATH as usize];
     unsafe {
-        if SHGetSpecialFolderPathW(
-            None,
-            &mut path[..MAX_PATH as usize].try_into().unwrap(),
-            CSIDL_PERSONAL as i32,
-            false,
-        )
-        .as_bool()
-            == false
+        if SHGetSpecialFolderPathW(None, &mut path, CSIDL_PERSONAL as i32, false).as_bool() == false
         {
             return Err(anyhow::anyhow!("Failed to get Documents folder"));
         }
@@ -34,11 +31,14 @@ pub fn app_dir() -> Result<PathBuf> {
     if !config_path.exists() {
         std::fs::create_dir_all(&config_path)?;
     }
-    Ok(config_path)
+    APP_DIR
+        .set(config_path)
+        .map_err(|_| anyhow::anyhow!("Failed to set APP_DIR"))?;
+    Ok(())
 }
 
 pub fn app_file(file: &str) -> Result<PathBuf> {
-    let mut path = app_dir()?;
+    let mut path = APP_DIR.get().unwrap().clone();
     path.push(file);
     Ok(path)
 }
