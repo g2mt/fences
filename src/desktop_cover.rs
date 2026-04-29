@@ -79,7 +79,10 @@ impl DesktopCover {
                     nid.uID = 1;
                     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
                     nid.uCallbackMessage = WM_USER_SHELLICON;
-                    nid.hIcon = LoadIconW(None, IDI_APPLICATION).unwrap_or_default();
+                    // winresource puts icon at ID 1
+                    nid.hIcon = LoadIconW(Some(h_instance.into()), PCWSTR(1usize as *const u16))
+                        .or_else(|_| LoadIconW(None, IDI_APPLICATION))
+                        .unwrap_or_default();
                     let tip: Vec<u16> = "Desktop Cover"
                         .encode_utf16()
                         .chain(std::iter::once(0))
