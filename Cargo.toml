@@ -2,6 +2,16 @@
 name = "fences"
 version = "0.1.0"
 edition = "2024"
+build = "build.rs"
+
+[package.metadata.winresource]
+CompanyName = ""
+FileDescription = "Minimal desktop fence application"
+FileVersion = "1"
+InternalName = "FENCES.EXE"
+OriginalFilename = "FENCES.EXE"
+ProductName = "Desktop Fences"
+ProductVersion = "0.1.0"
 
 [dependencies]
 anyhow = "1.0.102"
@@ -29,3 +39,6 @@ features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_Storage_Xps",
 ]
+
+[build-dependencies]
+winresource = "0.1"
