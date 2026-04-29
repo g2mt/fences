@@ -246,12 +246,12 @@ impl Window for Icon {
                 SetBkMode(hdc, TRANSPARENT);
                 SetTextColor(hdc, COLORREF(config.icon.text_color.0));
 
-                let title_utf16: Vec<u16> = state.title.encode_utf16().collect();
+                let mut title_utf16: Vec<u16> = state.title.encode_utf16().collect();
                 let mut text_rect = rect;
                 text_rect.top += icon_draw_size;
                 DrawTextW(
                     hdc,
-                    &title_utf16,
+                    &mut title_utf16,
                     &mut text_rect,
                     DT_CENTER | DT_WORDBREAK | DT_NOPREFIX,
                 );
