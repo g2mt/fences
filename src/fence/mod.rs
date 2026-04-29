@@ -603,14 +603,18 @@ impl Fence {
         *App::get().import_dialog.lock() = Some(import_dialog);
     }
 
-    pub async fn show_import_from_dialog(self: &Arc<Self>, parent_hwnd: HWND) {
-        let path_str = prompt::browse_for_folder().await;
-        self.set_imported_from(Some(Arc::from(path_str.as_str())));
-        self.show_import_existing_dialog();
+    pub async fn show_import_from_dialog(self: &Arc<Self>, _parent_hwnd: HWND) {
+        if let Some(path_str) = prompt::browse_for_folder().await {
+            self.set_imported_from(Some(Arc::from(path_str.as_str())));
+            self.show_import_existing_dialog();
+        }
     }
 
     pub async fn from_folder_selector(parent_hwnd: HWND) -> Result<Option<Arc<Self>>> {
-        let path_str = prompt::browse_for_folder().await;
+        let path_str = match prompt::browse_for_folder().await {
+            Some(p) => p,
+            None => return Ok(None),
+        };
         let folder_path = std::path::Path::new(&path_str);
         let title = folder_path
             .file_name()

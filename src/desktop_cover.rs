@@ -424,17 +424,20 @@ impl DesktopCover {
                 should_save = true;
             }
             IDM_ADD_FENCE_FROM_FOLDER => {
-                match Fence::from_folder_selector(hwnd) {
-                    Ok(Some(fence)) => {
-                        let mut inner = self.inner.lock();
-                        inner.fences.push(fence);
+                let cover = APP.get().unwrap().desktop_cover.clone();
+                self.executor.spawn(async move {
+                    match Fence::from_folder_selector(hwnd).await {
+                        Ok(Some(fence)) => {
+                            let mut inner = cover.inner.lock();
+                            inner.fences.push(fence);
+                            APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
+                        }
+                        Err(e) => {
+                            error!("Error adding fence: {:?}", e);
+                        }
+                        _ => (),
                     }
-                    Err(e) => {
-                        error!("Error adding fence: {:?}", e);
-                    }
-                    _ => (),
-                }
-                should_save = true;
+                });
             }
             IDM_ADD_ICON => {
                 let inner = self.inner.lock();

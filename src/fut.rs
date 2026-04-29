@@ -32,13 +32,18 @@ impl<T> Future for PromptFuture<T> {
 }
 
 pub struct WindowWaker {
-    pub hwnd: HWND,
+    pub hwnd: isize,
 }
 
 impl std::task::Wake for WindowWaker {
     fn wake(self: Arc<Self>) {
         unsafe {
-            let _ = PostMessageW(self.hwnd, WM_USER_WAKE_FUTURE, None, None);
+            let _ = PostMessageW(
+                HWND(self.hwnd as *mut _),
+                WM_USER_WAKE_FUTURE,
+                WPARAM(0),
+                LPARAM(0),
+            );
         }
     }
 }
@@ -60,7 +65,10 @@ impl AsyncExecutor {
 
     pub fn poll_all(&self, hwnd: HWND) {
         let mut tasks = self.tasks.lock();
-        let waker = Arc::new(WindowWaker { hwnd }).into();
+        let waker = Arc::new(WindowWaker {
+            hwnd: hwnd.0 as isize,
+        })
+        .into();
         let mut cx = Context::from_waker(&waker);
 
         let mut i = 0;

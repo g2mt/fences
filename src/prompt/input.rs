@@ -14,6 +14,7 @@ const ID_CANCEL: u32 = 2;
 
 struct InputDialogData {
     message_utf16: Vec<u16>,
+    default_text: String,
     edit_hwnd: HWND,
     state: Arc<Mutex<crate::fut::PromptState<Option<String>>>>,
 }
@@ -98,11 +99,12 @@ unsafe extern "system" fn input_wndproc(
             );
 
             // Set the edit's initial text
-            if let Some(default) = &data.result {
-                let default_utf16: Vec<u16> =
-                    default.encode_utf16().chain(std::iter::once(0)).collect();
-                SetWindowTextW(hwnd, PCWSTR(default_utf16.as_ptr()));
-            }
+            let default_utf16: Vec<u16> = data
+                .default_text
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
+            SetWindowTextW(data.edit_hwnd, PCWSTR(default_utf16.as_ptr()));
             DefWindowProcW(hwnd, msg, wparam, lparam)
         },
         WM_DESTROY => unsafe {
@@ -180,6 +182,7 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
 
         let data_ptr = Box::into_raw(Box::new(InputDialogData {
             message_utf16: message.encode_utf16().chain(std::iter::once(0)).collect(),
+            default_text: default.to_string(),
             edit_hwnd: HWND::default(),
             state: state.clone(),
         }));
