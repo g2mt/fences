@@ -1,12 +1,16 @@
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
+use parking_lot::Mutex;
 use tracing::error;
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
+
+use crate::fut::{PromptFuture, PromptState};
 
 const ID_EDIT: u32 = 101;
 const ID_OK: u32 = 1;
@@ -123,7 +127,7 @@ unsafe extern "system" fn input_wndproc(
                         let mut buf: Vec<u16> = vec![0; (len + 1) as usize];
                         GetWindowTextW(data.edit_hwnd, &mut buf);
                         let s = String::from_utf16_lossy(&buf[..len as usize]);
-                        
+
                         let mut state = data.state.lock();
                         state.result = Some(Some(s));
                         state.completed = true;
@@ -151,10 +155,6 @@ unsafe extern "system" fn input_wndproc(
 }
 
 static CLASS_REGISTERED: AtomicBool = AtomicBool::new(false);
-
-use std::sync::Arc;
-use parking_lot::Mutex;
-use crate::fut::{PromptFuture, PromptState};
 
 /// Shows a non-blocking input dialog.
 pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<String>> {

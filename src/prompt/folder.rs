@@ -1,16 +1,16 @@
-use tracing::info;
+use std::sync::Arc;
+
+use parking_lot::Mutex;
+use tracing::{debug, info};
 use windows::core::w;
 use windows::Win32::Foundation::*;
 use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::UI::Shell::*;
 
 use crate::app::App;
+use crate::fut::{PromptFuture, PromptState};
 use crate::utils::HWNDWrapper;
 use crate::window::Window;
-
-use std::sync::Arc;
-use parking_lot::Mutex;
-use crate::fut::{PromptFuture, PromptState};
 
 pub fn browse_for_folder() -> PromptFuture<Option<String>> {
     let state = Arc::new(Mutex::new(PromptState {
@@ -21,7 +21,8 @@ pub fn browse_for_folder() -> PromptFuture<Option<String>> {
 
     let state_clone = state.clone();
     std::thread::spawn(move || {
-        let res = browse_for_folder_internal();
+        debug!("spawned thread");
+        let res = browse_for_folder_sync();
         let mut s = state_clone.lock();
         s.result = Some(res);
         s.completed = true;
@@ -33,7 +34,7 @@ pub fn browse_for_folder() -> PromptFuture<Option<String>> {
     PromptFuture { state }
 }
 
-fn browse_for_folder_internal() -> Option<String> {
+fn browse_for_folder_sync() -> Option<String> {
     let mut browse_info = BROWSEINFOW {
         hwndOwner: HWND(std::ptr::null_mut()),
         pidlRoot: std::ptr::null_mut(),

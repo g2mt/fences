@@ -16,6 +16,7 @@ use crate::app::{App, APP};
 use crate::config::state::AppState;
 use crate::fence::{Fence, HitTest};
 use crate::prompt;
+use crate::utils::HWNDWrapper;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Menus
@@ -124,7 +125,7 @@ impl DesktopCover {
     pub fn set_state(&self, state: &AppState) -> Result<()> {
         let mut fences = Vec::new();
         for f_state in &state.fences {
-            let fence = Fence::from_state(self.base().hwnd(), f_state.clone())?;
+            let fence = Fence::from_state(self, f_state.clone())?;
             fences.push(fence);
         }
         let mut inner = self.inner.lock();
@@ -417,20 +418,21 @@ impl DesktopCover {
             IDM_ADD_FENCE => {
                 let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
                 let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
-                if let Ok(fence) = Fence::new(hwnd, width / 2 - 150, height / 2 - 75, "Untitled") {
+                if let Ok(fence) = Fence::new(self, width / 2 - 150, height / 2 - 75, "Untitled") {
                     let mut inner = self.inner.lock();
                     inner.fences.push(fence);
                 }
                 should_save = true;
             }
             IDM_ADD_FENCE_FROM_FOLDER => {
-                let cover = APP.get().unwrap().desktop_cover.clone();
-                self.executor.spawn(async move {
-                    match Fence::from_folder_selector(hwnd).await {
+                self.executor.spawn(self, async move {
+                    debug!("IDM_ADD_FENCE_FROM_FOLDER async spawn");
+                    let cover = App::get().cover.get().unwrap();
+                    match Fence::from_folder_selector(&cover).await {
                         Ok(Some(fence)) => {
                             let mut inner = cover.inner.lock();
                             inner.fences.push(fence);
-                            APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
+                            App::get().save_thread.get().unwrap().set_unsaved();
                         }
                         Err(e) => {
                             error!("Error adding fence: {:?}", e);
@@ -452,8 +454,11 @@ impl DesktopCover {
                 if let Some(fence) = inner.fences.last() {
                     let fence = fence.clone();
                     let current_title = String::from(&fence.title() as &str);
-                    self.executor.spawn(async move {
-                        if let Some(new_title) = prompt::input("Rename fence", "Enter new fence name:", &current_title).await {
+                    self.executor.spawn(self, async move {
+                        if let Some(new_title) =
+                            prompt::input("Rename fence", "Enter new fence name:", &current_title)
+                                .await
+                        {
                             if !new_title.is_empty() {
                                 fence.set_title(new_title.into());
                                 APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
@@ -493,8 +498,14 @@ impl DesktopCover {
                     if let Some(fence) = inner.fences.last() {
                         if let Some(icon) = fence.icon_by_index(icon_idx) {
                             let current_title = String::from(&icon.title() as &str);
-                            self.executor.spawn(async move {
-                                if let Some(new_title) = prompt::input("Rename icon", "Enter new icon name:", &current_title).await {
+                            self.executor.spawn(self, async move {
+                                if let Some(new_title) = prompt::input(
+                                    "Rename icon",
+                                    "Enter new icon name:",
+                                    &current_title,
+                                )
+                                .await
+                                {
                                     if !new_title.is_empty() {
                                         icon.set_title(new_title.into());
                                         APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
@@ -573,7 +584,7 @@ impl Window for DesktopCover {
             WM_RBUTTONUP => self.on_rbutton_up(lparam),
             WM_USER_SHELLICON => self.on_shell_icon(lparam),
             WM_USER_WAKE_FUTURE => {
-                self.executor.poll_all(hwnd);
+                self.executor.poll_all(self);
                 LRESULT(0)
             }
             WM_COMMAND => self.on_command(wparam),

@@ -13,6 +13,7 @@ mod config;
 mod desktop_cover;
 mod desktop_mirror;
 mod fence;
+mod fut;
 mod geo;
 mod paths;
 mod prompt;

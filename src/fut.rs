@@ -2,10 +2,14 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
+
 use parking_lot::Mutex;
-use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
-use crate::desktop_cover::WM_USER_WAKE_FUTURE;
+
+use crate::desktop_cover::{DesktopCover, WM_USER_WAKE_FUTURE};
+use crate::utils::HWNDWrapper;
+use crate::window::Window;
 
 pub struct PromptState<T> {
     pub result: Option<T>,
@@ -32,14 +36,14 @@ impl<T> Future for PromptFuture<T> {
 }
 
 pub struct WindowWaker {
-    pub hwnd: isize,
+    hwnd_w: HWNDWrapper,
 }
 
 impl std::task::Wake for WindowWaker {
     fn wake(self: Arc<Self>) {
         unsafe {
             let _ = PostMessageW(
-                HWND(self.hwnd as *mut _),
+                Some(self.hwnd_w.0),
                 WM_USER_WAKE_FUTURE,
                 WPARAM(0),
                 LPARAM(0),
@@ -59,14 +63,22 @@ impl AsyncExecutor {
         }
     }
 
-    pub fn spawn(&self, fut: impl Future<Output = ()> + Send + 'static) {
+    pub fn spawn(&self, cover: &DesktopCover, fut: impl Future<Output = ()> + Send + 'static) {
         self.tasks.lock().push(Box::pin(fut));
+        unsafe {
+            let _ = PostMessageW(
+                Some(cover.base().hwnd()),
+                WM_USER_WAKE_FUTURE,
+                WPARAM(0),
+                LPARAM(0),
+            );
+        }
     }
 
-    pub fn poll_all(&self, hwnd: HWND) {
+    pub fn poll_all(&self, cover: &DesktopCover) {
         let mut tasks = self.tasks.lock();
         let waker = Arc::new(WindowWaker {
-            hwnd: hwnd.0 as isize,
+            hwnd_w: HWNDWrapper(cover.base().hwnd()),
         })
         .into();
         let mut cx = Context::from_waker(&waker);

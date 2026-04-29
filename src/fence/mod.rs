@@ -13,6 +13,7 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::app::App;
 use crate::config::state::{FenceState, IconState};
+use crate::desktop_cover::DesktopCover;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
 use crate::prompt;
@@ -303,9 +304,9 @@ struct FenceInner {
 }
 
 impl Fence {
-    pub fn new(parent_hwnd: HWND, x: i32, y: i32, title: &str) -> Result<Arc<Self>> {
+    pub fn new(cover: &DesktopCover, x: i32, y: i32, title: &str) -> Result<Arc<Self>> {
         Self::from_state(
-            parent_hwnd,
+            cover,
             FenceState {
                 title: Arc::from(title),
                 area: Area::new(x, y, 300, 150),
@@ -315,7 +316,8 @@ impl Fence {
         )
     }
 
-    pub fn from_state(parent_hwnd: HWND, state: FenceState) -> Result<Arc<Self>> {
+    pub fn from_state(cover: &DesktopCover, state: FenceState) -> Result<Arc<Self>> {
+        let parent_hwnd = cover.base().hwnd();
         let h_instance = unsafe {
             HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
         };
@@ -610,7 +612,7 @@ impl Fence {
         }
     }
 
-    pub async fn from_folder_selector(parent_hwnd: HWND) -> Result<Option<Arc<Self>>> {
+    pub async fn from_folder_selector(cover: &DesktopCover) -> Result<Option<Arc<Self>>> {
         let path_str = match prompt::browse_for_folder().await {
             Some(p) => p,
             None => return Ok(None),
@@ -623,7 +625,7 @@ impl Fence {
 
         let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
-        let fence = Self::new(parent_hwnd, width / 2 - 150, height / 2 - 75, title)?;
+        let fence = Self::new(cover, width / 2 - 150, height / 2 - 75, title)?;
         fence.set_imported_from(Some(Arc::from(path_str.as_str())));
 
         if let Ok(entries) = std::fs::read_dir(folder_path) {
