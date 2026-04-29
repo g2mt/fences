@@ -14,7 +14,7 @@ pub fn app_dir() -> Result<PathBuf> {
             None,
             &mut path[..MAX_PATH as usize].try_into().unwrap(),
             CSIDL_PERSONAL as i32,
-            FALSE.into(),
+            false,
         )
         .as_bool()
             == false

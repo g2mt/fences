@@ -61,7 +61,7 @@ impl Icon {
     pub fn set_selected(&self, selected: bool) {
         self.selected.store(selected, Ordering::SeqCst);
         unsafe {
-            InvalidateRect(Some(self.base.hwnd()), None, TRUE.into());
+            InvalidateRect(Some(self.base.hwnd()), None, true);
         }
     }
 

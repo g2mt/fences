@@ -190,7 +190,7 @@ impl Window for ScrollArea {
                 }
 
                 si.fMask = SIF_POS;
-                SetScrollInfo(hwnd, SB_VERT, &si, TRUE.into());
+                SetScrollInfo(hwnd, SB_VERT, &si, true);
                 GetScrollInfo(hwnd, SB_VERT, &mut si);
 
                 if si.nPos != cur_pos {
@@ -206,7 +206,7 @@ impl Window for ScrollArea {
                     );
                     let parent = GetParent(hwnd);
                     if let Ok(parent) = parent {
-                        InvalidateRect(Some(parent), None, TRUE.into());
+                        InvalidateRect(Some(parent), None, true);
                     }
                 }
                 LRESULT(0)
@@ -708,7 +708,7 @@ impl Fence {
         si.nMin = 0;
         si.nMax = content_height;
         si.nPage = view_height as u32;
-        unsafe { SetScrollInfo(self.scroll_area.base().hwnd(), SB_VERT, &si, TRUE.into()) };
+        unsafe { SetScrollInfo(self.scroll_area.base().hwnd(), SB_VERT, &si, true) };
         drop(inner);
     }
 }
@@ -723,7 +723,7 @@ impl Window for Fence {
         match msg {
             WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
             WM_MOVE => unsafe {
-                InvalidateRect(Some(self.scroll_area.base().hwnd()), None, TRUE.into());
+                InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             },
             WM_PAINT => unsafe {
