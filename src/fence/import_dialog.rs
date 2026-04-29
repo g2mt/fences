@@ -5,6 +5,7 @@ use tracing::debug;
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
 use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::Shell::*;
@@ -90,7 +91,10 @@ impl ImportDialog {
                         WINDOW_EX_STYLE(0),
                         w!("SysListView32"),
                         None,
-                        WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(LVS_REPORT | LVS_SINGLESEL),
+                        WS_CHILD
+                            | WS_VISIBLE
+                            | WS_BORDER
+                            | WINDOW_STYLE(LVS_REPORT | LVS_SINGLESEL),
                         10,
                         10,
                         dlg_w - 20,
@@ -109,7 +113,9 @@ impl ImportDialog {
                         lv_hwnd,
                         LVM_SETEXTENDEDLISTVIEWSTYLE,
                         Some(WPARAM(0)),
-                        Some(LPARAM((LVS_EX_FULLROWSELECT | LVS_EX_SUBITEMIMAGES) as isize)),
+                        Some(LPARAM(
+                            (LVS_EX_FULLROWSELECT | LVS_EX_SUBITEMIMAGES) as isize,
+                        )),
                     );
 
                     // Assign image list
@@ -198,7 +204,12 @@ impl ImportDialog {
                         lvi.iItem = i as i32;
                         lvi.iSubItem = COL_ICON;
                         lvi.iImage = icon_index;
-                        SendMessageW(lv_hwnd, LVM_INSERTITEMW, Some(WPARAM(0)), Some(LPARAM(&lvi as *const _ as isize)));
+                        SendMessageW(
+                            lv_hwnd,
+                            LVM_INSERTITEMW,
+                            Some(WPARAM(0)),
+                            Some(LPARAM(&lvi as *const _ as isize)),
+                        );
 
                         // Column 1: path text
                         let path_u16: Vec<u16> =
@@ -208,7 +219,12 @@ impl ImportDialog {
                         lvi_path.iItem = i as i32;
                         lvi_path.iSubItem = COL_PATH;
                         lvi_path.pszText = windows::core::PWSTR(path_u16.as_ptr() as *mut _);
-                        SendMessageW(lv_hwnd, LVM_SETITEMW, Some(WPARAM(0)), Some(LPARAM(&lvi_path as *const _ as isize)));
+                        SendMessageW(
+                            lv_hwnd,
+                            LVM_SETITEMW,
+                            Some(WPARAM(0)),
+                            Some(LPARAM(&lvi_path as *const _ as isize)),
+                        );
 
                         // Column 2: action text
                         let action_str = if item.action == ACTION_KEEP {
@@ -225,7 +241,12 @@ impl ImportDialog {
                         lvi_action.iItem = i as i32;
                         lvi_action.iSubItem = COL_ACTION;
                         lvi_action.pszText = windows::core::PWSTR(action_u16.as_ptr() as *mut _);
-                        SendMessageW(lv_hwnd, LVM_SETITEMW, Some(WPARAM(0)), Some(LPARAM(&lvi_action as *const _ as isize)));
+                        SendMessageW(
+                            lv_hwnd,
+                            LVM_SETITEMW,
+                            Some(WPARAM(0)),
+                            Some(LPARAM(&lvi_action as *const _ as isize)),
+                        );
                     }
                 }
 
@@ -321,7 +342,12 @@ impl ImportDialog {
             lvi.iItem = idx as i32;
             lvi.iSubItem = COL_ACTION;
             lvi.pszText = windows::core::PWSTR(action_u16.as_ptr() as *mut _);
-            SendMessageW(lv, LVM_SETITEMW, Some(WPARAM(0)), Some(LPARAM(&lvi as *const _ as isize)));
+            SendMessageW(
+                lv,
+                LVM_SETITEMW,
+                Some(WPARAM(0)),
+                Some(LPARAM(&lvi as *const _ as isize)),
+            );
         }
     }
 
