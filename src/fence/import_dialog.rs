@@ -372,7 +372,6 @@ impl Window for ImportDialog {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        debug!("{:?} {:?} {:?}", msg, wparam, lparam);
         let hwnd = self.base().hwnd();
         match msg {
             WM_COMMAND => {

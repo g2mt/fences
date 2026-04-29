@@ -4,7 +4,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use import_dialog::{ImportDialog, ImportItem};
 use parking_lot::Mutex;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
@@ -605,7 +605,8 @@ impl Fence {
         *App::get().import_dialog.lock() = Some(import_dialog);
     }
 
-    pub async fn show_import_from_dialog(self: &Arc<Self>, _parent_hwnd: HWND) {
+    pub async fn show_import_from_dialog(self: &Arc<Self>) {
+        debug!("called");
         if let Some(path_str) = prompt::browse_for_folder().await {
             self.set_imported_from(Some(Arc::from(path_str.as_str())));
             self.show_import_existing_dialog();

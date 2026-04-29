@@ -552,13 +552,19 @@ impl DesktopCover {
                 if fence.imported_from().is_some() {
                     fence.show_import_existing_dialog();
                 } else {
-                    fence.show_import_from_dialog(hwnd);
+                    let fence: Arc<Fence> = fence.clone();
+                    self.executor.spawn(self, async move {
+                        fence.show_import_from_dialog().await;
+                    });
                 }
                 should_save = true;
             }
             IDM_IMPORT_FROM => {
-                let inner = self.inner.lock();
-                inner.fences.last().unwrap().show_import_from_dialog(hwnd);
+                debug!("import from");
+                let fence: Arc<Fence> = self.inner.lock().fences.last().unwrap().clone();
+                self.executor.spawn(self, async move {
+                    fence.show_import_from_dialog().await;
+                });
                 should_save = true;
             }
             _ => {}
