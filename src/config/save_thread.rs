@@ -1,11 +1,11 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
 use tracing::error;
 
-use crate::app::APP;
+use crate::app::App;
 
 #[derive(Debug)]
 pub struct SaveThread {
@@ -21,17 +21,13 @@ impl SaveThread {
         let flag = Arc::new(AtomicBool::new(false));
         let flag_clone = flag.clone();
 
-        let handle = thread::spawn(move || {
-            loop {
-                thread::sleep(Duration::from_secs(3));
-                if flag_clone
-                    .compare_exchange(true, false, Ordering::Acquire, Ordering::Acquire)
-                    .is_ok()
-                {
-                    if let Err(e) = APP.get().unwrap().save_state() {
-                        error!("{}", e.to_string());
-                    }
-                }
+        let handle = thread::spawn(move || loop {
+            thread::sleep(Duration::from_secs(3));
+            if flag_clone
+                .compare_exchange(true, false, Ordering::Acquire, Ordering::Acquire)
+                .is_ok()
+            {
+                App::get().save_state();
             }
         });
 

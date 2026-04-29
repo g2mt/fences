@@ -20,21 +20,14 @@ mod prompt;
 mod utils;
 mod window;
 
-use crate::app::{APP, App};
+use crate::app::App;
 use crate::config::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
-use crate::paths::{LOG_PATH, app_file, init_app_dir};
+use crate::paths::{app_file, init_app_dir, LOG_PATH};
 
 fn main() -> Result<()> {
     init_app_dir();
-    APP.get_or_init(|| App {
-        cover: OnceLock::new(),
-        save_thread: OnceLock::new(),
-        config: OnceLock::new(),
-        mirror: Mutex::new(DesktopMirror::new()),
-        import_dialog: Mutex::new(None),
-    });
 
     let log_path = app_file(LOG_PATH)?;
     let file = std::fs::OpenOptions::new()

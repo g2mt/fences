@@ -4,20 +4,20 @@ use std::sync::Arc;
 use anyhow::Result;
 use parking_lot::Mutex;
 use tracing::{debug, error};
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
 
-use crate::app::{APP, App};
+use crate::app::App;
 use crate::config::state::AppState;
 use crate::fence::{Fence, HitTest};
 use crate::prompt;
 use crate::utils::HWNDWrapper;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Menus
 pub const IDM_EXIT: usize = 101;
@@ -288,7 +288,7 @@ impl DesktopCover {
             }
 
             self.base.redraw();
-            APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
+            App::get().save_thread.get().unwrap().set_unsaved();
             inner.last_mouse_pos = POINT { x, y };
         }
         LRESULT(0)
@@ -461,7 +461,7 @@ impl DesktopCover {
                         {
                             if !new_title.is_empty() {
                                 fence.set_title(new_title.into());
-                                APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
+                                App::get().save_thread.get().unwrap().set_unsaved();
                             }
                         }
                     });
@@ -513,7 +513,7 @@ impl DesktopCover {
                         {
                             if !new_title.is_empty() {
                                 icon.set_title(new_title.into());
-                                APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
+                                App::get().save_thread.get().unwrap().set_unsaved();
                             }
                         }
                     });
@@ -570,7 +570,7 @@ impl DesktopCover {
             _ => {}
         }
         if should_save {
-            APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
+            App::get().save_thread.get().unwrap().set_unsaved();
         }
         LRESULT(0)
     }

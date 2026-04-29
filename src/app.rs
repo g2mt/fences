@@ -1,6 +1,6 @@
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, LazyLock, OnceLock};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use parking_lot::Mutex;
 use tracing::{info, warn};
 
@@ -10,7 +10,7 @@ use crate::config::state::AppState;
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
 use crate::fence::import_dialog::ImportDialog;
-use crate::paths::{STATE_PATH, app_file};
+use crate::paths::{app_file, STATE_PATH};
 
 pub struct App {
     pub cover: OnceLock<Arc<DesktopCover>>,
@@ -20,12 +20,18 @@ pub struct App {
     pub import_dialog: Mutex<Option<Arc<ImportDialog>>>,
 }
 
-/// Assume that the APP is always initialized and the [App::get()] api to access.
-pub static APP: OnceLock<App> = OnceLock::new();
+/// Assume that the singleton is always initialized and the [App::get()] api to access.
+static SINGLETON: LazyLock<App> = LazyLock::new(|| App {
+    cover: OnceLock::new(),
+    save_thread: OnceLock::new(),
+    config: OnceLock::new(),
+    mirror: Mutex::new(DesktopMirror::new()),
+    import_dialog: Mutex::new(None),
+});
 
 impl App {
     pub fn get() -> &'static Self {
-        APP.get().expect("App not initialized")
+        &SINGLETON
     }
 
     pub fn config() -> Arc<Config> {
