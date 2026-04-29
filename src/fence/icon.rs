@@ -60,7 +60,7 @@ impl Icon {
     pub fn set_selected(&self, selected: bool) {
         self.selected.store(selected, Ordering::SeqCst);
         unsafe {
-            InvalidateRect(self.base.hwnd(), None, TRUE);
+            InvalidateRect(Some(self.base.hwnd()), None, TRUE.into());
         }
     }
 
@@ -142,7 +142,7 @@ impl Icon {
             if let Some(name) = path_stem {
                 let result = unsafe {
                     MessageBoxW(
-                        self.base.hwnd(),
+                        Some(self.base.hwnd()),
                         w!("Do you want to update the icon name to match the file?"),
                         w!("Update Name"),
                         MB_YESNO | MB_ICONQUESTION,
@@ -194,7 +194,7 @@ impl Window for Icon {
                         0,
                         rect.right - rect.left,
                         rect.bottom - rect.top,
-                        mirror.hdc(),
+                        Some(mirror.hdc()),
                         pt.x - screen_left,
                         pt.y - screen_top,
                         SRCCOPY,

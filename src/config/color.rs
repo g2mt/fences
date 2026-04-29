@@ -119,13 +119,13 @@ impl Color<true> {
             if alpha == 255 {
                 let brush = CreateSolidBrush(COLORREF(color & 0xFFFFFF));
                 FillRect(hdc, rect, brush);
-                DeleteObject(brush);
+                DeleteObject(brush.into());
             } else if alpha > 0 {
-                let mem_dc = CreateCompatibleDC(hdc);
+                let mem_dc = CreateCompatibleDC(Some(hdc));
                 let width = rect.right - rect.left;
                 let height = rect.bottom - rect.top;
                 let bitmap = CreateCompatibleBitmap(hdc, width, height);
-                SelectObject(mem_dc, bitmap);
+                SelectObject(mem_dc, bitmap.into());
 
                 let brush = CreateSolidBrush(COLORREF(color & 0xFFFFFF));
                 let local_rect = RECT {
@@ -135,7 +135,7 @@ impl Color<true> {
                     bottom: height,
                 };
                 FillRect(mem_dc, &local_rect, brush);
-                DeleteObject(brush);
+                DeleteObject(brush.into());
 
                 let blend = BLENDFUNCTION {
                     BlendOp: AC_SRC_OVER as u8,
@@ -145,7 +145,7 @@ impl Color<true> {
                 };
                 GdiAlphaBlend(hdc, 0, 0, width, height, mem_dc, 0, 0, width, height, blend);
 
-                DeleteObject(bitmap);
+                DeleteObject(bitmap.into());
                 DeleteDC(mem_dc);
             }
         }
@@ -157,7 +157,7 @@ impl Color<false> {
         unsafe {
             let brush = CreateSolidBrush(COLORREF(self.0 & 0xFFFFFF));
             FillRect(hdc, rect, brush);
-            DeleteObject(brush);
+            DeleteObject(brush.into());
         }
     }
 }

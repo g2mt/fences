@@ -65,7 +65,7 @@ impl DesktopCover {
             height,
             HWND::default(),
             None,
-            h_instance,
+            h_instance.into(),
             |base| {
                 let hwnd = base.hwnd();
                 unsafe {
@@ -87,7 +87,7 @@ impl DesktopCover {
                     SetLayeredWindowAttributes(hwnd, COLORREF(0x00000000), 0, LWA_COLORKEY);
                     SetWindowPos(
                         hwnd,
-                        HWND_BOTTOM,
+                        Some(HWND_BOTTOM),
                         0,
                         0,
                         0,
@@ -163,7 +163,7 @@ impl DesktopCover {
 
             let brush = CreateSolidBrush(COLORREF(0x00000000));
             FillRect(hdc, &ps.rcPaint, brush);
-            DeleteObject(brush);
+            DeleteObject(brush.into());
 
             EndPaint(hwnd, &ps);
         }
@@ -189,7 +189,7 @@ impl DesktopCover {
                 };
                 unsafe {
                     let cursor = LoadCursorW(None, cursor_id).unwrap_or_default();
-                    SetCursor(cursor);
+                    SetCursor(Some(cursor));
                 }
                 return LRESULT(TRUE.0 as isize);
             }
@@ -354,7 +354,7 @@ impl DesktopCover {
                     TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                     pt.x,
                     pt.y,
-                    0,
+                    Some(0),
                     hwnd,
                     None,
                 );
@@ -385,7 +385,7 @@ impl DesktopCover {
                     TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                     pt.x,
                     pt.y,
-                    0,
+                    Some(0),
                     hwnd,
                     None,
                 );
@@ -461,7 +461,7 @@ impl DesktopCover {
             IDM_DELETE_FENCE => {
                 let result = unsafe {
                     MessageBoxW(
-                        hwnd,
+                        Some(hwnd),
                         w!("Are you sure you want to delete this fence?"),
                         w!("Confirm Deletion"),
                         MB_YESNO | MB_ICONQUESTION,

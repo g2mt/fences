@@ -12,9 +12,9 @@ pub fn app_dir() -> Result<PathBuf> {
     unsafe {
         if SHGetSpecialFolderPathW(
             None,
-            windows::core::PWSTR(path.as_mut_ptr()),
+            &mut path[..MAX_PATH as usize].try_into().unwrap(),
             CSIDL_PERSONAL as i32,
-            FALSE,
+            FALSE.into(),
         )
         .as_bool()
             == false

@@ -25,7 +25,7 @@ fn browse_for_folder_sync(parent_hwnd_w: HWNDWrapper) -> Option<String> {
             None
         } else {
             let mut path_str_buf = [0u16; MAX_PATH as usize];
-            SHGetPathFromIDListW(pidl, windows::core::PWSTR(path_str_buf.as_mut_ptr()));
+            SHGetPathFromIDListW(pidl, &mut path_str_buf);
             CoTaskMemFree(Some(pidl as *const core::ffi::c_void));
             Some(String::from_utf16_lossy(
                 &path_str_buf[..path_str_buf.iter().position(|&c| c == 0).unwrap_or(0)],

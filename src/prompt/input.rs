@@ -42,9 +42,9 @@ unsafe extern "system" fn input_wndproc(
                 10,
                 200,
                 20,
-                hwnd,
+                Some(hwnd),
                 None,
-                GetModuleHandleW(None).unwrap_or_default(),
+                Some(GetModuleHandleW(None).unwrap_or_default().into()),
                 None,
             );
 
@@ -58,9 +58,9 @@ unsafe extern "system" fn input_wndproc(
                 40,
                 200,
                 20,
-                hwnd,
+                Some(hwnd),
                 Some(HMENU(ID_EDIT as *mut core::ffi::c_void)),
-                GetModuleHandleW(None).unwrap_or_default(),
+                Some(GetModuleHandleW(None).unwrap_or_default().into()),
                 None,
             )
             .unwrap_or_default();
@@ -76,9 +76,9 @@ unsafe extern "system" fn input_wndproc(
                 80,
                 60,
                 25,
-                hwnd,
+                Some(hwnd),
                 Some(HMENU(ID_OK as *mut core::ffi::c_void)),
-                GetModuleHandleW(None).unwrap_or_default(),
+                Some(GetModuleHandleW(None).unwrap_or_default().into()),
                 None,
             );
 
@@ -92,9 +92,9 @@ unsafe extern "system" fn input_wndproc(
                 80,
                 60,
                 25,
-                hwnd,
+                Some(hwnd),
                 Some(HMENU(ID_CANCEL as *mut core::ffi::c_void)),
-                GetModuleHandleW(None).unwrap_or_default(),
+                Some(GetModuleHandleW(None).unwrap_or_default().into()),
                 None,
             );
 
@@ -154,7 +154,7 @@ fn input_sync(title: &str, message: &str, default: &str) -> Option<String> {
             let mut wc: WNDCLASSW = std::mem::zeroed();
             wc.style = CS_HREDRAW | CS_VREDRAW;
             wc.lpfnWndProc = Some(input_wndproc);
-            wc.hInstance = h_instance;
+            wc.hInstance = h_instance.into();
             wc.hbrBackground = HBRUSH((COLOR_BTNFACE.0 + 1) as *mut core::ffi::c_void);
             wc.lpszClassName = w!("InputDialogClass");
             let atom = RegisterClassW(&wc);
@@ -186,7 +186,7 @@ fn input_sync(title: &str, message: &str, default: &str) -> Option<String> {
             150,
             None,
             None,
-            h_instance,
+            Some(h_instance.into()),
             Some(data_ptr as *mut core::ffi::c_void),
         );
         if hwnd.is_err() {

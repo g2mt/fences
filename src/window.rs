@@ -54,7 +54,7 @@ pub fn register_classname_ex(name: PCWSTR, mut wc: WNDCLASSW) -> ClassName {
     }
     unsafe {
         let h_instance = GetModuleHandleW(None).unwrap_or_default();
-        wc.hInstance = h_instance;
+        wc.hInstance = h_instance.into();
         wc.lpszClassName = name;
         wc.lpfnWndProc = Some(base_wndproc);
         if RegisterClassW(&wc) == 0 {
@@ -154,9 +154,9 @@ impl Base {
                 y,
                 nwidth,
                 nheight,
-                hwndparent,
+                Some(hwndparent),
                 hmenu,
-                hinstance,
+                Some(hinstance),
                 Some(&*self_ref as *const Base as *const _),
             )
         };
@@ -177,7 +177,7 @@ impl Base {
 
     pub fn redraw(&self) {
         unsafe {
-            InvalidateRect(self.hwnd, None, TRUE);
+            InvalidateRect(Some(self.hwnd), None, TRUE.into());
             UpdateWindow(self.hwnd);
         }
     }

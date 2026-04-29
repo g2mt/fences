@@ -90,12 +90,12 @@ impl Window for TitleBar {
                 SetBkMode(hdc, TRANSPARENT);
                 SetTextColor(hdc, COLORREF(config.fence.title_text_color.0));
 
-                let title_utf16: Vec<u16> = self.title.lock().unwrap().encode_utf16().collect();
+                let mut title_utf16: Vec<u16> = self.title.lock().unwrap().encode_utf16().collect();
                 let mut text_rect = rect;
                 text_rect.left += 5;
                 DrawTextW(
                     hdc,
-                    &title_utf16,
+                    &mut title_utf16,
                     &mut text_rect,
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE,
                 );
@@ -178,7 +178,7 @@ impl Window for ScrollArea {
                 GetScrollInfo(hwnd, SB_VERT, &mut si);
 
                 let cur_pos = si.nPos;
-                match (wparam.0 & 0xFFFF) as i32 {
+                match SCROLLBAR_COMMAND((wparam.0 & 0xFFFF) as i32) {
                     SB_TOP => si.nPos = si.nMin,
                     SB_BOTTOM => si.nPos = si.nMax,
                     SB_LINEUP => si.nPos -= 10,
@@ -190,7 +190,7 @@ impl Window for ScrollArea {
                 }
 
                 si.fMask = SIF_POS;
-                SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
+                SetScrollInfo(hwnd, SB_VERT, &si, TRUE.into());
                 GetScrollInfo(hwnd, SB_VERT, &mut si);
 
                 if si.nPos != cur_pos {
@@ -206,7 +206,7 @@ impl Window for ScrollArea {
                     );
                     let parent = GetParent(hwnd);
                     if let Ok(parent) = parent {
-                        InvalidateRect(parent, None, TRUE);
+                        InvalidateRect(Some(parent), None, TRUE.into());
                     }
                 }
                 LRESULT(0)
@@ -225,8 +225,8 @@ impl Window for ScrollArea {
                     SendMessageW(
                         hwnd,
                         WM_VSCROLL,
-                        WPARAM(((new_pos as usize) << 16) | SB_THUMBTRACK as usize),
-                        LPARAM(0),
+                        Some(WPARAM(((new_pos as usize) << 16) | SB_THUMBTRACK.0 as usize)),
+                        Some(LPARAM(0)),
                     );
                 }
                 LRESULT(0)
@@ -252,7 +252,7 @@ impl Window for ScrollArea {
                         0,
                         rect.right - rect.left,
                         rect.bottom - rect.top,
-                        mirror.hdc(),
+                        Some(mirror.hdc()),
                         pt.x - screen_left,
                         pt.y - screen_top,
                         SRCCOPY,
@@ -662,7 +662,7 @@ impl Fence {
         let scroll_area = ScrollArea::area_from_fence_area(&fence_area);
 
         unsafe {
-            let mut hdwp = BeginDeferWindowPos(2);
+            let hdwp = BeginDeferWindowPos(2);
             if hdwp.is_err() {
                 panic!("hdwp is null");
             }
@@ -708,7 +708,7 @@ impl Fence {
         si.nMin = 0;
         si.nMax = content_height;
         si.nPage = view_height as u32;
-        unsafe { SetScrollInfo(self.scroll_area.base().hwnd(), SB_VERT, &si, TRUE) };
+        unsafe { SetScrollInfo(self.scroll_area.base().hwnd(), SB_VERT, &si, TRUE.into()) };
         drop(inner);
     }
 }
@@ -723,7 +723,7 @@ impl Window for Fence {
         match msg {
             WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
             WM_MOVE => unsafe {
-                InvalidateRect(self.scroll_area.base().hwnd(), None, TRUE);
+                InvalidateRect(Some(self.scroll_area.base().hwnd()), None, TRUE.into());
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             },
             WM_PAINT => unsafe {
