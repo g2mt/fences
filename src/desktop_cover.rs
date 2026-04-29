@@ -446,6 +446,7 @@ impl DesktopCover {
                 if let Some(fence) = inner.fences.last() {
                     let fence = fence.clone();
                     prompt::input(
+                        // TODO: make prompt::input async
                         "Rename fence".into(),
                         "Enter new fence name:".into(),
                         Cow::Owned(String::from(&fence.title() as &str)),
@@ -491,6 +492,7 @@ impl DesktopCover {
                     if let Some(fence) = inner.fences.last() {
                         if let Some(icon) = fence.icon_by_index(icon_idx) {
                             prompt::input(
+                                // TODO: make prompt::input async
                                 "Rename icon".into(),
                                 "Enter new icon name:".into(),
                                 Cow::Owned(String::from(&icon.title() as &str)),
