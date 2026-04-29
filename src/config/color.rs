@@ -1,5 +1,5 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use windows::Win32::Foundation::RECT;
+use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 
 /// Represents a color value stored as **AABBGGRR** (alpha, blue, green, red).
