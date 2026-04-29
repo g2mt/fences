@@ -34,10 +34,12 @@ pub const IDM_IMPORT_FROM: usize = 112;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
+pub const WM_USER_WAKE_FUTURE: u32 = WM_USER + 2;
 
 pub struct DesktopCover {
     base: BaseRef,
     inner: Mutex<DesktopCoverInner>,
+    executor: crate::fut::AsyncExecutor,
 }
 
 struct DesktopCoverInner {
@@ -104,6 +106,7 @@ impl DesktopCover {
                         hit_type: None,
                         last_mouse_pos: POINT { x: 0, y: 0 },
                     }),
+                    executor: crate::fut::AsyncExecutor::new(),
                 });
 
                 Ok(cover)
@@ -445,21 +448,16 @@ impl DesktopCover {
                 let inner = self.inner.lock();
                 if let Some(fence) = inner.fences.last() {
                     let fence = fence.clone();
-                    prompt::input(
-                        // TODO: make prompt::input async
-                        "Rename fence".into(),
-                        "Enter new fence name:".into(),
-                        Cow::Owned(String::from(&fence.title() as &str)),
-                        move |new_title| {
-                            if let Some(new_title) = new_title {
-                                if !new_title.is_empty() {
-                                    fence.set_title(new_title.into());
-                                }
+                    let current_title = String::from(&fence.title() as &str);
+                    self.executor.spawn(async move {
+                        if let Some(new_title) = prompt::input("Rename fence", "Enter new fence name:", &current_title).await {
+                            if !new_title.is_empty() {
+                                fence.set_title(new_title.into());
+                                APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
                             }
-                        },
-                    );
+                        }
+                    });
                 }
-                should_save = true;
             }
             IDM_DELETE_FENCE => {
                 let result = unsafe {
@@ -491,23 +489,18 @@ impl DesktopCover {
                     let inner = self.inner.lock();
                     if let Some(fence) = inner.fences.last() {
                         if let Some(icon) = fence.icon_by_index(icon_idx) {
-                            prompt::input(
-                                // TODO: make prompt::input async
-                                "Rename icon".into(),
-                                "Enter new icon name:".into(),
-                                Cow::Owned(String::from(&icon.title() as &str)),
-                                move |new_title| {
-                                    if let Some(new_title) = new_title {
-                                        if !new_title.is_empty() {
-                                            icon.set_title(new_title.into());
-                                        }
+                            let current_title = String::from(&icon.title() as &str);
+                            self.executor.spawn(async move {
+                                if let Some(new_title) = prompt::input("Rename icon", "Enter new icon name:", &current_title).await {
+                                    if !new_title.is_empty() {
+                                        icon.set_title(new_title.into());
+                                        APP.get().unwrap().save_thread.get().unwrap().set_unsaved();
                                     }
-                                },
-                            );
+                                }
+                            });
                         }
                     }
                 }
-                should_save = true;
             }
             IDM_SET_ICON_PATH => {
                 if let Some(HitTest::Icon(icon_idx)) = hit_type {
@@ -576,6 +569,10 @@ impl Window for DesktopCover {
             WM_LBUTTONUP => self.on_lbutton_up(),
             WM_RBUTTONUP => self.on_rbutton_up(lparam),
             WM_USER_SHELLICON => self.on_shell_icon(lparam),
+            WM_USER_WAKE_FUTURE => {
+                self.executor.poll_all(hwnd);
+                LRESULT(0)
+            }
             WM_COMMAND => self.on_command(wparam),
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }

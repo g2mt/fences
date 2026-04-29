@@ -15,8 +15,7 @@ const ID_CANCEL: u32 = 2;
 struct InputDialogData {
     message_utf16: Vec<u16>,
     edit_hwnd: HWND,
-    result: Option<String>,
-    ok_clicked: AtomicBool,
+    state: Arc<Mutex<crate::fut::PromptState<Option<String>>>>,
 }
 
 unsafe extern "system" fn input_wndproc(
@@ -122,13 +121,22 @@ unsafe extern "system" fn input_wndproc(
                         let mut buf: Vec<u16> = vec![0; (len + 1) as usize];
                         GetWindowTextW(data.edit_hwnd, &mut buf);
                         let s = String::from_utf16_lossy(&buf[..len as usize]);
-                        data.result = Some(s);
-                        data.ok_clicked.store(true, Ordering::SeqCst);
-                        DestroyWindow(data.edit_hwnd);
+                        
+                        let mut state = data.state.lock();
+                        state.result = Some(Some(s));
+                        state.completed = true;
+                        if let Some(waker) = state.waker.take() {
+                            waker.wake();
+                        }
                         DestroyWindow(hwnd);
                     }
                     ID_CANCEL => {
-                        data.ok_clicked.store(false, Ordering::SeqCst);
+                        let mut state = data.state.lock();
+                        state.result = Some(None);
+                        state.completed = true;
+                        if let Some(waker) = state.waker.take() {
+                            waker.wake();
+                        }
                         DestroyWindow(hwnd);
                     }
                     _ => {}
@@ -142,12 +150,21 @@ unsafe extern "system" fn input_wndproc(
 
 static CLASS_REGISTERED: AtomicBool = AtomicBool::new(false);
 
-/// Shows a modal input dialog. Returns `None` if the user cancelled, otherwise `Some(String)`.
-pub fn input_sync(title: &str, message: &str, default: &str) -> Option<String> {
+use std::sync::Arc;
+use parking_lot::Mutex;
+use crate::fut::{PromptFuture, PromptState};
+
+/// Shows a non-blocking input dialog.
+pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<String>> {
+    let state = Arc::new(Mutex::new(PromptState {
+        result: None,
+        waker: None,
+        completed: false,
+    }));
+
     unsafe {
         let h_instance = GetModuleHandleW(None).unwrap_or_default();
 
-        // Register a window class for the dialog
         if CLASS_REGISTERED
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
             .is_ok()
@@ -158,23 +175,15 @@ pub fn input_sync(title: &str, message: &str, default: &str) -> Option<String> {
             wc.hInstance = h_instance.into();
             wc.hbrBackground = HBRUSH((COLOR_BTNFACE.0 + 1) as *mut core::ffi::c_void);
             wc.lpszClassName = w!("InputDialogClass");
-            let atom = RegisterClassW(&wc);
-            if atom == 0 {
-                // Fallback: return default as stub
-                error!("atom == 0");
-                return Some(default.to_string());
-            }
+            RegisterClassW(&wc);
         }
 
-        // Prepare data
         let data_ptr = Box::into_raw(Box::new(InputDialogData {
             message_utf16: message.encode_utf16().chain(std::iter::once(0)).collect(),
             edit_hwnd: HWND::default(),
-            result: Some(default.to_string()),
-            ok_clicked: AtomicBool::new(false),
+            state: state.clone(),
         }));
 
-        // Create the dialog window
         let title_utf16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
         let hwnd = CreateWindowExW(
             WS_EX_CLIENTEDGE,
@@ -190,29 +199,16 @@ pub fn input_sync(title: &str, message: &str, default: &str) -> Option<String> {
             Some(h_instance.into()),
             Some(data_ptr as *mut core::ffi::c_void),
         );
-        if hwnd.is_err() {
-            error!("hwnd == null, {}", GetLastError().0);
-            return Some(default.to_string());
-        }
-        let hwnd = hwnd.unwrap();
 
-        // Show and run modal loop
-        ShowWindow(hwnd, SW_SHOWNORMAL);
-        UpdateWindow(hwnd);
-
-        let mut msg: MSG = std::mem::zeroed();
-        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-        }
-
-        // Retrieve result
-        let data = Box::from_raw(data_ptr);
-        let result = data.ok_clicked.load(Ordering::SeqCst);
-        if result {
-            data.result
+        if let Ok(hwnd) = hwnd {
+            ShowWindow(hwnd, SW_SHOWNORMAL);
+            UpdateWindow(hwnd);
         } else {
-            None
+            let mut s = state.lock();
+            s.completed = true;
+            s.result = Some(None);
         }
     }
+
+    PromptFuture { state }
 }

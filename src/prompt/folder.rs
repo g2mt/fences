@@ -8,7 +8,32 @@ use crate::app::App;
 use crate::utils::HWNDWrapper;
 use crate::window::Window;
 
-pub fn browse_for_folder_sync() -> Option<String> {
+use std::sync::Arc;
+use parking_lot::Mutex;
+use crate::fut::{PromptFuture, PromptState};
+
+pub fn browse_for_folder() -> PromptFuture<Option<String>> {
+    let state = Arc::new(Mutex::new(PromptState {
+        result: None,
+        waker: None,
+        completed: false,
+    }));
+
+    let state_clone = state.clone();
+    std::thread::spawn(move || {
+        let res = browse_for_folder_internal();
+        let mut s = state_clone.lock();
+        s.result = Some(res);
+        s.completed = true;
+        if let Some(waker) = s.waker.take() {
+            waker.wake();
+        }
+    });
+
+    PromptFuture { state }
+}
+
+fn browse_for_folder_internal() -> Option<String> {
     let mut browse_info = BROWSEINFOW {
         hwndOwner: HWND(std::ptr::null_mut()),
         pidlRoot: std::ptr::null_mut(),
