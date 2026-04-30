@@ -27,7 +27,7 @@ impl SaveThread {
                     .compare_exchange(true, false, Ordering::Acquire, Ordering::Acquire)
                     .is_ok()
                 {
-                    App::get().save_state();
+                    let _ = App::get().save_state();
                 }
             }
         });

@@ -103,8 +103,8 @@ impl DesktopCover {
                     nid.szTip[..len].copy_from_slice(&tip[..len]);
                     Shell_NotifyIconW(NIM_ADD, &nid);
 
-                    SetLayeredWindowAttributes(hwnd, COLORREF(0x00000000), 0, LWA_COLORKEY);
-                    SetWindowPos(
+                    let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0x00000000), 0, LWA_COLORKEY);
+                    let _ = SetWindowPos(
                         hwnd,
                         Some(HWND_BOTTOM),
                         0,
@@ -209,7 +209,7 @@ impl DesktopCover {
         self.rearrange_fences(old_width, old_height);
 
         unsafe {
-            SetWindowPos(
+            let _ = SetWindowPos(
                 self.base().hwnd(),
                 None,
                 0,
@@ -269,7 +269,7 @@ impl DesktopCover {
     fn on_set_cursor(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         let mut pt = POINT { x: 0, y: 0 };
-        unsafe { GetCursorPos(&mut pt) };
+        unsafe { let _ = GetCursorPos(&mut pt); };
         unsafe { ScreenToClient(hwnd, &mut pt) };
 
         let inner = self.inner.lock();
@@ -389,7 +389,7 @@ impl DesktopCover {
         let mut inner = self.inner.lock();
         if inner.hit_type.is_some() {
             inner.hit_type = None;
-            unsafe { ReleaseCapture() };
+            unsafe { let _ = ReleaseCapture(); };
         }
         LRESULT(0)
     }
@@ -451,14 +451,14 @@ impl DesktopCover {
                     } else {
                         MF_STRING | MF_GRAYED
                     };
-                    AppendMenuW(
+                    let _ = AppendMenuW(
                         h_menu,
                         open_explorer_flags,
                         IDM_OPEN_EXPLORER,
                         w!("Open in Explorer"),
                     );
-                    AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
-                    AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR::null());
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
+                    let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR::null());
 
                     let h_sticky_menu = CreatePopupMenu().unwrap_or_default();
                     let current_sticky = self.inner.lock().fences.last().and_then(|f| f.sticky());
@@ -471,46 +471,46 @@ impl DesktopCover {
                         }
                     };
 
-                    AppendMenuW(
+                    let _ = AppendMenuW(
                         h_sticky_menu,
                         MF_STRING | checky_sticky(None),
                         IDM_STICKY_NONE,
                         w!("None"),
                     );
-                    AppendMenuW(
+                    let _ = AppendMenuW(
                         h_sticky_menu,
                         MF_STRING | checky_sticky(Some(FenceStickyPosition::TopLeft)),
                         IDM_STICKY_TOPLEFT,
                         w!("Top Left"),
                     );
-                    AppendMenuW(
+                    let _ = AppendMenuW(
                         h_sticky_menu,
                         MF_STRING | checky_sticky(Some(FenceStickyPosition::TopRight)),
                         IDM_STICKY_TOPRIGHT,
                         w!("Top Right"),
                     );
-                    AppendMenuW(
+                    let _ = AppendMenuW(
                         h_sticky_menu,
                         MF_STRING | checky_sticky(Some(FenceStickyPosition::BottomLeft)),
                         IDM_STICKY_BOTTOMLEFT,
                         w!("Bottom Left"),
                     );
-                    AppendMenuW(
+                    let _ = AppendMenuW(
                         h_sticky_menu,
                         MF_STRING | checky_sticky(Some(FenceStickyPosition::BottomRight)),
                         IDM_STICKY_BOTTOMRIGHT,
                         w!("Bottom Right"),
                     );
 
-                    AppendMenuW(
+                    let _ = AppendMenuW(
                         h_menu,
                         MF_POPUP,
                         h_sticky_menu.0 as usize,
                         w!("Sticky position"),
                     );
 
-                    AppendMenuW(h_menu, MF_STRING, IDM_RENAME_FENCE, w!("Re&name fence"));
-                    AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_RENAME_FENCE, w!("Re&name fence"));
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
                 }
                 SetForegroundWindow(hwnd);
                 TrackPopupMenu(
@@ -522,7 +522,7 @@ impl DesktopCover {
                     hwnd,
                     None,
                 );
-                DestroyMenu(h_menu);
+                let _ = DestroyMenu(h_menu);
             }
         }
         LRESULT(0)
@@ -532,17 +532,17 @@ impl DesktopCover {
         let hwnd = self.base().hwnd();
         if lparam.0 as u32 == WM_RBUTTONUP || lparam.0 as u32 == WM_LBUTTONUP {
             let mut pt = POINT { x: 0, y: 0 };
-            unsafe { GetCursorPos(&mut pt) };
+            unsafe { let _ = GetCursorPos(&mut pt); };
             let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
             unsafe {
-                AppendMenuW(h_menu, MF_STRING, IDM_ADD_FENCE, w!("&Add fence"));
-                AppendMenuW(
+                let _ = AppendMenuW(h_menu, MF_STRING, IDM_ADD_FENCE, w!("&Add fence"));
+                let _ = AppendMenuW(
                     h_menu,
                     MF_STRING,
                     IDM_ADD_FENCE_FROM_FOLDER,
                     w!("Add fence from &folder"),
                 );
-                AppendMenuW(h_menu, MF_STRING, IDM_EXIT, w!("&Exit"));
+                let _ = AppendMenuW(h_menu, MF_STRING, IDM_EXIT, w!("&Exit"));
                 SetForegroundWindow(hwnd);
                 TrackPopupMenu(
                     h_menu,
@@ -553,7 +553,7 @@ impl DesktopCover {
                     hwnd,
                     None,
                 );
-                DestroyMenu(h_menu);
+                let _ = DestroyMenu(h_menu);
             }
         }
         LRESULT(0)
@@ -572,7 +572,7 @@ impl DesktopCover {
         let mut should_save = false;
         match command {
             IDM_EXIT => unsafe {
-                DestroyWindow(hwnd);
+                let _ = DestroyWindow(hwnd);
             },
             IDM_ADD_FENCE => {
                 let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };

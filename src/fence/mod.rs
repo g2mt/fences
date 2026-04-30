@@ -86,7 +86,7 @@ impl Window for TitleBar {
                 let hdc = BeginPaint(hwnd, &mut ps);
 
                 let mut rect: RECT = std::mem::zeroed();
-                GetClientRect(hwnd, &mut rect);
+                let _ = GetClientRect(hwnd, &mut rect);
 
                 let config = App::config();
                 config.fence.title_bar_bg_color.paint_background(hdc, &rect);
@@ -178,7 +178,7 @@ impl Window for ScrollArea {
                 let mut si: SCROLLINFO = std::mem::zeroed();
                 si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
                 si.fMask = SIF_ALL;
-                GetScrollInfo(hwnd, SB_VERT, &mut si);
+                let _ = GetScrollInfo(hwnd, SB_VERT, &mut si);
 
                 let cur_pos = si.nPos;
                 match SCROLLBAR_COMMAND((wparam.0 & 0xFFFF) as i32) {
@@ -194,7 +194,7 @@ impl Window for ScrollArea {
 
                 si.fMask = SIF_POS;
                 SetScrollInfo(hwnd, SB_VERT, &si, true);
-                GetScrollInfo(hwnd, SB_VERT, &mut si);
+                let _ = GetScrollInfo(hwnd, SB_VERT, &mut si);
 
                 if si.nPos != cur_pos {
                     ScrollWindowEx(
@@ -219,7 +219,7 @@ impl Window for ScrollArea {
                 let mut si: SCROLLINFO = std::mem::zeroed();
                 si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
                 si.fMask = SIF_ALL;
-                GetScrollInfo(hwnd, SB_VERT, &mut si);
+                let _ = GetScrollInfo(hwnd, SB_VERT, &mut si);
 
                 let scroll_amount = (delta / WHEEL_DELTA as i32) * 30;
                 let new_pos = (si.nPos - scroll_amount).clamp(si.nMin, si.nMax - si.nPage as i32);
@@ -241,7 +241,7 @@ impl Window for ScrollArea {
                 let hdc = BeginPaint(hwnd, &mut ps);
 
                 let mut rect: RECT = std::mem::zeroed();
-                GetClientRect(hwnd, &mut rect);
+                let _ = GetClientRect(hwnd, &mut rect);
 
                 let mut pt = POINT { x: 0, y: 0 };
                 ClientToScreen(hwnd, &mut pt);
@@ -251,7 +251,7 @@ impl Window for ScrollArea {
                     let mirror = App::get().mirror.lock();
                     let screen_left = GetSystemMetrics(SM_XVIRTUALSCREEN);
                     let screen_top = GetSystemMetrics(SM_YVIRTUALSCREEN);
-                    BitBlt(
+                    let _ = BitBlt(
                         hdc,
                         0,
                         0,
@@ -415,7 +415,7 @@ impl Fence {
                     let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
                     si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
                     si.fMask = SIF_POS;
-                    unsafe { GetScrollInfo(self.scroll_area.base().hwnd(), SB_VERT, &mut si) };
+                    unsafe { let _ = GetScrollInfo(self.scroll_area.base().hwnd(), SB_VERT, &mut si); };
 
                     let rel_x = x - rect.left;
                     let rel_y = y - (rect.top + title_h) + si.nPos;
@@ -691,7 +691,7 @@ impl Fence {
                 scroll_area.height,
                 hdwp,
             );
-            EndDeferWindowPos(hdwp);
+            let _ = EndDeferWindowPos(hdwp);
         }
 
         self.reflow_icons();
@@ -699,7 +699,7 @@ impl Fence {
 
     pub fn update_scroll_info(&self) {
         let mut rect: RECT = unsafe { std::mem::zeroed() };
-        unsafe { GetClientRect(self.scroll_area.base().hwnd(), &mut rect) };
+        unsafe { let _ = GetClientRect(self.scroll_area.base().hwnd(), &mut rect); };
         let view_height = rect.bottom - rect.top;
 
         let inner = self.inner.lock();
@@ -741,7 +741,7 @@ impl Window for Fence {
                 let hdc = BeginPaint(hwnd, &mut ps);
 
                 let mut rect: RECT = std::mem::zeroed();
-                GetClientRect(hwnd, &mut rect);
+                let _ = GetClientRect(hwnd, &mut rect);
 
                 let config = App::config();
                 config.fence.fence_bg_color.paint_background(hdc, &rect);

@@ -83,7 +83,7 @@ impl Icon {
         let hwnd = self.base.hwnd();
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
         unsafe {
-            SetWindowTextW(hwnd, PCWSTR(title_u16.as_ptr()));
+            let _ = SetWindowTextW(hwnd, PCWSTR(title_u16.as_ptr()));
         }
         self.base.redraw();
     }
@@ -167,7 +167,7 @@ impl Window for Icon {
                 let hdc = BeginPaint(hwnd, &mut ps);
 
                 let mut rect: RECT = std::mem::zeroed();
-                GetClientRect(hwnd, &mut rect);
+                let _ = GetClientRect(hwnd, &mut rect);
 
                 let mut pt = POINT { x: 0, y: 0 };
                 ClientToScreen(hwnd, &mut pt);
@@ -185,7 +185,7 @@ impl Window for Icon {
                     let mirror = App::get().mirror.lock();
                     let screen_left = GetSystemMetrics(SM_XVIRTUALSCREEN);
                     let screen_top = GetSystemMetrics(SM_YVIRTUALSCREEN);
-                    BitBlt(
+                    let _ = BitBlt(
                         hdc,
                         0,
                         0,
@@ -224,7 +224,7 @@ impl Window for Icon {
                     hicon = LoadIconW(None, IDI_APPLICATION).unwrap_or_default();
                 }
 
-                DrawIconEx(
+                let _ = DrawIconEx(
                     hdc,
                     (width - icon_draw_size) / 2,
                     0,
@@ -237,7 +237,7 @@ impl Window for Icon {
                 );
 
                 if path.is_some() {
-                    DestroyIcon(hicon);
+                    let _ = DestroyIcon(hicon);
                 }
 
                 SetBkMode(hdc, TRANSPARENT);

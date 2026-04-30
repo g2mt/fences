@@ -200,7 +200,7 @@ impl ImportDialog {
                             ImageList_ReplaceIcon(himagelist, -1, hicon)
                         };
                         if !shfi.hIcon.is_invalid() {
-                            DestroyIcon(shfi.hIcon);
+                            let _ = DestroyIcon(shfi.hIcon);
                         }
                         idx
                     };
@@ -262,7 +262,7 @@ impl ImportDialog {
                 let import_text: Vec<u16> =
                     "Import".encode_utf16().chain(std::iter::once(0)).collect();
                 unsafe {
-                    CreateWindowExW(
+                    let _ = CreateWindowExW(
                         WINDOW_EX_STYLE(0),
                         w!("BUTTON"),
                         PCWSTR(import_text.as_ptr()),
@@ -282,7 +282,7 @@ impl ImportDialog {
                 let cancel_text: Vec<u16> =
                     "Cancel".encode_utf16().chain(std::iter::once(0)).collect();
                 unsafe {
-                    CreateWindowExW(
+                    let _ = CreateWindowExW(
                         WINDOW_EX_STYLE(0),
                         w!("BUTTON"),
                         PCWSTR(cancel_text.as_ptr()),
@@ -326,7 +326,7 @@ impl ImportDialog {
     fn layout_widgets(&self) {
         let hwnd = self.base.hwnd();
         let mut rect = RECT::default();
-        unsafe { GetClientRect(hwnd, &mut rect) };
+        unsafe { let _ = GetClientRect(hwnd, &mut rect); };
 
         let width = rect.right - rect.left;
         let height = rect.bottom - rect.top;
@@ -337,7 +337,7 @@ impl ImportDialog {
 
         unsafe {
             // ListView takes most of the space
-            MoveWindow(
+            let _ = MoveWindow(
                 lv_hwnd,
                 MARGIN,
                 MARGIN,
@@ -347,7 +347,7 @@ impl ImportDialog {
             );
 
             // Cancel button on the right
-            MoveWindow(
+            let _ = MoveWindow(
                 cancel_btn_hwnd,
                 width - MARGIN - BUTTON_WIDTH,
                 height - MARGIN - BUTTON_HEIGHT,
@@ -357,7 +357,7 @@ impl ImportDialog {
             );
 
             // Import button to the left of Cancel
-            MoveWindow(
+            let _ = MoveWindow(
                 import_btn_hwnd,
                 width - 2 * MARGIN - 2 * BUTTON_WIDTH,
                 height - MARGIN - BUTTON_HEIGHT,
@@ -427,7 +427,7 @@ impl ImportDialog {
             .collect();
         drop(inner);
         (self.on_import)(kept);
-        unsafe { DestroyWindow(self.base.hwnd()) };
+        unsafe { let _ = DestroyWindow(self.base.hwnd()); };
     }
 }
 
@@ -451,7 +451,7 @@ impl Window for ImportDialog {
                         LRESULT(0)
                     }
                     ID_CANCEL_BTN => {
-                        unsafe { DestroyWindow(hwnd) };
+                        unsafe { let _ = DestroyWindow(hwnd); };
                         LRESULT(0)
                     }
                     _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },

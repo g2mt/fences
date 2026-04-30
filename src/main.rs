@@ -49,7 +49,7 @@ fn ensure_single_instance() -> Result<()> {
             return Err(anyhow!("Handle not owned by PID"));
         }
         if !hwnd.is_invalid() {
-            PostMessageW(Some(hwnd), WM_DESTROY, WPARAM(0), LPARAM(0));
+            let _ = PostMessageW(Some(hwnd), WM_DESTROY, WPARAM(0), LPARAM(0));
         } else {
             return Err(anyhow!("Unable to find desktop cover class"));
         }
@@ -67,7 +67,7 @@ fn ensure_single_instance() -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    init_app_dir();
+    let _ = init_app_dir();
 
     let log_path = app_file(LOG_PATH)?;
     let file = std::fs::OpenOptions::new()

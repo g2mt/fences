@@ -198,7 +198,7 @@ impl Base {
         let width = self.area.width.load(Ordering::Relaxed);
         let height = self.area.height.load(Ordering::Relaxed);
         unsafe {
-            SetWindowPos(
+            let _ = SetWindowPos(
                 self.hwnd,
                 None,
                 x,
@@ -267,7 +267,7 @@ impl Base {
 
     pub fn bring_to_front(&self) {
         unsafe {
-            SetWindowPos(
+            let _ = SetWindowPos(
                 self.hwnd,
                 Some(HWND_TOP),
                 0,
@@ -285,7 +285,7 @@ impl Drop for Base {
         unsafe {
             debug!("DestroyWindow({:?})", self.hwnd);
             if self.hwnd != HWND::default() {
-                DestroyWindow(self.hwnd);
+                let _ = DestroyWindow(self.hwnd);
             }
             self.hwnd = HWND::default();
         }

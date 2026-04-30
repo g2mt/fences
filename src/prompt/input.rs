@@ -35,7 +35,7 @@ unsafe extern "system" fn input_wndproc(
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, data as *mut InputDialogData as isize);
 
             // Create a static message label
-            CreateWindowExW(
+            let _ = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
                 w!("STATIC"),
                 PCWSTR(data.message_utf16.as_ptr()),
@@ -69,7 +69,7 @@ unsafe extern "system" fn input_wndproc(
             data.edit_hwnd = edit;
 
             // Create OK button
-            CreateWindowExW(
+            let _ = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
                 w!("BUTTON"),
                 w!("OK"),
@@ -85,7 +85,7 @@ unsafe extern "system" fn input_wndproc(
             );
 
             // Create Cancel button
-            CreateWindowExW(
+            let _ = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
                 w!("BUTTON"),
                 w!("Cancel"),
@@ -106,7 +106,7 @@ unsafe extern "system" fn input_wndproc(
                 .encode_utf16()
                 .chain(std::iter::once(0))
                 .collect();
-            SetWindowTextW(data.edit_hwnd, PCWSTR(default_utf16.as_ptr()));
+            let _ = SetWindowTextW(data.edit_hwnd, PCWSTR(default_utf16.as_ptr()));
             DefWindowProcW(hwnd, msg, wparam, lparam)
         },
         WM_DESTROY => unsafe {
@@ -132,7 +132,7 @@ unsafe extern "system" fn input_wndproc(
                         if let Some(waker) = state.waker.take() {
                             waker.wake();
                         }
-                        DestroyWindow(hwnd);
+                        let _ = DestroyWindow(hwnd);
                     }
                     ID_CANCEL => {
                         let mut state = data.state.lock();
@@ -141,7 +141,7 @@ unsafe extern "system" fn input_wndproc(
                         if let Some(waker) = state.waker.take() {
                             waker.wake();
                         }
-                        DestroyWindow(hwnd);
+                        let _ = DestroyWindow(hwnd);
                     }
                     _ => {}
                 }
