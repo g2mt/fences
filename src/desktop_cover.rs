@@ -543,8 +543,8 @@ impl DesktopCover {
                     w!("Add fence from &folder"),
                 );
                 let _ = AppendMenuW(h_menu, MF_STRING, IDM_EXIT, w!("&Exit"));
-                SetForegroundWindow(hwnd);
-                TrackPopupMenu(
+                let _ = SetForegroundWindow(hwnd);
+                let _ = TrackPopupMenu(
                     h_menu,
                     TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                     pt.x,
