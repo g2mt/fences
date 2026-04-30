@@ -82,14 +82,6 @@ impl AsyncExecutor {
         })
         .into();
         let mut cx = Context::from_waker(&waker);
-
-        let mut i = 0;
-        while i < tasks.len() {
-            if tasks[i].as_mut().poll(&mut cx).is_ready() {
-                let _ = tasks.remove(i);
-            } else {
-                i += 1;
-            }
-        }
+        tasks.retain_mut(|task| !task.as_mut().poll(&mut cx).is_ready());
     }
 }
