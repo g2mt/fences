@@ -191,6 +191,8 @@ impl DesktopCover {
                 fence.base().move_to(new_x, new_y);
             }
         }
+
+        App::get().save_thread.get().unwrap().set_unsaved();
     }
 
     fn on_display_change(&self) -> LRESULT {
