@@ -56,8 +56,8 @@ struct DesktopCoverInner {
     hit_type: Option<HitTest>,
     /// The last recorded mouse position in client coordinates.
     last_mouse_pos: POINT,
-    width: i32,
-    height: i32,
+    screen_width: i32,
+    screen_height: i32,
 }
 
 impl DesktopCover {
@@ -117,8 +117,8 @@ impl DesktopCover {
                         fences: Vec::new(),
                         hit_type: None,
                         last_mouse_pos: POINT { x: 0, y: 0 },
-                        width,
-                        height,
+                        screen_width: width,
+                        screen_height: height,
                     }),
                     executor: crate::fut::AsyncExecutor::new(),
                 });
@@ -132,8 +132,8 @@ impl DesktopCover {
         let inner = self.inner.lock();
         AppState {
             fences: inner.fences.iter().map(|f| f.get_state()).collect(),
-            width: inner.width,
-            height: inner.height,
+            screen_width: inner.screen_width,
+            screen_height: inner.screen_height,
         }
     }
 
@@ -155,8 +155,8 @@ impl DesktopCover {
         info!("Screen resolution changed to {}x{}", width, height);
 
         let mut inner = self.inner.lock();
-        inner.width = width;
-        inner.height = height;
+        inner.screen_width = width;
+        inner.screen_height = height;
         drop(inner);
 
         unsafe {

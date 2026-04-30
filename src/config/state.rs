@@ -7,8 +7,8 @@ use crate::geo::Area;
 #[derive(Serialize, Deserialize)]
 pub struct AppState {
     pub fences: Vec<FenceState>,
-    pub width: i32,
-    pub height: i32,
+    pub screen_width: i32,
+    pub screen_height: i32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
