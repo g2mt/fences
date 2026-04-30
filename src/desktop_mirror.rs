@@ -72,9 +72,9 @@ impl DesktopMirror {
 
     pub fn update(&mut self) {
         let bounds = App::get().screen_bounds();
-
         let width = bounds.width.load(Ordering::Relaxed);
         let height = bounds.height.load(Ordering::Relaxed);
+        drop(bounds);
 
         if width != self.width || height != self.height {
             self.reset();

@@ -63,8 +63,14 @@ struct DesktopCoverInner {
 impl DesktopCover {
     pub fn new() -> Result<Arc<Self>> {
         let h_instance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
+
         let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+        {
+            let bounds = App::get().screen_bounds();
+            bounds.width.store(width, Ordering::Relaxed);
+            bounds.height.store(height, Ordering::Relaxed);
+        }
 
         Base::create_window(
             WS_EX_NOACTIVATE | WS_EX_LAYERED,
@@ -121,11 +127,6 @@ impl DesktopCover {
                     executor: crate::fut::AsyncExecutor::new(),
                 });
 
-                // Keep global screen bounds updated.
-                let bounds = App::get().screen_bounds();
-                bounds.width.store(width, Ordering::Relaxed);
-                bounds.height.store(height, Ordering::Relaxed);
-
                 Ok(cover)
             },
         )
@@ -160,6 +161,7 @@ impl DesktopCover {
         let bounds = App::get().screen_bounds();
         let new_width = bounds.width.load(Ordering::Relaxed);
         let new_height = bounds.height.load(Ordering::Relaxed);
+        drop(bounds);
 
         if old_screen_width == new_width && old_screen_height == new_height {
             return;
