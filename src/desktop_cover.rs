@@ -387,12 +387,24 @@ impl DesktopCover {
                     AppendMenuW(h_menu, MF_STRING, IDM_IMPORT_FROM, w!("Import &from..."));
                     let has_import_path = {
                         let inner = self.inner.lock();
-                        inner.fences.last().map_or(false, |f| f.imported_from().is_some())
+                        inner
+                            .fences
+                            .last()
+                            .map_or(false, |f| f.imported_from().is_some())
                     };
-                    let open_explorer_flags = if has_import_path { MF_STRING } else { MF_STRING | MF_GRAYED };
-                    AppendMenuW(h_menu, open_explorer_flags, IDM_OPEN_EXPLORER, w!("Open in Explorer"));
-                    AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR::null());
+                    let open_explorer_flags = if has_import_path {
+                        MF_STRING
+                    } else {
+                        MF_STRING | MF_GRAYED
+                    };
+                    AppendMenuW(
+                        h_menu,
+                        open_explorer_flags,
+                        IDM_OPEN_EXPLORER,
+                        w!("Open in Explorer"),
+                    );
                     AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
+                    AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR::null());
                     AppendMenuW(h_menu, MF_STRING, IDM_RENAME_FENCE, w!("Re&name fence"));
                     AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
                 }
