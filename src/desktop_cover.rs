@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::Mutex;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
@@ -51,6 +51,8 @@ struct DesktopCoverInner {
     hit_type: Option<HitTest>,
     /// The last recorded mouse position in client coordinates.
     last_mouse_pos: POINT,
+    width: i32,
+    height: i32,
 }
 
 impl DesktopCover {
@@ -110,6 +112,8 @@ impl DesktopCover {
                         fences: Vec::new(),
                         hit_type: None,
                         last_mouse_pos: POINT { x: 0, y: 0 },
+                        width,
+                        height,
                     }),
                     executor: crate::fut::AsyncExecutor::new(),
                 });
@@ -123,6 +127,8 @@ impl DesktopCover {
         let inner = self.inner.lock();
         AppState {
             fences: inner.fences.iter().map(|f| f.get_state()).collect(),
+            width: inner.width,
+            height: inner.height,
         }
     }
 
@@ -135,6 +141,33 @@ impl DesktopCover {
         let mut inner = self.inner.lock();
         inner.fences = fences;
         Ok(())
+    }
+
+    fn on_display_change(&self) -> LRESULT {
+        let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+        let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+
+        info!("Screen resolution changed to {}x{}", width, height);
+
+        let mut inner = self.inner.lock();
+        inner.width = width;
+        inner.height = height;
+        drop(inner);
+
+        unsafe {
+            SetWindowPos(
+                self.base().hwnd(),
+                None,
+                0,
+                0,
+                width,
+                height,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
+
+        App::get().save_thread.get().unwrap().set_unsaved();
+        LRESULT(0)
     }
 
     fn on_destroy(&self) -> LRESULT {
@@ -616,6 +649,7 @@ impl Window for DesktopCover {
         let hwnd = self.base().hwnd();
         match msg {
             WM_CLOSE => LRESULT(0),
+            WM_DISPLAYCHANGE => self.on_display_change(),
             WM_DESTROY => self.on_destroy(),
             WM_WINDOWPOSCHANGING => self.on_window_pos_changing(msg, wparam, lparam),
             WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),
