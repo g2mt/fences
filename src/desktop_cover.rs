@@ -14,6 +14,8 @@ use windows::core::*;
 
 use crate::app::App;
 use crate::config::state::{AppState, FenceStickyPosition};
+use crate::geo::Bounds;
+use crate::geo::Scalar;
 use crate::fence::{Fence, HitTest};
 use crate::prompt;
 use crate::utils::HWNDWrapper;
@@ -56,10 +58,6 @@ struct DesktopCoverInner {
     hit_type: Option<HitTest>,
     /// The last recorded mouse position in client coordinates.
     last_mouse_pos: POINT,
-    /// Width of the screen
-    screen_width: i32,
-    /// Height of the screen
-    screen_height: i32,
 }
 
 impl DesktopCover {
@@ -119,11 +117,14 @@ impl DesktopCover {
                         fences: Vec::new(),
                         hit_type: None,
                         last_mouse_pos: POINT { x: 0, y: 0 },
-                        screen_width: width,
-                        screen_height: height,
                     }),
                     executor: crate::fut::AsyncExecutor::new(),
                 });
+
+                // Keep global screen bounds updated.
+                let bounds = App::screen_bounds();
+                bounds.width.store(width);
+                bounds.height.store(height);
 
                 Ok(cover)
             },
@@ -132,10 +133,11 @@ impl DesktopCover {
 
     pub fn state(&self) -> AppState {
         let inner = self.inner.lock();
+        let bounds = App::screen_bounds();
         AppState {
             fences: inner.fences.iter().map(|f| f.get_state()).collect(),
-            screen_width: inner.screen_width,
-            screen_height: inner.screen_height,
+            screen_width: bounds.width.load(),
+            screen_height: bounds.height.load(),
         }
     }
 
@@ -155,8 +157,9 @@ impl DesktopCover {
 
     pub fn rearrange_fences(&self, old_screen_width: i32, old_screen_height: i32) {
         let inner = self.inner.lock();
-        let new_width = inner.screen_width;
-        let new_height = inner.screen_height;
+        let bounds = App::screen_bounds();
+        let new_width = bounds.width.load();
+        let new_height = bounds.height.load();
 
         if old_screen_width == new_width && old_screen_height == new_height {
             return;
@@ -201,12 +204,11 @@ impl DesktopCover {
 
         info!("Screen resolution changed to {}x{}", width, height);
 
-        let mut inner = self.inner.lock();
-        let old_width = inner.screen_width;
-        let old_height = inner.screen_height;
-        inner.screen_width = width;
-        inner.screen_height = height;
-        drop(inner);
+        let bounds = App::screen_bounds();
+        let old_width = bounds.width.load();
+        let old_height = bounds.height.load();
+        bounds.width.store(width);
+        bounds.height.store(height);
 
         self.rearrange_fences(old_width, old_height);
 
