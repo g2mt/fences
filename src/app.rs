@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicI32;
 use std::sync::{Arc, LazyLock, OnceLock};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use parking_lot::Mutex;
 use tracing::{error, info, warn};
 use windows::Win32::Foundation::RECT;
@@ -15,7 +15,7 @@ use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
 use crate::fence::import_dialog::ImportDialog;
 use crate::geo::Bounds;
-use crate::paths::{STATE_PATH, app_file};
+use crate::paths::{app_file, STATE_PATH};
 
 #[derive(Default)]
 pub struct App {
@@ -128,21 +128,21 @@ impl App {
                 0,
                 0,
                 0,
-                DEFAULT_CHARSET.0 as u32,
-                OUT_DEFAULT_PRECIS.0 as u32,
-                CLIP_DEFAULT_PRECIS.0 as u32,
-                CLEARTYPE_QUALITY.0 as u32,
+                DEFAULT_CHARSET,
+                OUT_DEFAULT_PRECIS,
+                CLIP_DEFAULT_PRECIS,
+                CLEARTYPE_QUALITY,
                 VARIABLE_PITCH.0 as u32,
                 windows::core::PCWSTR(font_name_u16.as_ptr()),
             );
 
-            let old_font = SelectObject(hdc, hfont);
+            let old_font = SelectObject(hdc, hfont.into());
 
             let mut text_u16: Vec<u16> = text.encode_utf16().collect();
             DrawTextW(hdc, &mut text_u16, rect, format);
 
-            SelectObject(hdc, old_font);
-            DeleteObject(hfont);
+            SelectObject(hdc, old_font.into());
+            let _ = DeleteObject(hfont.into());
         }
     }
 }
