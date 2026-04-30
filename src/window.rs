@@ -3,14 +3,14 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, LazyLock, OnceLock, Weak};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use parking_lot::{Mutex, MutexGuard};
 use tracing::debug;
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
 use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
 
 use crate::geo::Area;
 
@@ -208,6 +208,12 @@ impl Base {
                 SWP_NOZORDER | SWP_NOACTIVATE,
             );
         }
+    }
+
+    pub fn move_to(&self, x: i32, y: i32) {
+        self.area.x.store(x, Ordering::Relaxed);
+        self.area.y.store(y, Ordering::Relaxed);
+        self.set_window_pos();
     }
 
     pub fn move_by(&self, dl: i32, dt: i32) {

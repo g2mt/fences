@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::geo::Area;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct AppState {
     pub fences: Vec<FenceState>,
     pub screen_width: i32,
@@ -19,7 +19,7 @@ pub enum FenceStickyPosition {
     BottomRight,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Default)]
 pub struct FenceState {
     pub title: Arc<str>,
     pub area: Area<i32>,
@@ -28,7 +28,7 @@ pub struct FenceState {
     pub sticky_pos: Option<FenceStickyPosition>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Default)]
 pub struct IconState {
     pub title: Arc<str>,
     pub path: Option<Arc<str>>,

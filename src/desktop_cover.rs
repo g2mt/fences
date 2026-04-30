@@ -13,7 +13,7 @@ use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::app::App;
-use crate::config::state::AppState;
+use crate::config::state::{AppState, FenceStickyPosition};
 use crate::fence::{Fence, HitTest};
 use crate::prompt;
 use crate::utils::HWNDWrapper;
@@ -153,37 +153,6 @@ impl DesktopCover {
         Ok(())
     }
 
-    fn on_display_change(&self) -> LRESULT {
-        let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
-        let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
-
-        info!("Screen resolution changed to {}x{}", width, height);
-
-        let mut inner = self.inner.lock();
-        let old_width = inner.screen_width;
-        let old_height = inner.screen_height;
-        inner.screen_width = width;
-        inner.screen_height = height;
-        drop(inner);
-
-        self.rearrange_fences(old_width, old_height);
-
-        unsafe {
-            SetWindowPos(
-                self.base().hwnd(),
-                None,
-                0,
-                0,
-                width,
-                height,
-                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
-            );
-        }
-
-        App::get().save_thread.get().unwrap().set_unsaved();
-        LRESULT(0)
-    }
-
     pub fn rearrange_fences(&self, old_screen_width: i32, old_screen_height: i32) {
         let inner = self.inner.lock();
         let new_width = inner.screen_width;
@@ -214,6 +183,37 @@ impl DesktopCover {
                 fence.base().move_to(new_x, new_y);
             }
         }
+    }
+
+    fn on_display_change(&self) -> LRESULT {
+        let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+        let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+
+        info!("Screen resolution changed to {}x{}", width, height);
+
+        let mut inner = self.inner.lock();
+        let old_width = inner.screen_width;
+        let old_height = inner.screen_height;
+        inner.screen_width = width;
+        inner.screen_height = height;
+        drop(inner);
+
+        self.rearrange_fences(old_width, old_height);
+
+        unsafe {
+            SetWindowPos(
+                self.base().hwnd(),
+                None,
+                0,
+                0,
+                width,
+                height,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
+
+        App::get().save_thread.get().unwrap().set_unsaved();
+        LRESULT(0)
     }
 
     fn on_destroy(&self) -> LRESULT {

@@ -19,7 +19,7 @@ impl Scalar for AtomicI32 {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Area<S: Scalar> {
     pub x: S,
     pub y: S,
