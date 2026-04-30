@@ -147,6 +147,9 @@ impl DesktopCover {
         }
         let mut inner = self.inner.lock();
         inner.fences = fences;
+        drop(inner);
+
+        self.rearrange_fences(state.screen_width, state.screen_height);
         Ok(())
     }
 
@@ -157,9 +160,13 @@ impl DesktopCover {
         info!("Screen resolution changed to {}x{}", width, height);
 
         let mut inner = self.inner.lock();
+        let old_width = inner.screen_width;
+        let old_height = inner.screen_height;
         inner.screen_width = width;
         inner.screen_height = height;
         drop(inner);
+
+        self.rearrange_fences(old_width, old_height);
 
         unsafe {
             SetWindowPos(
@@ -175,6 +182,38 @@ impl DesktopCover {
 
         App::get().save_thread.get().unwrap().set_unsaved();
         LRESULT(0)
+    }
+
+    pub fn rearrange_fences(&self, old_screen_width: i32, old_screen_height: i32) {
+        let inner = self.inner.lock();
+        let new_width = inner.screen_width;
+        let new_height = inner.screen_height;
+
+        for fence in &inner.fences {
+            if let Some(sticky) = fence.sticky() {
+                let area = fence.get_state().area;
+                let (new_x, new_y) = match sticky {
+                    FenceStickyPosition::TopLeft => (area.x, area.y),
+                    FenceStickyPosition::TopRight => {
+                        let offset_from_right = old_screen_width - (area.x + area.width);
+                        (new_width - area.width - offset_from_right, area.y)
+                    }
+                    FenceStickyPosition::BottomLeft => {
+                        let offset_from_bottom = old_screen_height - (area.y + area.height);
+                        (area.x, new_height - area.height - offset_from_bottom)
+                    }
+                    FenceStickyPosition::BottomRight => {
+                        let offset_from_right = old_screen_width - (area.x + area.width);
+                        let offset_from_bottom = old_screen_height - (area.y + area.height);
+                        (
+                            new_width - area.width - offset_from_right,
+                            new_height - area.height - offset_from_bottom,
+                        )
+                    }
+                };
+                fence.base().move_to(new_x, new_y);
+            }
+        }
     }
 
     fn on_destroy(&self) -> LRESULT {
