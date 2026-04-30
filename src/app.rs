@@ -16,6 +16,7 @@ use crate::fence::import_dialog::ImportDialog;
 use crate::geo::{Bounds, Scalar};
 use crate::paths::{app_file, ID_PATH, STATE_PATH};
 
+#[derive(Default)]
 pub struct App {
     pub cover: OnceLock<Arc<DesktopCover>>,
     pub mirror: Mutex<DesktopMirror>,
@@ -27,15 +28,7 @@ pub struct App {
 }
 
 /// Assume that the singleton is always initialized and the [App::get()] api to access.
-static SINGLETON: LazyLock<App> = LazyLock::new(|| App {
-    cover: OnceLock::new(),
-    save_thread: OnceLock::new(),
-    config: OnceLock::new(),
-    mirror: Mutex::new(DesktopMirror::new()),
-    import_dialog: Mutex::new(None),
-    id_path: OnceLock::new(),
-    screen_bounds: OnceLock::new(),
-});
+static SINGLETON: LazyLock<App> = LazyLock::new(|| App::default());
 
 impl App {
     pub fn get() -> &'static Self {

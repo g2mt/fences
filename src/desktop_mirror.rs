@@ -10,7 +10,7 @@ use crate::app::App;
 
 const PW_RENDERFULLCONTENT: PRINT_WINDOW_FLAGS = PRINT_WINDOW_FLAGS(0x00000002);
 
-#[allow(dead_code)]
+#[derive(Default)]
 pub struct DesktopMirror {
     hdc: HDC,
     bitmap: HBITMAP,
@@ -21,30 +21,6 @@ unsafe impl Send for DesktopMirror {}
 unsafe impl Sync for DesktopMirror {}
 
 impl DesktopMirror {
-    pub fn new() -> Self {
-        unsafe {
-            let bounds = App::get().screen_bounds();
-            let width = bounds.width.load(Ordering::Relaxed);
-            let height = bounds.height.load(Ordering::Relaxed);
-
-            let screen_dc = GetDC(None);
-            let hdc = CreateCompatibleDC(Some(screen_dc));
-            let bitmap = CreateCompatibleBitmap(screen_dc, width, height);
-            SelectObject(hdc, bitmap.into());
-            ReleaseDC(None, screen_dc);
-
-            let mirror = Self {
-                hdc,
-                bitmap,
-                width: width,
-                height: height,
-            };
-            mirror.capture();
-
-            mirror
-        }
-    }
-
     fn reset(&mut self) {
         unsafe {
             if !self.bitmap.is_invalid() {
@@ -55,18 +31,6 @@ impl DesktopMirror {
                 DeleteDC(self.hdc);
             }
             self.hdc = Default::default();
-        }
-    }
-
-    fn capture(&self) {
-        unsafe {
-            // Progman hosts the desktop. On systems with an active wallpaper slideshow/
-            // Windows 10+, a WorkerW window behind the icons may hold the wallpaper,
-            // but Progman + PW_RENDERFULLCONTENT still renders wallpaper + icons fine.
-            let desktop_hwnd = FindWindowW(w!("Progman"), None);
-            if let Ok(desktop_hwnd) = desktop_hwnd {
-                PrintWindow(desktop_hwnd, self.hdc, PW_RENDERFULLCONTENT);
-            }
         }
     }
 
@@ -88,7 +52,16 @@ impl DesktopMirror {
                 self.hdc = hdc;
             }
         }
-        self.capture();
+
+        unsafe {
+            // Progman hosts the desktop. On systems with an active wallpaper slideshow/
+            // Windows 10+, a WorkerW window behind the icons may hold the wallpaper,
+            // but Progman + PW_RENDERFULLCONTENT still renders wallpaper + icons fine.
+            let desktop_hwnd = FindWindowW(w!("Progman"), None);
+            if let Ok(desktop_hwnd) = desktop_hwnd {
+                PrintWindow(desktop_hwnd, self.hdc, PW_RENDERFULLCONTENT);
+            }
+        }
     }
 
     pub fn hdc(&self) -> HDC {
