@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::Mutex;
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
@@ -9,9 +10,8 @@ use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
 
-use crate::window::{Base, BaseRef, Window, register_classname_ex};
+use crate::window::{register_classname_ex, Base, BaseRef, Window};
 
 const ID_LISTVIEW: u32 = 1001;
 const ID_IMPORT_BTN: u32 = 1002;
@@ -326,7 +326,9 @@ impl ImportDialog {
     fn layout_widgets(&self) {
         let hwnd = self.base.hwnd();
         let mut rect = RECT::default();
-        unsafe { let _ = GetClientRect(hwnd, &mut rect); };
+        unsafe {
+            let _ = GetClientRect(hwnd, &mut rect);
+        };
 
         let width = rect.right - rect.left;
         let height = rect.bottom - rect.top;
@@ -427,7 +429,9 @@ impl ImportDialog {
             .collect();
         drop(inner);
         (self.on_import)(kept);
-        unsafe { let _ = DestroyWindow(self.base.hwnd()); };
+        unsafe {
+            let _ = DestroyWindow(self.base.hwnd());
+        };
     }
 }
 
@@ -451,7 +455,9 @@ impl Window for ImportDialog {
                         LRESULT(0)
                     }
                     ID_CANCEL_BTN => {
-                        unsafe { let _ = DestroyWindow(hwnd); };
+                        unsafe {
+                            let _ = DestroyWindow(hwnd);
+                        };
                         LRESULT(0)
                     }
                     _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
@@ -467,7 +473,9 @@ impl Window for ImportDialog {
             }
             WM_DESTROY => {
                 let inner = self.inner.lock();
-                unsafe { let _ = ImageList_Destroy(Some(inner.himagelist)) };
+                unsafe {
+                    let _ = ImageList_Destroy(Some(inner.himagelist));
+                };
                 LRESULT(0)
             }
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },

@@ -143,10 +143,10 @@ impl Color<true> {
                     SourceConstantAlpha: alpha,
                     AlphaFormat: 0,
                 };
-                GdiAlphaBlend(hdc, 0, 0, width, height, mem_dc, 0, 0, width, height, blend);
+                let _ = GdiAlphaBlend(hdc, 0, 0, width, height, mem_dc, 0, 0, width, height, blend);
 
-                DeleteObject(bitmap.into());
-                DeleteDC(mem_dc);
+                let _ = DeleteObject(bitmap.into());
+                let _ = DeleteDC(mem_dc);
             }
         }
     }
