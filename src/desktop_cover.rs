@@ -56,7 +56,9 @@ struct DesktopCoverInner {
     hit_type: Option<HitTest>,
     /// The last recorded mouse position in client coordinates.
     last_mouse_pos: POINT,
+    /// Width of the screen
     screen_width: i32,
+    /// Height of the screen
     screen_height: i32,
 }
 

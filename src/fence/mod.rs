@@ -1,23 +1,23 @@
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use anyhow::Result;
 use import_dialog::{ImportDialog, ImportItem};
 use parking_lot::Mutex;
 use tracing::{debug, error, info};
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
 
 use crate::app::App;
-use crate::config::state::{FenceState, IconState};
+use crate::config::state::{FenceState, FenceStickyPosition, IconState};
 use crate::desktop_cover::DesktopCover;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
 use crate::prompt;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 mod icon;
 pub mod import_dialog;
@@ -301,7 +301,7 @@ struct FenceInner {
     title: Arc<str>,
     icons: Vec<Arc<Icon>>,
     imported_from: Option<Arc<str>>,
-    sticky: Option<crate::config::state::FenceStickyPosition>,
+    sticky_pos: Option<FenceStickyPosition>,
 }
 
 impl Fence {
@@ -313,6 +313,7 @@ impl Fence {
                 area: Area::new(x, y, 300, 150),
                 icons: Vec::new(),
                 imported_from: None,
+                sticky_pos: None,
             },
         )
     }
@@ -344,7 +345,7 @@ impl Fence {
                         title: state.title.clone(),
                         icons: Vec::new(),
                         imported_from: state.imported_from.clone(),
-                        sticky: state.sticky,
+                        sticky_pos: state.sticky_pos,
                     }),
                     title_bar,
                     scroll_area,
@@ -378,7 +379,7 @@ impl Fence {
                 })
                 .collect(),
             imported_from: inner.imported_from.clone(),
-            sticky: inner.sticky,
+            sticky_pos: inner.sticky_pos,
         }
     }
 
@@ -443,11 +444,11 @@ impl Fence {
     }
 
     pub fn sticky(&self) -> Option<crate::config::state::FenceStickyPosition> {
-        self.inner.lock().sticky
+        self.inner.lock().sticky_pos
     }
 
     pub fn set_sticky(&self, sticky: Option<crate::config::state::FenceStickyPosition>) {
-        self.inner.lock().sticky = sticky;
+        self.inner.lock().sticky_pos = sticky;
     }
 
     pub fn add_icon(&self, title: &str) {
