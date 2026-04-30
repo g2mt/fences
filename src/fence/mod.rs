@@ -193,11 +193,11 @@ impl Window for ScrollArea {
                 }
 
                 si.fMask = SIF_POS;
-                SetScrollInfo(hwnd, SB_VERT, &si, true);
+                let _ = SetScrollInfo(hwnd, SB_VERT, &si, true);
                 let _ = GetScrollInfo(hwnd, SB_VERT, &mut si);
 
                 if si.nPos != cur_pos {
-                    ScrollWindowEx(
+                    let _ = ScrollWindowEx(
                         hwnd,
                         0,
                         cur_pos - si.nPos,
@@ -209,7 +209,7 @@ impl Window for ScrollArea {
                     );
                     let parent = GetParent(hwnd);
                     if let Ok(parent) = parent {
-                        InvalidateRect(Some(parent), None, true);
+                        let _ = InvalidateRect(Some(parent), None, true);
                     }
                 }
                 LRESULT(0)
@@ -225,7 +225,7 @@ impl Window for ScrollArea {
                 let new_pos = (si.nPos - scroll_amount).clamp(si.nMin, si.nMax - si.nPage as i32);
 
                 if new_pos != si.nPos {
-                    SendMessageW(
+                    let _ = SendMessageW(
                         hwnd,
                         WM_VSCROLL,
                         Some(WPARAM(

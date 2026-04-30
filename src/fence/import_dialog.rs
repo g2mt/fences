@@ -117,7 +117,7 @@ impl ImportDialog {
 
                 unsafe {
                     // Extended styles: full row select, subitem images
-                    SendMessageW(
+                    let _ = SendMessageW(
                         lv_hwnd,
                         LVM_SETEXTENDEDLISTVIEWSTYLE,
                         Some(WPARAM(0)),
@@ -127,7 +127,7 @@ impl ImportDialog {
                     );
 
                     // Assign image list
-                    SendMessageW(
+                    let _ = SendMessageW(
                         lv_hwnd,
                         LVM_SETIMAGELIST,
                         Some(WPARAM(LVSIL_SMALL as usize)),
@@ -141,7 +141,7 @@ impl ImportDialog {
                     col0.cx = 40;
                     col0.pszText = windows::core::PWSTR(col0_text.as_ptr() as *mut _);
                     col0.iSubItem = COL_ICON;
-                    SendMessageW(
+                    let _ = SendMessageW(
                         lv_hwnd,
                         LVM_INSERTCOLUMNW,
                         Some(WPARAM(COL_ICON as usize)),
@@ -156,7 +156,7 @@ impl ImportDialog {
                     col1.cx = 380;
                     col1.pszText = windows::core::PWSTR(col1_text.as_ptr() as *mut _);
                     col1.iSubItem = COL_PATH;
-                    SendMessageW(
+                    let _ = SendMessageW(
                         lv_hwnd,
                         LVM_INSERTCOLUMNW,
                         Some(WPARAM(COL_PATH as usize)),
@@ -171,7 +171,7 @@ impl ImportDialog {
                     col2.cx = 140;
                     col2.pszText = windows::core::PWSTR(col2_text.as_ptr() as *mut _);
                     col2.iSubItem = COL_ACTION;
-                    SendMessageW(
+                    let _ = SendMessageW(
                         lv_hwnd,
                         LVM_INSERTCOLUMNW,
                         Some(WPARAM(COL_ACTION as usize)),
@@ -212,7 +212,7 @@ impl ImportDialog {
                         lvi.iItem = i as i32;
                         lvi.iSubItem = COL_ICON;
                         lvi.iImage = icon_index;
-                        SendMessageW(
+                        let _ = SendMessageW(
                             lv_hwnd,
                             LVM_INSERTITEMW,
                             Some(WPARAM(0)),
@@ -227,7 +227,7 @@ impl ImportDialog {
                         lvi_path.iItem = i as i32;
                         lvi_path.iSubItem = COL_PATH;
                         lvi_path.pszText = windows::core::PWSTR(path_u16.as_ptr() as *mut _);
-                        SendMessageW(
+                        let _ = SendMessageW(
                             lv_hwnd,
                             LVM_SETITEMW,
                             Some(WPARAM(0)),
@@ -249,7 +249,7 @@ impl ImportDialog {
                         lvi_action.iItem = i as i32;
                         lvi_action.iSubItem = COL_ACTION;
                         lvi_action.pszText = windows::core::PWSTR(action_u16.as_ptr() as *mut _);
-                        SendMessageW(
+                        let _ = SendMessageW(
                             lv_hwnd,
                             LVM_SETITEMW,
                             Some(WPARAM(0)),
@@ -408,7 +408,7 @@ impl ImportDialog {
             lvi.iItem = idx as i32;
             lvi.iSubItem = COL_ACTION;
             lvi.pszText = windows::core::PWSTR(action_u16.as_ptr() as *mut _);
-            SendMessageW(
+            let _ = SendMessageW(
                 lv,
                 LVM_SETITEMW,
                 Some(WPARAM(0)),

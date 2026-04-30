@@ -57,7 +57,7 @@ impl DesktopMirror {
             // but Progman + PW_RENDERFULLCONTENT still renders wallpaper + icons fine.
             let desktop_hwnd = FindWindowW(w!("Progman"), None);
             if let Ok(desktop_hwnd) = desktop_hwnd {
-                PrintWindow(desktop_hwnd, self.hdc, PW_RENDERFULLCONTENT);
+                let _ = PrintWindow(desktop_hwnd, self.hdc, PW_RENDERFULLCONTENT);
             }
         }
     }

@@ -179,8 +179,8 @@ impl Base {
 
     pub fn redraw(&self) {
         unsafe {
-            InvalidateRect(Some(self.hwnd), None, true);
-            UpdateWindow(self.hwnd);
+            let _ = InvalidateRect(Some(self.hwnd), None, true);
+            let _ = UpdateWindow(self.hwnd);
         }
     }
 
