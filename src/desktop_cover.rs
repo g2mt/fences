@@ -207,11 +207,9 @@ impl DesktopCover {
         info!("Screen resolution changed to {}x{}", width, height);
 
         let bounds = App::get().screen_bounds();
-        let old_width = bounds.width.load(Ordering::Relaxed);
-        let old_height = bounds.height.load(Ordering::Relaxed);
-        bounds.width.store(width, Ordering::Relaxed);
-        bounds.height.store(height, Ordering::Relaxed);
-
+        let old_width = bounds.width.swap(width, Ordering::Relaxed);
+        let old_height = bounds.height.swap(height, Ordering::Relaxed);
+        drop(bounds);
         self.rearrange_fences(old_width, old_height);
 
         unsafe {
