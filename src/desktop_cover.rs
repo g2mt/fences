@@ -1,3 +1,4 @@
+use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
@@ -37,6 +38,7 @@ pub const IDM_STICKY_TOPLEFT: usize = 115;
 pub const IDM_STICKY_TOPRIGHT: usize = 116;
 pub const IDM_STICKY_BOTTOMLEFT: usize = 117;
 pub const IDM_STICKY_BOTTOMRIGHT: usize = 118;
+pub const IDM_RELOAD: usize = 119;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
@@ -551,6 +553,7 @@ impl DesktopCover {
                     IDM_ADD_FENCE_FROM_FOLDER,
                     w!("Add fence from &folder"),
                 );
+                let _ = AppendMenuW(h_menu, MF_STRING, IDM_RELOAD, w!("&Reload"));
                 let _ = AppendMenuW(h_menu, MF_STRING, IDM_EXIT, w!("&Exit"));
                 let _ = SetForegroundWindow(hwnd);
                 let _ = TrackPopupMenu(
@@ -773,6 +776,15 @@ impl DesktopCover {
                             );
                         }
                     }
+                }
+            }
+            IDM_RELOAD => {
+                // Spawn a new instance of the same executable
+                let exe = std::env::current_exe().expect("failed to get current exe path");
+                let _ = Command::new(exe).spawn();
+                // Close this instance
+                unsafe {
+                    let _ = DestroyWindow(hwnd);
                 }
             }
             _ => {}
