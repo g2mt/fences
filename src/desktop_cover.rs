@@ -122,7 +122,7 @@ impl DesktopCover {
                 });
 
                 // Keep global screen bounds updated.
-                let bounds = App::screen_bounds();
+                let bounds = App::get().screen_bounds();
                 bounds.width.store(width);
                 bounds.height.store(height);
 
@@ -133,7 +133,7 @@ impl DesktopCover {
 
     pub fn state(&self) -> AppState {
         let inner = self.inner.lock();
-        let bounds = App::screen_bounds();
+        let bounds = App::get().screen_bounds();
         AppState {
             fences: inner.fences.iter().map(|f| f.get_state()).collect(),
             screen_width: bounds.width.load(),
@@ -157,7 +157,7 @@ impl DesktopCover {
 
     pub fn rearrange_fences(&self, old_screen_width: i32, old_screen_height: i32) {
         let inner = self.inner.lock();
-        let bounds = App::screen_bounds();
+        let bounds = App::get().screen_bounds();
         let new_width = bounds.width.load();
         let new_height = bounds.height.load();
 
@@ -204,7 +204,7 @@ impl DesktopCover {
 
         info!("Screen resolution changed to {}x{}", width, height);
 
-        let bounds = App::screen_bounds();
+        let bounds = App::get().screen_bounds();
         let old_width = bounds.width.load();
         let old_height = bounds.height.load();
         bounds.width.store(width);

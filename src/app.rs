@@ -51,10 +51,6 @@ impl App {
             })
     }
 
-    pub fn screen_bounds() -> &'static Bounds<std::sync::atomic::AtomicI32> {
-        Self::get().screen_bounds()
-    }
-
     pub fn config() -> Arc<Config> {
         Self::get().config.get().expect("Config not loaded").clone()
     }
