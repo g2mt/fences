@@ -123,8 +123,8 @@ impl DesktopCover {
 
                 // Keep global screen bounds updated.
                 let bounds = App::get().screen_bounds();
-                bounds.width.store(width);
-                bounds.height.store(height);
+                bounds.width.store(width, std::sync::atomic::Ordering::Relaxed);
+                bounds.height.store(height, std::sync::atomic::Ordering::Relaxed);
 
                 Ok(cover)
             },
@@ -136,8 +136,8 @@ impl DesktopCover {
         let bounds = App::get().screen_bounds();
         AppState {
             fences: inner.fences.iter().map(|f| f.get_state()).collect(),
-            screen_width: bounds.width.load(),
-            screen_height: bounds.height.load(),
+            screen_width: bounds.width.load(std::sync::atomic::Ordering::Relaxed),
+            screen_height: bounds.height.load(std::sync::atomic::Ordering::Relaxed),
         }
     }
 
@@ -158,8 +158,8 @@ impl DesktopCover {
     pub fn rearrange_fences(&self, old_screen_width: i32, old_screen_height: i32) {
         let inner = self.inner.lock();
         let bounds = App::get().screen_bounds();
-        let new_width = bounds.width.load();
-        let new_height = bounds.height.load();
+        let new_width = bounds.width.load(std::sync::atomic::Ordering::Relaxed);
+        let new_height = bounds.height.load(std::sync::atomic::Ordering::Relaxed);
 
         if old_screen_width == new_width && old_screen_height == new_height {
             return;
@@ -205,10 +205,10 @@ impl DesktopCover {
         info!("Screen resolution changed to {}x{}", width, height);
 
         let bounds = App::get().screen_bounds();
-        let old_width = bounds.width.load();
-        let old_height = bounds.height.load();
-        bounds.width.store(width);
-        bounds.height.store(height);
+        let old_width = bounds.width.load(std::sync::atomic::Ordering::Relaxed);
+        let old_height = bounds.height.load(std::sync::atomic::Ordering::Relaxed);
+        bounds.width.store(width, std::sync::atomic::Ordering::Relaxed);
+        bounds.height.store(height, std::sync::atomic::Ordering::Relaxed);
 
         self.rearrange_fences(old_width, old_height);
 
