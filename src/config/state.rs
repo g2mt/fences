@@ -25,7 +25,7 @@ pub struct FenceState {
     pub area: Area<i32>,
     pub icons: Vec<IconState>,
     pub imported_from: Option<Arc<str>>,
-    pub sticky: Option<FenceStickyPosition>,
+    pub sticky_pos: Option<FenceStickyPosition>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

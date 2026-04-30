@@ -413,19 +413,52 @@ impl DesktopCover {
 
                     let h_sticky_menu = CreatePopupMenu().unwrap_or_default();
                     let current_sticky = self.inner.lock().fences.last().and_then(|f| f.sticky());
-                    
-                    use crate::config::state::FenceStickyPosition;
-                    let check_flag = |pos: Option<FenceStickyPosition>| {
-                        if current_sticky == pos { MF_CHECKED } else { MF_UNCHECKED }
+
+                    let checky_sticky = |pos: Option<FenceStickyPosition>| {
+                        if current_sticky == pos {
+                            MF_CHECKED
+                        } else {
+                            MF_UNCHECKED
+                        }
                     };
 
-                    AppendMenuW(h_sticky_menu, MF_STRING | check_flag(None), IDM_STICKY_NONE, w!("None"));
-                    AppendMenuW(h_sticky_menu, MF_STRING | check_flag(Some(FenceStickyPosition::TopLeft)), IDM_STICKY_TOPLEFT, w!("Top Left"));
-                    AppendMenuW(h_sticky_menu, MF_STRING | check_flag(Some(FenceStickyPosition::TopRight)), IDM_STICKY_TOPRIGHT, w!("Top Right"));
-                    AppendMenuW(h_sticky_menu, MF_STRING | check_flag(Some(FenceStickyPosition::BottomLeft)), IDM_STICKY_BOTTOMLEFT, w!("Bottom Left"));
-                    AppendMenuW(h_sticky_menu, MF_STRING | check_flag(Some(FenceStickyPosition::BottomRight)), IDM_STICKY_BOTTOMRIGHT, w!("Bottom Right"));
-                    
-                    AppendMenuW(h_menu, MF_POPUP, h_sticky_menu.0 as usize, w!("Sticky position"));
+                    AppendMenuW(
+                        h_sticky_menu,
+                        MF_STRING | checky_sticky(None),
+                        IDM_STICKY_NONE,
+                        w!("None"),
+                    );
+                    AppendMenuW(
+                        h_sticky_menu,
+                        MF_STRING | checky_sticky(Some(FenceStickyPosition::TopLeft)),
+                        IDM_STICKY_TOPLEFT,
+                        w!("Top Left"),
+                    );
+                    AppendMenuW(
+                        h_sticky_menu,
+                        MF_STRING | checky_sticky(Some(FenceStickyPosition::TopRight)),
+                        IDM_STICKY_TOPRIGHT,
+                        w!("Top Right"),
+                    );
+                    AppendMenuW(
+                        h_sticky_menu,
+                        MF_STRING | checky_sticky(Some(FenceStickyPosition::BottomLeft)),
+                        IDM_STICKY_BOTTOMLEFT,
+                        w!("Bottom Left"),
+                    );
+                    AppendMenuW(
+                        h_sticky_menu,
+                        MF_STRING | checky_sticky(Some(FenceStickyPosition::BottomRight)),
+                        IDM_STICKY_BOTTOMRIGHT,
+                        w!("Bottom Right"),
+                    );
+
+                    AppendMenuW(
+                        h_menu,
+                        MF_POPUP,
+                        h_sticky_menu.0 as usize,
+                        w!("Sticky position"),
+                    );
 
                     AppendMenuW(h_menu, MF_STRING, IDM_RENAME_FENCE, w!("Re&name fence"));
                     AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
@@ -644,7 +677,11 @@ impl DesktopCover {
                 });
                 should_save = true;
             }
-            IDM_STICKY_NONE | IDM_STICKY_TOPLEFT | IDM_STICKY_TOPRIGHT | IDM_STICKY_BOTTOMLEFT | IDM_STICKY_BOTTOMRIGHT => {
+            IDM_STICKY_NONE
+            | IDM_STICKY_TOPLEFT
+            | IDM_STICKY_TOPRIGHT
+            | IDM_STICKY_BOTTOMLEFT
+            | IDM_STICKY_BOTTOMRIGHT => {
                 use crate::config::state::FenceStickyPosition;
                 let sticky = match command {
                     IDM_STICKY_TOPLEFT => Some(FenceStickyPosition::TopLeft),
