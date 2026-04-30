@@ -3,13 +3,13 @@
 use std::path::Path;
 use std::sync::OnceLock;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use parking_lot::Mutex;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::*;
-use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
 
 mod app;
 mod config;
@@ -27,7 +27,7 @@ use crate::app::App;
 use crate::config::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
-use crate::paths::{app_file, init_app_dir, ID_PATH, LOG_PATH};
+use crate::paths::{ID_PATH, LOG_PATH, app_file, init_app_dir};
 
 fn ensure_single_instance() -> Result<()> {
     let id_path = App::get().id_path.get().unwrap();

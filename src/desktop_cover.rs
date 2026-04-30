@@ -4,20 +4,20 @@ use std::sync::Arc;
 use anyhow::Result;
 use parking_lot::Mutex;
 use tracing::{debug, error, info};
-use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
 
 use crate::app::App;
 use crate::config::state::{AppState, FenceStickyPosition};
 use crate::fence::{Fence, HitTest};
 use crate::prompt;
 use crate::utils::HWNDWrapper;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 // Menus
 pub const IDM_EXIT: usize = 101;
