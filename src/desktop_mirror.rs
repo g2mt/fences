@@ -23,11 +23,11 @@ impl DesktopMirror {
     fn reset(&mut self) {
         unsafe {
             if !self.bitmap.is_invalid() {
-                DeleteObject(self.bitmap.into());
+                let _ = DeleteObject(self.bitmap.into());
             }
             self.bitmap = Default::default();
             if !self.hdc.is_invalid() {
-                DeleteDC(self.hdc);
+                let _ = DeleteDC(self.hdc);
             }
             self.hdc = Default::default();
         }

@@ -733,7 +733,7 @@ impl Window for Fence {
         match msg {
             WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
             WM_MOVE => unsafe {
-                InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
+                let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             },
             WM_PAINT => unsafe {

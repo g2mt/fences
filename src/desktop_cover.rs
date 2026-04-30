@@ -270,7 +270,7 @@ impl DesktopCover {
         let hwnd = self.base().hwnd();
         let mut pt = POINT { x: 0, y: 0 };
         unsafe { let _ = GetCursorPos(&mut pt); };
-        unsafe { ScreenToClient(hwnd, &mut pt) };
+        unsafe { let _ = ScreenToClient(hwnd, &mut pt); };
 
         let inner = self.inner.lock();
         for fence in inner.fences.iter().rev() {
@@ -427,7 +427,7 @@ impl DesktopCover {
             }
 
             let mut pt = POINT { x, y };
-            unsafe { ClientToScreen(hwnd, &mut pt) };
+            unsafe { let _ = ClientToScreen(hwnd, &mut pt); };
             let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
 
             unsafe {
@@ -512,8 +512,8 @@ impl DesktopCover {
                     let _ = AppendMenuW(h_menu, MF_STRING, IDM_RENAME_FENCE, w!("Re&name fence"));
                     let _ = AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
                 }
-                SetForegroundWindow(hwnd);
-                TrackPopupMenu(
+                let _ = SetForegroundWindow(hwnd);
+                let _ = TrackPopupMenu(
                     h_menu,
                     TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                     pt.x,

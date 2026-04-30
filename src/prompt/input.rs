@@ -202,8 +202,8 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
         );
 
         if let Ok(hwnd) = hwnd {
-            ShowWindow(hwnd, SW_SHOWNORMAL);
-            UpdateWindow(hwnd);
+            let _ = ShowWindow(hwnd, SW_SHOWNORMAL);
+            let _ = UpdateWindow(hwnd);
         } else {
             let mut s = state.lock();
             s.completed = true;

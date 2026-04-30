@@ -467,7 +467,7 @@ impl Window for ImportDialog {
             }
             WM_DESTROY => {
                 let inner = self.inner.lock();
-                unsafe { ImageList_Destroy(Some(inner.himagelist)) };
+                unsafe { let _ = ImageList_Destroy(Some(inner.himagelist)) };
                 LRESULT(0)
             }
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
