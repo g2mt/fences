@@ -158,6 +158,14 @@ impl DesktopCover {
         let new_width = inner.screen_width;
         let new_height = inner.screen_height;
 
+        if old_screen_width == new_width && old_screen_height == new_height {
+            return;
+        }
+
+        info!(
+            "rearranging from {}x{} to {}x{}",
+            old_screen_width, old_screen_height, new_width, new_height
+        );
         for fence in &inner.fences {
             if let Some(sticky) = fence.sticky() {
                 let area = fence.get_state().area;
