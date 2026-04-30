@@ -432,13 +432,13 @@ impl DesktopCover {
 
             unsafe {
                 if let HitTest::Icon(_) = hit {
-                    AppendMenuW(h_menu, MF_STRING, IDM_RUN_ICON, w!("&Run"));
-                    AppendMenuW(h_menu, MF_STRING, IDM_RENAME_ICON, w!("Re&name"));
-                    AppendMenuW(h_menu, MF_STRING, IDM_SET_ICON_PATH, w!("Set &path"));
-                    AppendMenuW(h_menu, MF_STRING, IDM_DELETE_ICON, w!("&Delete"));
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_RUN_ICON, w!("&Run"));
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_RENAME_ICON, w!("Re&name"));
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_SET_ICON_PATH, w!("Set &path"));
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_DELETE_ICON, w!("&Delete"));
                 } else {
-                    AppendMenuW(h_menu, MF_STRING, IDM_IMPORT, w!("&Import"));
-                    AppendMenuW(h_menu, MF_STRING, IDM_IMPORT_FROM, w!("Import &from..."));
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_IMPORT, w!("&Import"));
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_IMPORT_FROM, w!("Import &from..."));
                     let has_import_path = {
                         let inner = self.inner.lock();
                         inner
