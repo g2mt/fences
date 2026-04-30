@@ -19,8 +19,9 @@ unsafe impl Sync for DesktopMirror {}
 impl DesktopMirror {
     pub fn new() -> Self {
         unsafe {
-            let width = GetSystemMetrics(SM_CXSCREEN);
-            let height = GetSystemMetrics(SM_CYSCREEN);
+            let bounds = crate::app::App::get().screen_bounds();
+            let width = bounds.width.load(std::sync::atomic::Ordering::Relaxed);
+            let height = bounds.height.load(std::sync::atomic::Ordering::Relaxed);
 
             let screen_dc = GetDC(None);
             let mem_dc = CreateCompatibleDC(Some(screen_dc));

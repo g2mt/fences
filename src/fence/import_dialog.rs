@@ -58,8 +58,9 @@ impl ImportDialog {
         let h_instance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
 
         // Center dialog on screen
-        let screen_w = unsafe { GetSystemMetrics(SM_CXSCREEN) };
-        let screen_h = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+        let bounds = crate::app::App::get().screen_bounds();
+        let screen_w = bounds.width.load(std::sync::atomic::Ordering::Relaxed);
+        let screen_h = bounds.height.load(std::sync::atomic::Ordering::Relaxed);
         let dlg_w = DLG_DEFAULT_WIDTH;
         let dlg_h = DLG_DEFAULT_HEIGHT;
         let dlg_x = (screen_w - dlg_w) / 2;

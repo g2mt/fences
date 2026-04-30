@@ -637,8 +637,9 @@ impl Fence {
             .and_then(|n| n.to_str())
             .unwrap_or("Folder Fence");
 
-        let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
-        let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+        let bounds = App::get().screen_bounds();
+        let width = bounds.width.load(Ordering::Relaxed);
+        let height = bounds.height.load(Ordering::Relaxed);
         let fence = Self::new(cover, width / 2 - 150, height / 2 - 75, title)?;
         fence.set_imported_from(Some(Arc::from(path_str.as_str())));
 
