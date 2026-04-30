@@ -32,6 +32,7 @@ pub const IDM_RENAME_ICON: usize = 109;
 pub const IDM_SET_ICON_PATH: usize = 110;
 pub const IDM_IMPORT: usize = 111;
 pub const IDM_IMPORT_FROM: usize = 112;
+pub const IDM_OPEN_EXPLORER: usize = 113;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
@@ -351,6 +352,12 @@ impl DesktopCover {
                 } else {
                     AppendMenuW(h_menu, MF_STRING, IDM_IMPORT, w!("&Import"));
                     AppendMenuW(h_menu, MF_STRING, IDM_IMPORT_FROM, w!("Import &from..."));
+                    let has_import_path = {
+                        let inner = self.inner.lock();
+                        inner.fences.last().map_or(false, |f| f.imported_from().is_some())
+                    };
+                    let open_explorer_flags = if has_import_path { MF_STRING } else { MF_STRING | MF_GRAYED };
+                    AppendMenuW(h_menu, open_explorer_flags, IDM_OPEN_EXPLORER, w!("Open in Explorer"));
                     AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR::null());
                     AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
                     AppendMenuW(h_menu, MF_STRING, IDM_RENAME_FENCE, w!("Re&name fence"));
@@ -569,6 +576,27 @@ impl DesktopCover {
                     fence.show_import_from_dialog().await;
                 });
                 should_save = true;
+            }
+            IDM_OPEN_EXPLORER => {
+                let fence = self.inner.lock().fences.last().cloned();
+                if let Some(fence) = fence {
+                    if let Some(import_path) = fence.imported_from() {
+                        let path_wide: Vec<u16> = import_path
+                            .encode_utf16()
+                            .chain(std::iter::once(0))
+                            .collect();
+                        unsafe {
+                            ShellExecuteW(
+                                None,
+                                w!("open"),
+                                PCWSTR(path_wide.as_ptr()),
+                                PCWSTR::null(),
+                                PCWSTR::null(),
+                                SW_SHOWNORMAL,
+                            );
+                        }
+                    }
+                }
             }
             _ => {}
         }
