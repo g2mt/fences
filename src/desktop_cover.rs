@@ -161,7 +161,6 @@ impl DesktopCover {
         let bounds = App::get().screen_bounds();
         let new_width = bounds.width.load(Ordering::Relaxed);
         let new_height = bounds.height.load(Ordering::Relaxed);
-        drop(bounds);
 
         if old_screen_width == new_width && old_screen_height == new_height {
             return;
@@ -209,7 +208,6 @@ impl DesktopCover {
         let bounds = App::get().screen_bounds();
         let old_width = bounds.width.swap(width, Ordering::Relaxed);
         let old_height = bounds.height.swap(height, Ordering::Relaxed);
-        drop(bounds);
         self.rearrange_fences(old_width, old_height);
 
         unsafe {
