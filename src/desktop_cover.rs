@@ -1,25 +1,25 @@
 use std::borrow::Cow;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::Mutex;
 use tracing::{debug, error, info};
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
 
 use crate::app::App;
 use crate::config::state::{AppState, FenceStickyPosition};
-use crate::geo::Bounds;
-use crate::geo::Scalar;
 use crate::fence::{Fence, HitTest};
+use crate::geo::{Bounds, Scalar};
 use crate::prompt;
 use crate::utils::HWNDWrapper;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Menus
 pub const IDM_EXIT: usize = 101;
@@ -123,8 +123,8 @@ impl DesktopCover {
 
                 // Keep global screen bounds updated.
                 let bounds = App::get().screen_bounds();
-                bounds.width.store(width, std::sync::atomic::Ordering::Relaxed);
-                bounds.height.store(height, std::sync::atomic::Ordering::Relaxed);
+                bounds.width.store(width, Ordering::Relaxed);
+                bounds.height.store(height, Ordering::Relaxed);
 
                 Ok(cover)
             },
@@ -136,8 +136,8 @@ impl DesktopCover {
         let bounds = App::get().screen_bounds();
         AppState {
             fences: inner.fences.iter().map(|f| f.get_state()).collect(),
-            screen_width: bounds.width.load(std::sync::atomic::Ordering::Relaxed),
-            screen_height: bounds.height.load(std::sync::atomic::Ordering::Relaxed),
+            screen_width: bounds.width.load(Ordering::Relaxed),
+            screen_height: bounds.height.load(Ordering::Relaxed),
         }
     }
 
@@ -158,8 +158,8 @@ impl DesktopCover {
     pub fn rearrange_fences(&self, old_screen_width: i32, old_screen_height: i32) {
         let inner = self.inner.lock();
         let bounds = App::get().screen_bounds();
-        let new_width = bounds.width.load(std::sync::atomic::Ordering::Relaxed);
-        let new_height = bounds.height.load(std::sync::atomic::Ordering::Relaxed);
+        let new_width = bounds.width.load(Ordering::Relaxed);
+        let new_height = bounds.height.load(Ordering::Relaxed);
 
         if old_screen_width == new_width && old_screen_height == new_height {
             return;
@@ -205,10 +205,10 @@ impl DesktopCover {
         info!("Screen resolution changed to {}x{}", width, height);
 
         let bounds = App::get().screen_bounds();
-        let old_width = bounds.width.load(std::sync::atomic::Ordering::Relaxed);
-        let old_height = bounds.height.load(std::sync::atomic::Ordering::Relaxed);
-        bounds.width.store(width, std::sync::atomic::Ordering::Relaxed);
-        bounds.height.store(height, std::sync::atomic::Ordering::Relaxed);
+        let old_width = bounds.width.load(Ordering::Relaxed);
+        let old_height = bounds.height.load(Ordering::Relaxed);
+        bounds.width.store(width, Ordering::Relaxed);
+        bounds.height.store(height, Ordering::Relaxed);
 
         self.rearrange_fences(old_width, old_height);
 

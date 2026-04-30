@@ -1,9 +1,11 @@
 use std::path::PathBuf;
+use std::sync::atomic::AtomicI32;
 use std::sync::{Arc, LazyLock, OnceLock};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use parking_lot::Mutex;
 use tracing::{error, info, warn};
+use windows::Win32::Foundation::RECT;
 
 use crate::config::config::Config;
 use crate::config::save_thread::SaveThread;
@@ -11,11 +13,8 @@ use crate::config::state::AppState;
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
 use crate::fence::import_dialog::ImportDialog;
-use crate::geo::Bounds;
-use crate::paths::{ID_PATH, STATE_PATH, app_file};
-
-use windows::Win32::Foundation::RECT;
-use crate::geo::Scalar;
+use crate::geo::{Bounds, Scalar};
+use crate::paths::{app_file, ID_PATH, STATE_PATH};
 
 pub struct App {
     pub cover: OnceLock<Arc<DesktopCover>>,
@@ -24,7 +23,7 @@ pub struct App {
     pub config: OnceLock<Arc<Config>>,
     pub import_dialog: Mutex<Option<Arc<ImportDialog>>>,
     pub id_path: OnceLock<PathBuf>,
-    pub screen_bounds: OnceLock<Bounds<std::sync::atomic::AtomicI32>>,
+    pub screen_bounds: OnceLock<Bounds<AtomicI32>>,
 }
 
 /// Assume that the singleton is always initialized and the [App::get()] api to access.
@@ -43,12 +42,11 @@ impl App {
         &SINGLETON
     }
 
-    pub fn screen_bounds(&self) -> &'static Bounds<std::sync::atomic::AtomicI32> {
-        self.screen_bounds
-            .get_or_init(|| Bounds {
-                width: std::sync::atomic::AtomicI32::new(0),
-                height: std::sync::atomic::AtomicI32::new(0),
-            })
+    pub fn screen_bounds(&self) -> &Bounds<AtomicI32> {
+        self.screen_bounds.get_or_init(move || Bounds {
+            width: AtomicI32::new(0),
+            height: AtomicI32::new(0),
+        })
     }
 
     pub fn config() -> Arc<Config> {

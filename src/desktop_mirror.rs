@@ -1,8 +1,12 @@
-use tracing::info;
-use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::Storage::Xps::{PRINT_WINDOW_FLAGS, PrintWindow};
-use windows::Win32::UI::WindowsAndMessaging::*;
+use std::sync::atomic::{AtomicI32, Ordering};
+
+use tracing::debug;
 use windows::core::w;
+use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
+use windows::Win32::UI::WindowsAndMessaging::*;
+
+use crate::app::App;
 
 const PW_RENDERFULLCONTENT: PRINT_WINDOW_FLAGS = PRINT_WINDOW_FLAGS(0x00000002);
 
@@ -19,31 +23,42 @@ unsafe impl Sync for DesktopMirror {}
 impl DesktopMirror {
     pub fn new() -> Self {
         unsafe {
-            let bounds = crate::app::App::get().screen_bounds();
-            let width = bounds.width.load(std::sync::atomic::Ordering::Relaxed);
-            let height = bounds.height.load(std::sync::atomic::Ordering::Relaxed);
+            let bounds = App::get().screen_bounds();
+            let width = bounds.width.load(Ordering::Relaxed);
+            let height = bounds.height.load(Ordering::Relaxed);
 
             let screen_dc = GetDC(None);
-            let mem_dc = CreateCompatibleDC(Some(screen_dc));
-            let mem_bmp = CreateCompatibleBitmap(screen_dc, width, height);
-            SelectObject(mem_dc, mem_bmp.into());
+            let hdc = CreateCompatibleDC(Some(screen_dc));
+            let bitmap = CreateCompatibleBitmap(screen_dc, width, height);
+            SelectObject(hdc, bitmap.into());
             ReleaseDC(None, screen_dc);
 
             let mirror = Self {
-                hdc: mem_dc,
-                bitmap: mem_bmp,
-                width,
-                height,
+                hdc,
+                bitmap,
+                width: width,
+                height: height,
             };
-
-            mirror.update();
+            mirror.capture();
 
             mirror
         }
     }
 
-    pub fn update(&self) {
-        info!("updating DesktopMirror");
+    fn reset(&mut self) {
+        unsafe {
+            if !self.bitmap.is_invalid() {
+                DeleteObject(self.bitmap.into());
+            }
+            self.bitmap = Default::default();
+            if !self.hdc.is_invalid() {
+                DeleteDC(self.hdc);
+            }
+            self.hdc = Default::default();
+        }
+    }
+
+    fn capture(&self) {
         unsafe {
             // Progman hosts the desktop. On systems with an active wallpaper slideshow/
             // Windows 10+, a WorkerW window behind the icons may hold the wallpaper,
@@ -55,6 +70,27 @@ impl DesktopMirror {
         }
     }
 
+    pub fn update(&mut self) {
+        let bounds = App::get().screen_bounds();
+
+        let width = bounds.width.load(Ordering::Relaxed);
+        let height = bounds.height.load(Ordering::Relaxed);
+
+        if width != self.width || height != self.height {
+            self.reset();
+            unsafe {
+                let screen_dc = GetDC(None);
+                let hdc = CreateCompatibleDC(Some(screen_dc));
+                let bitmap = CreateCompatibleBitmap(screen_dc, width, height);
+                SelectObject(hdc, bitmap.into());
+                ReleaseDC(None, screen_dc);
+                self.bitmap = bitmap;
+                self.hdc = hdc;
+            }
+        }
+        self.capture();
+    }
+
     pub fn hdc(&self) -> HDC {
         self.hdc
     }
@@ -62,13 +98,6 @@ impl DesktopMirror {
 
 impl Drop for DesktopMirror {
     fn drop(&mut self) {
-        unsafe {
-            if !self.bitmap.is_invalid() {
-                DeleteObject(self.bitmap.into());
-            }
-            if !self.hdc.is_invalid() {
-                DeleteDC(self.hdc);
-            }
-        }
+        self.reset();
     }
 }
