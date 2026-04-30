@@ -63,3 +63,9 @@ impl<S: Scalar> Into<RECT> for &Area<S> {
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct Bounds<S: Scalar> {
+    pub width: S,
+    pub height: S,
+}

@@ -1,15 +1,16 @@
-use std::sync::Arc;
+use std::path::Path;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use anyhow::Result;
 use import_dialog::{ImportDialog, ImportItem};
 use parking_lot::Mutex;
 use tracing::{debug, error, info};
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
 
 use crate::app::App;
 use crate::config::state::{FenceState, FenceStickyPosition, IconState};
@@ -17,7 +18,7 @@ use crate::desktop_cover::DesktopCover;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
 use crate::prompt;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 mod icon;
 pub mod import_dialog;
@@ -537,7 +538,7 @@ impl Fence {
             return;
         };
 
-        let folder_path = std::path::Path::new(imported_from.as_ref());
+        let folder_path = Path::new(imported_from.as_ref());
 
         // Read all .lnk files from the directory
         let mut dir_items: Vec<(String, String)> = Vec::new(); // (title, path)
@@ -630,7 +631,7 @@ impl Fence {
             Some(p) => p,
             None => return Ok(None),
         };
-        let folder_path = std::path::Path::new(&path_str);
+        let folder_path = Path::new(&path_str);
         let title = folder_path
             .file_name()
             .and_then(|n| n.to_str())
@@ -658,12 +659,12 @@ impl Fence {
     pub fn add_area(&self, dl: i32, dt: i32, dw: i32, dh: i32) {
         self.base.add_area(dl, dt, dw, dh);
 
-        let bounds = self.base.area();
+        let area = self.base.area();
         let fence_area = Area::new(
-            bounds.x.load(Ordering::Relaxed),
-            bounds.y.load(Ordering::Relaxed),
-            bounds.width.load(Ordering::Relaxed),
-            bounds.height.load(Ordering::Relaxed),
+            area.x.load(Ordering::Relaxed),
+            area.y.load(Ordering::Relaxed),
+            area.width.load(Ordering::Relaxed),
+            area.height.load(Ordering::Relaxed),
         );
 
         let title_area = TitleBar::area_from_fence_area(&fence_area);
