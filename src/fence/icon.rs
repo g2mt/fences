@@ -62,7 +62,7 @@ impl Icon {
     pub fn set_selected(&self, selected: bool) {
         self.selected.store(selected, Ordering::SeqCst);
         unsafe {
-            InvalidateRect(Some(self.base.hwnd()), None, true);
+            let _ = InvalidateRect(Some(self.base.hwnd()), None, true);
         }
     }
 
@@ -170,7 +170,7 @@ impl Window for Icon {
                 let _ = GetClientRect(hwnd, &mut rect);
 
                 let mut pt = POINT { x: 0, y: 0 };
-                ClientToScreen(hwnd, &mut pt);
+                let _ = ClientToScreen(hwnd, &mut pt);
 
                 let config = App::config();
                 let selected = self.selected.load(Ordering::SeqCst);
@@ -253,7 +253,7 @@ impl Window for Icon {
                     DT_CENTER | DT_WORDBREAK | DT_NOPREFIX,
                 );
 
-                EndPaint(hwnd, &ps);
+                let _ = EndPaint(hwnd, &ps);
                 LRESULT(0)
             },
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },

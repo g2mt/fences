@@ -119,7 +119,7 @@ impl Color<true> {
             if alpha == 255 {
                 let brush = CreateSolidBrush(COLORREF(color & 0xFFFFFF));
                 FillRect(hdc, rect, brush);
-                DeleteObject(brush.into());
+                let _ = DeleteObject(brush.into());
             } else if alpha > 0 {
                 let mem_dc = CreateCompatibleDC(Some(hdc));
                 let width = rect.right - rect.left;
@@ -134,8 +134,8 @@ impl Color<true> {
                     right: width,
                     bottom: height,
                 };
-                FillRect(mem_dc, &local_rect, brush);
-                DeleteObject(brush.into());
+                let _ = FillRect(mem_dc, &local_rect, brush);
+                let _ = DeleteObject(brush.into());
 
                 let blend = BLENDFUNCTION {
                     BlendOp: AC_SRC_OVER as u8,
@@ -157,7 +157,7 @@ impl Color<false> {
         unsafe {
             let brush = CreateSolidBrush(COLORREF(self.0 & 0xFFFFFF));
             FillRect(hdc, rect, brush);
-            DeleteObject(brush.into());
+            let _ = DeleteObject(brush.into());
         }
     }
 }

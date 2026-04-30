@@ -103,7 +103,7 @@ impl Window for TitleBar {
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE,
                 );
 
-                EndPaint(hwnd, &ps);
+                let _ = EndPaint(hwnd, &ps);
                 LRESULT(0)
             },
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
@@ -244,7 +244,7 @@ impl Window for ScrollArea {
                 let _ = GetClientRect(hwnd, &mut rect);
 
                 let mut pt = POINT { x: 0, y: 0 };
-                ClientToScreen(hwnd, &mut pt);
+                let _ = ClientToScreen(hwnd, &mut pt);
 
                 let config = App::config();
                 if config.fence.scroll_area_bg_color.a() < 255 {
@@ -268,7 +268,7 @@ impl Window for ScrollArea {
                     .scroll_area_bg_color
                     .paint_background(hdc, &rect);
 
-                EndPaint(hwnd, &ps);
+                let _ = EndPaint(hwnd, &ps);
                 LRESULT(0)
             },
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },

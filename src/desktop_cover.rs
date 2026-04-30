@@ -101,7 +101,7 @@ impl DesktopCover {
                         .collect();
                     let len = tip.len().min(nid.szTip.len());
                     nid.szTip[..len].copy_from_slice(&tip[..len]);
-                    Shell_NotifyIconW(NIM_ADD, &nid);
+                    let _ = Shell_NotifyIconW(NIM_ADD, &nid);
 
                     let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0x00000000), 0, LWA_COLORKEY);
                     let _ = SetWindowPos(
@@ -231,7 +231,7 @@ impl DesktopCover {
         nid.hWnd = hwnd;
         nid.uID = 1;
         unsafe {
-            Shell_NotifyIconW(NIM_DELETE, &nid);
+            let _ = Shell_NotifyIconW(NIM_DELETE, &nid);
             PostQuitMessage(0);
         }
         LRESULT(0)
@@ -258,10 +258,10 @@ impl DesktopCover {
             let hdc = BeginPaint(hwnd, &mut ps);
 
             let brush = CreateSolidBrush(COLORREF(0x00000000));
-            FillRect(hdc, &ps.rcPaint, brush);
-            DeleteObject(brush.into());
+            let _ = FillRect(hdc, &ps.rcPaint, brush);
+            let _ = DeleteObject(brush.into());
 
-            EndPaint(hwnd, &ps);
+            let _ = EndPaint(hwnd, &ps);
         }
         LRESULT(0)
     }

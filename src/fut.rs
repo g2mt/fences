@@ -86,7 +86,7 @@ impl AsyncExecutor {
         let mut i = 0;
         while i < tasks.len() {
             if tasks[i].as_mut().poll(&mut cx).is_ready() {
-                tasks.remove(i);
+                let _ = tasks.remove(i);
             } else {
                 i += 1;
             }
