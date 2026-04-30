@@ -5,8 +5,25 @@ use crate::config::color::Color;
 #[derive(Serialize, Deserialize, Clone, Default)]
 #[serde(default)]
 pub struct Config {
+    pub font: FontConfig,
     pub fence: FenceConfig,
     pub icon: IconConfig,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct FontConfig {
+    pub family: String,
+    pub size: i32,
+}
+
+impl Default for FontConfig {
+    fn default() -> Self {
+        Self {
+            family: "Segoe UI".to_string(),
+            size: 16,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]

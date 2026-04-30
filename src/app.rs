@@ -5,6 +5,8 @@ use std::sync::{Arc, LazyLock, OnceLock};
 use anyhow::{Result, anyhow};
 use parking_lot::Mutex;
 use tracing::{error, info, warn};
+use windows::Win32::Foundation::RECT;
+use windows::Win32::Graphics::Gdi::*;
 
 use crate::config::config::Config;
 use crate::config::save_thread::SaveThread;
@@ -105,5 +107,42 @@ impl App {
         std::fs::write(&path, json)?;
         info!("Config saved to {:?}", path);
         Ok(())
+    }
+
+    pub fn draw_text(&self, hdc: HDC, text: &str, rect: &mut RECT, format: DRAW_TEXT_FORMAT) {
+        let config = Self::config();
+        let font_name_u16: Vec<u16> = config
+            .font
+            .family
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+
+        unsafe {
+            let hfont = CreateFontW(
+                -config.font.size,
+                0,
+                0,
+                0,
+                FW_NORMAL.0 as i32,
+                0,
+                0,
+                0,
+                DEFAULT_CHARSET.0 as u32,
+                OUT_DEFAULT_PRECIS.0 as u32,
+                CLIP_DEFAULT_PRECIS.0 as u32,
+                CLEARTYPE_QUALITY.0 as u32,
+                VARIABLE_PITCH.0 as u32,
+                windows::core::PCWSTR(font_name_u16.as_ptr()),
+            );
+
+            let old_font = SelectObject(hdc, hfont);
+
+            let mut text_u16: Vec<u16> = text.encode_utf16().collect();
+            DrawTextW(hdc, &mut text_u16, rect, format);
+
+            SelectObject(hdc, old_font);
+            DeleteObject(hfont);
+        }
     }
 }

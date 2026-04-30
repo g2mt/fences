@@ -93,12 +93,11 @@ impl Window for TitleBar {
                 SetBkMode(hdc, TRANSPARENT);
                 SetTextColor(hdc, COLORREF(config.fence.title_text_color.0));
 
-                let mut title_utf16: Vec<u16> = self.title.lock().encode_utf16().collect();
                 let mut text_rect = rect;
                 text_rect.left += 5;
-                DrawTextW(
+                App::get().draw_text(
                     hdc,
-                    &mut title_utf16,
+                    &self.title.lock(),
                     &mut text_rect,
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE,
                 );

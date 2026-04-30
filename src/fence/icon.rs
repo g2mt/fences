@@ -243,12 +243,11 @@ impl Window for Icon {
                 SetBkMode(hdc, TRANSPARENT);
                 SetTextColor(hdc, COLORREF(config.icon.text_color.0));
 
-                let mut title_utf16: Vec<u16> = state.title.encode_utf16().collect();
                 let mut text_rect = rect;
                 text_rect.top += icon_draw_size;
-                DrawTextW(
+                App::get().draw_text(
                     hdc,
-                    &mut title_utf16,
+                    &state.title,
                     &mut text_rect,
                     DT_CENTER | DT_WORDBREAK | DT_NOPREFIX,
                 );
