@@ -1,9 +1,9 @@
 use std::sync::atomic::Ordering;
 
-use windows::core::w;
 use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
+use windows::Win32::Storage::Xps::{PRINT_WINDOW_FLAGS, PrintWindow};
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::w;
 
 use crate::app::App;
 

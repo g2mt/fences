@@ -1,23 +1,22 @@
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use anyhow::Result;
 use parking_lot::Mutex;
 use tracing::{debug, error, info};
-use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
 
 use crate::app::App;
 use crate::config::state::{AppState, FenceStickyPosition};
 use crate::fence::{Fence, HitTest};
-use crate::geo::Scalar;
 use crate::prompt;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 // Menus
 pub const IDM_EXIT: usize = 101;
@@ -269,8 +268,12 @@ impl DesktopCover {
     fn on_set_cursor(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         let mut pt = POINT { x: 0, y: 0 };
-        unsafe { let _ = GetCursorPos(&mut pt); };
-        unsafe { let _ = ScreenToClient(hwnd, &mut pt); };
+        unsafe {
+            let _ = GetCursorPos(&mut pt);
+        };
+        unsafe {
+            let _ = ScreenToClient(hwnd, &mut pt);
+        };
 
         let inner = self.inner.lock();
         for fence in inner.fences.iter().rev() {
@@ -389,7 +392,9 @@ impl DesktopCover {
         let mut inner = self.inner.lock();
         if inner.hit_type.is_some() {
             inner.hit_type = None;
-            unsafe { let _ = ReleaseCapture(); };
+            unsafe {
+                let _ = ReleaseCapture();
+            };
         }
         LRESULT(0)
     }
@@ -427,7 +432,9 @@ impl DesktopCover {
             }
 
             let mut pt = POINT { x, y };
-            unsafe { let _ = ClientToScreen(hwnd, &mut pt); };
+            unsafe {
+                let _ = ClientToScreen(hwnd, &mut pt);
+            };
             let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
 
             unsafe {
@@ -532,7 +539,9 @@ impl DesktopCover {
         let hwnd = self.base().hwnd();
         if lparam.0 as u32 == WM_RBUTTONUP || lparam.0 as u32 == WM_LBUTTONUP {
             let mut pt = POINT { x: 0, y: 0 };
-            unsafe { let _ = GetCursorPos(&mut pt); };
+            unsafe {
+                let _ = GetCursorPos(&mut pt);
+            };
             let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
             unsafe {
                 let _ = AppendMenuW(h_menu, MF_STRING, IDM_ADD_FENCE, w!("&Add fence"));

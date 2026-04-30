@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicI32;
 use std::sync::{Arc, LazyLock, OnceLock};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use parking_lot::Mutex;
 use tracing::{error, info, warn};
 
@@ -13,7 +13,7 @@ use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
 use crate::fence::import_dialog::ImportDialog;
 use crate::geo::Bounds;
-use crate::paths::{app_file, STATE_PATH};
+use crate::paths::{STATE_PATH, app_file};
 
 #[derive(Default)]
 pub struct App {
