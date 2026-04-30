@@ -11,12 +11,21 @@ pub struct AppState {
     pub height: i32,
 }
 
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+pub enum FenceStickyPosition {
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct FenceState {
     pub title: Arc<str>,
     pub area: Area<i32>,
     pub icons: Vec<IconState>,
     pub imported_from: Option<Arc<str>>,
+    pub sticky: Option<FenceStickyPosition>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

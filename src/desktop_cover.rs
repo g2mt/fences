@@ -33,6 +33,11 @@ pub const IDM_SET_ICON_PATH: usize = 110;
 pub const IDM_IMPORT: usize = 111;
 pub const IDM_IMPORT_FROM: usize = 112;
 pub const IDM_OPEN_EXPLORER: usize = 113;
+pub const IDM_STICKY_NONE: usize = 114;
+pub const IDM_STICKY_TOPLEFT: usize = 115;
+pub const IDM_STICKY_TOPRIGHT: usize = 116;
+pub const IDM_STICKY_BOTTOMLEFT: usize = 117;
+pub const IDM_STICKY_BOTTOMRIGHT: usize = 118;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
@@ -405,6 +410,23 @@ impl DesktopCover {
                     );
                     AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
                     AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR::null());
+
+                    let h_sticky_menu = CreatePopupMenu().unwrap_or_default();
+                    let current_sticky = self.inner.lock().fences.last().and_then(|f| f.sticky());
+                    
+                    use crate::config::state::FenceStickyPosition;
+                    let check_flag = |pos: Option<FenceStickyPosition>| {
+                        if current_sticky == pos { MF_CHECKED } else { MF_UNCHECKED }
+                    };
+
+                    AppendMenuW(h_sticky_menu, MF_STRING | check_flag(None), IDM_STICKY_NONE, w!("None"));
+                    AppendMenuW(h_sticky_menu, MF_STRING | check_flag(Some(FenceStickyPosition::TopLeft)), IDM_STICKY_TOPLEFT, w!("Top Left"));
+                    AppendMenuW(h_sticky_menu, MF_STRING | check_flag(Some(FenceStickyPosition::TopRight)), IDM_STICKY_TOPRIGHT, w!("Top Right"));
+                    AppendMenuW(h_sticky_menu, MF_STRING | check_flag(Some(FenceStickyPosition::BottomLeft)), IDM_STICKY_BOTTOMLEFT, w!("Bottom Left"));
+                    AppendMenuW(h_sticky_menu, MF_STRING | check_flag(Some(FenceStickyPosition::BottomRight)), IDM_STICKY_BOTTOMRIGHT, w!("Bottom Right"));
+                    
+                    AppendMenuW(h_menu, MF_POPUP, h_sticky_menu.0 as usize, w!("Sticky position"));
+
                     AppendMenuW(h_menu, MF_STRING, IDM_RENAME_FENCE, w!("Re&name fence"));
                     AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
                 }
@@ -620,6 +642,21 @@ impl DesktopCover {
                 self.executor.spawn(self, async move {
                     fence.show_import_from_dialog().await;
                 });
+                should_save = true;
+            }
+            IDM_STICKY_NONE | IDM_STICKY_TOPLEFT | IDM_STICKY_TOPRIGHT | IDM_STICKY_BOTTOMLEFT | IDM_STICKY_BOTTOMRIGHT => {
+                use crate::config::state::FenceStickyPosition;
+                let sticky = match command {
+                    IDM_STICKY_TOPLEFT => Some(FenceStickyPosition::TopLeft),
+                    IDM_STICKY_TOPRIGHT => Some(FenceStickyPosition::TopRight),
+                    IDM_STICKY_BOTTOMLEFT => Some(FenceStickyPosition::BottomLeft),
+                    IDM_STICKY_BOTTOMRIGHT => Some(FenceStickyPosition::BottomRight),
+                    _ => None,
+                };
+                let inner = self.inner.lock();
+                if let Some(fence) = inner.fences.last() {
+                    fence.set_sticky(sticky);
+                }
                 should_save = true;
             }
             IDM_OPEN_EXPLORER => {

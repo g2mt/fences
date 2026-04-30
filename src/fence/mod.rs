@@ -301,6 +301,7 @@ struct FenceInner {
     title: Arc<str>,
     icons: Vec<Arc<Icon>>,
     imported_from: Option<Arc<str>>,
+    sticky: Option<crate::config::state::FenceStickyPosition>,
 }
 
 impl Fence {
@@ -343,6 +344,7 @@ impl Fence {
                         title: state.title.clone(),
                         icons: Vec::new(),
                         imported_from: state.imported_from.clone(),
+                        sticky: state.sticky,
                     }),
                     title_bar,
                     scroll_area,
@@ -376,6 +378,7 @@ impl Fence {
                 })
                 .collect(),
             imported_from: inner.imported_from.clone(),
+            sticky: inner.sticky,
         }
     }
 
@@ -437,6 +440,14 @@ impl Fence {
         let mut inner = self.inner.lock();
         self.title_bar.set_title(title.clone());
         inner.title = title;
+    }
+
+    pub fn sticky(&self) -> Option<crate::config::state::FenceStickyPosition> {
+        self.inner.lock().sticky
+    }
+
+    pub fn set_sticky(&self, sticky: Option<crate::config::state::FenceStickyPosition>) {
+        self.inner.lock().sticky = sticky;
     }
 
     pub fn add_icon(&self, title: &str) {
