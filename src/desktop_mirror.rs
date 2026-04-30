@@ -1,6 +1,5 @@
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::Ordering;
 
-use tracing::debug;
 use windows::core::w;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};

@@ -2,7 +2,6 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use anyhow::Result;
-use tracing::debug;
 use windows::Win32::Foundation::*;
 use windows::Win32::UI::Shell::*;
 

@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::Mutex;
-use tracing::debug;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
@@ -12,7 +11,7 @@ use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::*;
 
-use crate::window::{Base, BaseRef, Window, register_classname, register_classname_ex};
+use crate::window::{Base, BaseRef, Window, register_classname_ex};
 
 const ID_LISTVIEW: u32 = 1001;
 const ID_IMPORT_BTN: u32 = 1002;

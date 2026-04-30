@@ -7,10 +7,7 @@ use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::UI::Shell::*;
 use windows::core::w;
 
-use crate::app::App;
 use crate::fut::{PromptFuture, PromptState};
-use crate::utils::HWNDWrapper;
-use crate::window::Window;
 
 pub fn browse_for_folder() -> PromptFuture<Option<String>> {
     let state = Arc::new(Mutex::new(PromptState {

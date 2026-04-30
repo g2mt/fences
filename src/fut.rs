@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
 use parking_lot::Mutex;
-use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+use windows::Win32::Foundation::{LPARAM, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
 
 use crate::desktop_cover::{DesktopCover, WM_USER_WAKE_FUTURE};

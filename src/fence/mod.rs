@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use import_dialog::{ImportDialog, ImportItem};
 use parking_lot::Mutex;
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;

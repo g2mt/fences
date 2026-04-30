@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -16,9 +15,8 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 use crate::app::App;
 use crate::config::state::{AppState, FenceStickyPosition};
 use crate::fence::{Fence, HitTest};
-use crate::geo::{Bounds, Scalar};
+use crate::geo::Scalar;
 use crate::prompt;
-use crate::utils::HWNDWrapper;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Menus

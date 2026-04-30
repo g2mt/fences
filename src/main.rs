@@ -1,11 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::path::Path;
-use std::sync::OnceLock;
 
 use anyhow::{anyhow, Result};
-use parking_lot::Mutex;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 use tracing_subscriber::prelude::*;
 use windows::core::*;
 use windows::Win32::Foundation::*;
@@ -26,7 +23,6 @@ mod window;
 use crate::app::App;
 use crate::config::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
-use crate::desktop_mirror::DesktopMirror;
 use crate::paths::{app_file, init_app_dir, ID_PATH, LOG_PATH};
 
 fn ensure_single_instance() -> Result<()> {

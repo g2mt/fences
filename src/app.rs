@@ -5,7 +5,6 @@ use std::sync::{Arc, LazyLock, OnceLock};
 use anyhow::{anyhow, Result};
 use parking_lot::Mutex;
 use tracing::{error, info, warn};
-use windows::Win32::Foundation::RECT;
 
 use crate::config::config::Config;
 use crate::config::save_thread::SaveThread;
@@ -13,8 +12,8 @@ use crate::config::state::AppState;
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
 use crate::fence::import_dialog::ImportDialog;
-use crate::geo::{Bounds, Scalar};
-use crate::paths::{app_file, ID_PATH, STATE_PATH};
+use crate::geo::Bounds;
+use crate::paths::{app_file, STATE_PATH};
 
 #[derive(Default)]
 pub struct App {
