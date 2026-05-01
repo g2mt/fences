@@ -51,10 +51,10 @@ impl Default for FenceConfig {
             title_bar_height: 24,
             padding: 10,
             spacing: 10,
-            title_text_color: Color(0x00FFFFFF),
-            title_bar_bg_color: Color(0x00323232),
-            scroll_area_bg_color: Color(0xFF7D7D7D),
-            fence_bg_color: Color(0x00323232),
+            title_text_color: Color::from_argb(0x00FFFFFF),
+            title_bar_bg_color: Color::from_argb(0x00323232),
+            scroll_area_bg_color: Color::from_argb(0xFF7D7D7D),
+            fence_bg_color: Color::from_argb(0x00323232),
         }
     }
 }
@@ -73,9 +73,9 @@ impl Default for IconConfig {
     fn default() -> Self {
         IconConfig {
             size: 64,
-            selected_bg_color: Color(0x0044AAFF),
-            unselected_bg_color: Color(0x007D7D7D),
-            text_color: Color(0x00FFFFFF),
+            selected_bg_color: Color::from_argb(0x0044AAFF),
+            unselected_bg_color: Color::from_argb(0x007D7D7D),
+            text_color: Color::from_argb(0x00FFFFFF),
             icon_size_draw: 32,
         }
     }
