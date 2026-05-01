@@ -8,12 +8,8 @@ use windows::Win32::Graphics::Gdi::*;
 /// permits an explicit alpha component. When `true`, the color can be
 /// serialized/deserialized from `#AARRGGBB` strings; otherwise only `#RRGGBB`
 /// strings are accepted.
-///
-/// Internally the value is always stored in the
-/// Windows `COLORREF` format with an optional alpha byte in the most‑significant
-/// position.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Color<const ACCEPTS_ALPHA: bool = false>(pub u32);
+pub struct Color<const ACCEPTS_ALPHA: bool = false>(u32);
 
 #[allow(dead_code)]
 impl<const ACCEPTS_ALPHA: bool> Color<ACCEPTS_ALPHA> {
@@ -159,5 +155,11 @@ impl Color<false> {
             FillRect(hdc, rect, brush);
             let _ = DeleteObject(brush.into());
         }
+    }
+}
+
+impl<const ACCEPTS_ALPHA: bool> Into<COLORREF> for Color<ACCEPTS_ALPHA> {
+    fn into(self) -> COLORREF {
+        COLORREF(self.0)
     }
 }

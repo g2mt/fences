@@ -1,16 +1,16 @@
 use std::path::Path;
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use anyhow::Result;
 use import_dialog::{ImportDialog, ImportItem};
 use parking_lot::Mutex;
 use tracing::{debug, error};
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
 
 use crate::app::App;
 use crate::config::state::{FenceState, FenceStickyPosition, IconState};
@@ -18,7 +18,7 @@ use crate::desktop_cover::DesktopCover;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
 use crate::prompt;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 mod icon;
 pub mod import_dialog;
@@ -91,7 +91,7 @@ impl Window for TitleBar {
                 let config = App::config();
                 config.fence.title_bar_bg_color.paint_background(hdc, &rect);
                 SetBkMode(hdc, TRANSPARENT);
-                SetTextColor(hdc, COLORREF(config.fence.title_text_color.0));
+                SetTextColor(hdc, config.fence.title_text_color.into());
 
                 let mut text_rect = rect;
                 text_rect.left += 5;
