@@ -1,23 +1,23 @@
 use std::process::Command;
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::Mutex;
 use tracing::{debug, error, info};
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
 
 use crate::app::App;
 use crate::config::state::{AppState, FenceStickyPosition};
 use crate::fence::{Fence, HitTest};
 use crate::prompt;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Menus
 pub const IDM_EXIT: usize = 101;
@@ -80,17 +80,22 @@ impl DesktopCover {
             0,
             width,
             height,
-            HWND::default(),
+            unsafe {
+                // https://stackoverflow.com/a/32589338
+                let progman = FindWindowW(w!("Progman"), PCWSTR::null()).unwrap_or_default();
+                FindWindowExW(
+                    Some(progman),
+                    Some(HWND::default()),
+                    w!("SHELLDLL_DefView"),
+                    PCWSTR::null(),
+                )
+                .unwrap_or_default()
+            },
             None,
             h_instance.into(),
             |base| {
                 let hwnd = base.hwnd();
                 unsafe {
-                    let progman = FindWindowW(w!("Progman"), PCWSTR::null()).unwrap_or_default();
-                    let defview = FindWindowExW(progman, HWND::default(), w!("SHELLDLL_DefView"), PCWSTR::null()).unwrap_or_default();
-                    if !defview.is_invalid() {
-                        let _ = SetParent(hwnd, defview);
-                    }
                     let mut nid: NOTIFYICONDATAW = std::mem::zeroed();
                     nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
                     nid.hWnd = hwnd;
