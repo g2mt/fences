@@ -86,6 +86,11 @@ impl DesktopCover {
             |base| {
                 let hwnd = base.hwnd();
                 unsafe {
+                    let progman = FindWindowW(w!("Progman"), PCWSTR::null()).unwrap_or_default();
+                    let defview = FindWindowExW(progman, HWND::default(), w!("SHELLDLL_DefView"), PCWSTR::null()).unwrap_or_default();
+                    if !defview.is_invalid() {
+                        let _ = SetParent(hwnd, defview);
+                    }
                     let mut nid: NOTIFYICONDATAW = std::mem::zeroed();
                     nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
                     nid.hWnd = hwnd;
