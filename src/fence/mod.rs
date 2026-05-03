@@ -30,7 +30,7 @@ pub struct TitleBar {
 
 impl TitleBar {
     pub fn new(parent_hwnd: HWND, title: Arc<str>, fence_area: &Area<i32>) -> Result<Arc<Self>> {
-        let h_instance = unsafe {
+        let hinstance = unsafe {
             HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
         };
         let area = Self::area_from_fence_area(fence_area);
@@ -51,7 +51,7 @@ impl TitleBar {
             area.height,
             parent_hwnd,
             None,
-            h_instance,
+            hinstance,
             |base| {
                 Ok(Arc::new(Self {
                     base,
@@ -116,7 +116,7 @@ pub struct ScrollArea {
 
 impl ScrollArea {
     pub fn new(parent_hwnd: HWND, fence_area: &Area<i32>) -> Result<Arc<Self>> {
-        let h_instance = unsafe {
+        let hinstance = unsafe {
             HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
         };
         let config = App::config();
@@ -139,7 +139,7 @@ impl ScrollArea {
             area.height,
             parent_hwnd,
             None,
-            h_instance,
+            hinstance,
             |base| Ok(Arc::new(Self { base })),
         )
     }
@@ -320,7 +320,7 @@ impl Fence {
 
     pub fn from_state(cover: &DesktopCover, state: FenceState) -> Result<Arc<Self>> {
         let parent_hwnd = cover.base().hwnd();
-        let h_instance = unsafe {
+        let hinstance = unsafe {
             HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
         };
         Base::create_window(
@@ -334,7 +334,7 @@ impl Fence {
             state.area.height,
             parent_hwnd,
             None,
-            h_instance,
+            hinstance,
             |base| {
                 let title_bar = TitleBar::new(base.hwnd(), state.title.clone(), &state.area)?;
                 let scroll_area = ScrollArea::new(base.hwnd(), &state.area)?;

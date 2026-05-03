@@ -1,5 +1,4 @@
 use std::cell::LazyCell;
-use std::thread::LocalKey;
 
 use windows::core::*;
 use windows::Win32::Foundation::*;
@@ -20,7 +19,7 @@ thread_local! {
             std::mem::size_of::<NONCLIENTMETRICSW>() as u32,
             Some(&mut ncm as *mut NONCLIENTMETRICSW as *mut _),
             Default::default(),
-        );
+        ).unwrap();
         CreateFontIndirectW(&ncm.lfMessageFont)
     });
 }

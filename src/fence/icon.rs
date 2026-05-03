@@ -24,7 +24,7 @@ pub struct Icon {
 
 impl Icon {
     pub fn new(parent_hwnd: HWND, title: &str, path: Option<&str>, x: i32, y: i32) -> Arc<Self> {
-        let h_instance = unsafe {
+        let hinstance = unsafe {
             HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
         };
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
@@ -47,7 +47,7 @@ impl Icon {
             icon_size,
             parent_hwnd,
             None,
-            h_instance,
+            hinstance,
             |base| {
                 Ok(Arc::new(Self {
                     base,

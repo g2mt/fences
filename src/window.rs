@@ -55,8 +55,8 @@ pub fn register_classname_ex(name: &str, mut wc: WNDCLASSW) -> ClassName {
         return existing.clone();
     }
     unsafe {
-        let h_instance = GetModuleHandleW(None).unwrap_or_default();
-        wc.hInstance = h_instance.into();
+        let hinstance = GetModuleHandleW(None).unwrap_or_default();
+        wc.hInstance = hinstance.into();
         wc.lpszClassName = PCWSTR(class_name.0.as_ptr());
         wc.lpfnWndProc = Some(base_wndproc);
         if RegisterClassW(&wc) == 0 {

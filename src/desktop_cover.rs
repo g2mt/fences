@@ -61,7 +61,7 @@ struct DesktopCoverInner {
 
 impl DesktopCover {
     pub fn new() -> Result<Arc<Self>> {
-        let h_instance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
+        let hinstance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
 
         let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
@@ -92,7 +92,7 @@ impl DesktopCover {
                 .unwrap_or_default()
             },
             None,
-            h_instance.into(),
+            hinstance.into(),
             |base| {
                 let hwnd = base.hwnd();
                 unsafe {
@@ -103,7 +103,7 @@ impl DesktopCover {
                     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
                     nid.uCallbackMessage = WM_USER_SHELLICON;
                     // winresource puts icon at ID 1
-                    nid.hIcon = LoadIconW(Some(h_instance.into()), PCWSTR(1usize as *const u16))
+                    nid.hIcon = LoadIconW(Some(hinstance.into()), PCWSTR(1usize as *const u16))
                         .or_else(|_| LoadIconW(None, IDI_APPLICATION))
                         .unwrap_or_default();
                     let tip: Vec<u16> = "Desktop Cover"

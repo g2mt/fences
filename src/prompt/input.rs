@@ -9,7 +9,6 @@ use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::fut::{PromptFuture, PromptState};
-use crate::utils;
 
 const ID_EDIT: u32 = 101;
 const ID_OK: u32 = 1;
@@ -158,7 +157,7 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
     }));
 
     unsafe {
-        let h_instance = GetModuleHandleW(None).unwrap_or_default();
+        let hinstance = GetModuleHandleW(None).unwrap_or_default();
 
         if CLASS_REGISTERED
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
@@ -167,7 +166,7 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
             let mut wc: WNDCLASSW = std::mem::zeroed();
             wc.style = CS_HREDRAW | CS_VREDRAW;
             wc.lpfnWndProc = Some(input_wndproc);
-            wc.hInstance = h_instance.into();
+            wc.hInstance = hinstance.into();
             wc.hbrBackground = HBRUSH((COLOR_BTNFACE.0 + 1) as *mut core::ffi::c_void);
             wc.lpszClassName = w!("InputDialogClass");
             RegisterClassW(&wc);
@@ -192,7 +191,7 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
             150,
             None,
             None,
-            Some(h_instance.into()),
+            Some(hinstance.into()),
             Some(data_ptr as *mut core::ffi::c_void),
         );
 

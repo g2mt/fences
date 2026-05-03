@@ -11,7 +11,6 @@ use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
-use crate::utils;
 use crate::window::{register_classname_ex, Base, BaseRef, Window};
 
 const ID_LISTVIEW: u32 = 1001;
