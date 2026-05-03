@@ -592,11 +592,6 @@ impl DesktopCover {
         let hwnd = self.base().hwnd();
         let command = (wparam.0 & 0xFFFF) as u16 as usize;
         debug!("command: {}", command);
-        let hit_type;
-        {
-            let mut inner = self.inner.lock();
-            hit_type = inner.hit_type.take();
-        }
 
         let mut should_save = false;
         match command {
@@ -644,7 +639,7 @@ impl DesktopCover {
             | IDM_STICKY_BOTTOMLEFT
             | IDM_STICKY_BOTTOMRIGHT
             | IDM_OPEN_EXPLORER => {
-                self.trigger_fence_command(wparam, hit_type);
+                should_save = self.trigger_fence_command(wparam);
             }
             IDM_RELOAD => {
                 // Spawn a new instance of the same executable
