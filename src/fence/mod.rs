@@ -11,9 +11,11 @@ use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::*;
+use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::app::App;
+use crate::commands::*;
 use crate::config::state::{FenceState, FenceStickyPosition, IconState};
 use crate::desktop_cover::DesktopCover;
 use crate::fence::icon::Icon;
@@ -275,7 +277,7 @@ impl Window for ScrollArea {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub enum HitTest {
+pub enum HitType {
     TitleBar,
     Client,
     Icon(usize),
@@ -382,7 +384,7 @@ impl Fence {
         }
     }
 
-    pub fn hit_test(&self, x: i32, y: i32) -> Option<HitTest> {
+    pub fn hit_test(&self, x: i32, y: i32) -> Option<HitType> {
         let config = App::config();
         let border = config.fence.border_thickness;
         let title_h = config.fence.title_bar_height;
@@ -398,17 +400,17 @@ impl Fence {
         let on_bottom = y >= rect.bottom - border;
 
         let hit = match (on_left, on_right, on_top, on_bottom) {
-            (true, _, true, _) => HitTest::TopLeft,
-            (_, true, true, _) => HitTest::TopRight,
-            (true, _, _, true) => HitTest::BottomLeft,
-            (_, true, _, true) => HitTest::BottomRight,
-            (true, _, _, _) => HitTest::Left,
-            (_, true, _, _) => HitTest::Right,
-            (_, _, true, _) => HitTest::Top,
-            (_, _, _, true) => HitTest::Bottom,
+            (true, _, true, _) => HitType::TopLeft,
+            (_, true, true, _) => HitType::TopRight,
+            (true, _, _, true) => HitType::BottomLeft,
+            (_, true, _, true) => HitType::BottomRight,
+            (true, _, _, _) => HitType::Left,
+            (_, true, _, _) => HitType::Right,
+            (_, _, true, _) => HitType::Top,
+            (_, _, _, true) => HitType::Bottom,
             _ => {
                 if y < rect.top + title_h {
-                    HitTest::TitleBar
+                    HitType::TitleBar
                 } else {
                     let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
                     si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
@@ -423,11 +425,11 @@ impl Fence {
                     let inner = self.inner.lock();
                     for (i, icon) in inner.icons.iter().enumerate() {
                         if icon.hit_test(rel_x, rel_y) {
-                            icon_hit = Some(HitTest::Icon(i));
+                            icon_hit = Some(HitType::Icon(i));
                             break;
                         }
                     }
-                    icon_hit.unwrap_or(HitTest::Client)
+                    icon_hit.unwrap_or(HitType::Client)
                 }
             }
         };
@@ -723,6 +725,171 @@ impl Fence {
         unsafe { SetScrollInfo(self.scroll_area.base().hwnd(), SB_VERT, &si, true) };
         drop(inner);
     }
+
+    fn on_paint(&self) -> LRESULT {
+        let hwnd = self.base().hwnd();
+        unsafe {
+            let mut ps: PAINTSTRUCT = std::mem::zeroed();
+            let hdc = BeginPaint(hwnd, &mut ps);
+
+            let mut rect: RECT = std::mem::zeroed();
+            let _ = GetClientRect(hwnd, &mut rect);
+
+            let config = App::config();
+            config.fence.fence_bg_color.paint_background(hdc, &rect);
+
+            let _ = EndPaint(hwnd, &ps);
+        }
+        LRESULT(0)
+    }
+
+    fn on_move(&self, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().hwnd();
+        unsafe {
+            let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
+            DefWindowProcW(hwnd, WM_MOVE, wparam, lparam)
+        }
+    }
+
+    pub fn on_command(
+        self: &Arc<Self>,
+        cover: &DesktopCover,
+        command: usize,
+        hit_type: HitType,
+    ) -> bool {
+        let mut should_save = false;
+
+        match command {
+            IDM_ADD_ICON => {
+                let title = format!("Icon #{}", self.icon_count());
+                self.add_icon(&title);
+                should_save = true;
+            }
+            IDM_RENAME_FENCE => {
+                let fence = self.clone();
+                let current_title = String::from(&fence.title() as &str);
+                cover.executor().spawn(async move {
+                    if let Some(new_title) =
+                        prompt::input("Rename fence", "Enter new fence name:", &current_title).await
+                    {
+                        if !new_title.is_empty() {
+                            fence.set_title(new_title.into());
+                            App::get().save_thread.get().unwrap().set_unsaved();
+                        }
+                    }
+                });
+            }
+            IDM_DELETE_FENCE => {
+                let fence = self.clone();
+                cover.executor().spawn(async move {
+                    let result = prompt::confirm(
+                        None,
+                        w!("Are you sure you want to delete this fence?"),
+                        w!("Confirm Deletion"),
+                        MB_YESNO | MB_ICONQUESTION,
+                    )
+                    .await;
+                    if result == IDYES {
+                        let app = App::get();
+                        app.cover.get().unwrap().remove_fence(&fence);
+                        app.save_thread.get().unwrap().set_unsaved();
+                    }
+                });
+            }
+            IDM_RUN_ICON => {
+                if let HitType::Icon(icon_idx) = hit_type {
+                    let icon = self.icon_by_index(icon_idx).unwrap();
+                    icon.run();
+                }
+            }
+            IDM_RENAME_ICON => {
+                if let HitType::Icon(icon_idx) = hit_type {
+                    let icon = self.icon_by_index(icon_idx).unwrap();
+                    let current_title = String::from(&icon.title() as &str);
+                    cover.executor().spawn(async move {
+                        if let Some(new_title) =
+                            prompt::input("Rename icon", "Enter new icon name:", &current_title)
+                                .await
+                        {
+                            if !new_title.is_empty() {
+                                icon.set_title(new_title.into());
+                                App::get().save_thread.get().unwrap().set_unsaved();
+                            }
+                        }
+                    });
+                }
+            }
+            IDM_SET_ICON_PATH => {
+                if let HitType::Icon(icon_idx) = hit_type {
+                    let icon = self.icon_by_index(icon_idx).unwrap();
+                    icon.set_info_from_selector();
+                    should_save = true;
+                }
+            }
+            IDM_DELETE_ICON => {
+                if let HitType::Icon(icon_idx) = hit_type {
+                    self.remove_icon(icon_idx);
+                    should_save = true;
+                }
+            }
+            IDM_IMPORT => {
+                if self.imported_from().is_some() {
+                    self.show_import_existing_dialog();
+                } else {
+                    let fence = self.clone();
+                    cover.executor().spawn(async move {
+                        fence.show_import_from_dialog().await;
+                    });
+                }
+                should_save = true;
+            }
+            IDM_IMPORT_FROM => {
+                let fence = self.clone();
+                cover.executor().spawn(async move {
+                    fence.show_import_from_dialog().await;
+                });
+                should_save = true;
+            }
+            IDM_STICKY_NONE
+            | IDM_STICKY_TOPLEFT
+            | IDM_STICKY_TOPRIGHT
+            | IDM_STICKY_BOTTOMLEFT
+            | IDM_STICKY_BOTTOMRIGHT => {
+                let sticky = match command {
+                    IDM_STICKY_TOPLEFT => Some(FenceStickyPosition::TopLeft),
+                    IDM_STICKY_TOPRIGHT => Some(FenceStickyPosition::TopRight),
+                    IDM_STICKY_BOTTOMLEFT => Some(FenceStickyPosition::BottomLeft),
+                    IDM_STICKY_BOTTOMRIGHT => Some(FenceStickyPosition::BottomRight),
+                    _ => None,
+                };
+                self.set_sticky(sticky);
+                should_save = true;
+            }
+            IDM_OPEN_EXPLORER => {
+                if let Some(import_path) = self.imported_from() {
+                    let path_wide: Vec<u16> = import_path
+                        .encode_utf16()
+                        .chain(std::iter::once(0))
+                        .collect();
+                    unsafe {
+                        let _ = ShellExecuteW(
+                            None,
+                            w!("open"),
+                            PCWSTR(path_wide.as_ptr()),
+                            PCWSTR::null(),
+                            PCWSTR::null(),
+                            SW_SHOWNORMAL,
+                        );
+                    }
+                }
+            }
+            other => {
+                panic!("invalid command: {}", other);
+            }
+        }
+
+        should_save
+    }
 }
 
 impl Window for Fence {
@@ -734,23 +901,8 @@ impl Window for Fence {
         let hwnd = self.base().hwnd();
         match msg {
             WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
-            WM_MOVE => unsafe {
-                let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
-                DefWindowProcW(hwnd, msg, wparam, lparam)
-            },
-            WM_PAINT => unsafe {
-                let mut ps: PAINTSTRUCT = std::mem::zeroed();
-                let hdc = BeginPaint(hwnd, &mut ps);
-
-                let mut rect: RECT = std::mem::zeroed();
-                let _ = GetClientRect(hwnd, &mut rect);
-
-                let config = App::config();
-                config.fence.fence_bg_color.paint_background(hdc, &rect);
-
-                let _ = EndPaint(hwnd, &ps);
-                LRESULT(0)
-            },
+            WM_MOVE => self.on_move(wparam, lparam),
+            WM_PAINT => self.on_paint(),
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
     }
