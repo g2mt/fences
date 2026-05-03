@@ -82,19 +82,15 @@ unsafe extern "system" fn input_wndproc(
             );
 
             // Create Cancel button
-            let _ = CreateWindowExW(
-                WINDOW_EX_STYLE(0),
-                w!("BUTTON"),
-                w!("Cancel"),
-                WS_VISIBLE | WS_CHILD,
+            let _ = crate::utils::create_button(
+                "Cancel",
                 130,
                 80,
                 60,
                 25,
-                Some(hwnd),
+                hwnd,
                 Some(HMENU(ID_CANCEL as *mut core::ffi::c_void)),
-                Some(GetModuleHandleW(None).unwrap_or_default().into()),
-                None,
+                GetModuleHandleW(None).unwrap_or_default(),
             );
 
             // Set the edit's initial text
