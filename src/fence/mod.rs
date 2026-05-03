@@ -84,12 +84,14 @@ impl TitleBar {
         let config = App::config();
         unsafe {
             config.fence.title_bar_bg_color.paint_background(hdc, &rect);
-            SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, config.fence.title_text_color.into());
         }
 
         let mut text_rect = rect;
         text_rect.left += 5;
+        unsafe {
+            SetBkMode(hdc, TRANSPARENT);
+            SetTextColor(hdc, COLORREF(config.fence.title_text_color.bgr()));
+        }
         App::get().draw_text(
             hdc,
             &self.title.lock(),
@@ -491,8 +493,7 @@ impl Fence {
             let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, pixel_count);
             let config = App::config();
             for p in pixels.iter_mut() {
-                // *p = config.fence.title_bar_bg_color.argb();
-                *p = (127 << 24) | (0 << 16) | (0 << 8) | 127;
+                *p = config.fence.fence_bg_color.argb();
             }
             SendMessageW(
                 hwnd,

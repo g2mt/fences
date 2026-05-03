@@ -117,39 +117,33 @@ impl<'de, const ACCEPTS_ALPHA: bool> Deserialize<'de> for Color<ACCEPTS_ALPHA> {
 impl Color<true> {
     pub unsafe fn paint_background(&self, hdc: HDC, rect: &RECT) {
         unsafe {
-            let alpha = self.a();
-            if alpha == 255 {
-                let brush = CreateSolidBrush(COLORREF(self.abgr()));
-                FillRect(hdc, rect, brush);
-                let _ = DeleteObject(brush.into());
-            } else if alpha > 0 {
-                let mem_dc = CreateCompatibleDC(Some(hdc));
-                let width = rect.right - rect.left;
-                let height = rect.bottom - rect.top;
-                let bitmap = CreateCompatibleBitmap(hdc, width, height);
-                SelectObject(mem_dc, bitmap.into());
+            let alpha = 0xff - self.a();
+            let mem_dc = CreateCompatibleDC(Some(hdc));
+            let width = rect.right - rect.left;
+            let height = rect.bottom - rect.top;
+            let bitmap = CreateCompatibleBitmap(hdc, width, height);
+            SelectObject(mem_dc, bitmap.into());
 
-                let brush = CreateSolidBrush(COLORREF(self.bgr()));
-                let local_rect = RECT {
-                    left: 0,
-                    top: 0,
-                    right: width,
-                    bottom: height,
-                };
-                let _ = FillRect(mem_dc, &local_rect, brush);
-                let _ = DeleteObject(brush.into());
+            let brush = CreateSolidBrush(COLORREF(self.bgr()));
+            let local_rect = RECT {
+                left: 0,
+                top: 0,
+                right: width,
+                bottom: height,
+            };
+            let _ = FillRect(mem_dc, &local_rect, brush);
+            let _ = DeleteObject(brush.into());
 
-                let blend = BLENDFUNCTION {
-                    BlendOp: AC_SRC_OVER as u8,
-                    BlendFlags: 0,
-                    SourceConstantAlpha: alpha,
-                    AlphaFormat: 0,
-                };
-                let _ = GdiAlphaBlend(hdc, 0, 0, width, height, mem_dc, 0, 0, width, height, blend);
+            let blend = BLENDFUNCTION {
+                BlendOp: AC_SRC_OVER as u8,
+                BlendFlags: 0,
+                SourceConstantAlpha: alpha,
+                AlphaFormat: 0,
+            };
+            let _ = GdiAlphaBlend(hdc, 0, 0, width, height, mem_dc, 0, 0, width, height, blend);
 
-                let _ = DeleteObject(bitmap.into());
-                let _ = DeleteDC(mem_dc);
-            }
+            let _ = DeleteObject(bitmap.into());
+            let _ = DeleteDC(mem_dc);
         }
     }
 }

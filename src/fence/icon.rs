@@ -130,7 +130,7 @@ impl Icon {
         } else {
             config.icon.unselected_bg_color
         };
-
+        #[cfg(not(feature = "use-UpdateLayeredWindow"))]
         if bg_color.a() < 255 {
             let mirror = App::get().mirror.lock();
             let screen_left = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
@@ -148,6 +148,9 @@ impl Icon {
                     SRCCOPY,
                 )
             };
+            unsafe {
+                config.fence_bg_color.paint_background(hdc, &rect);
+            }
         }
         unsafe {
             bg_color.paint_background(hdc, &rect);
@@ -199,7 +202,7 @@ impl Icon {
 
         unsafe {
             SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, config.icon.text_color.into());
+            SetTextColor(hdc, COLORREF(config.icon.text_color.bgr()));
         }
 
         let mut text_rect = rect;
