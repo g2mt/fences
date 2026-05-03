@@ -20,6 +20,10 @@ impl<const ACCEPTS_ALPHA: bool> Color<ACCEPTS_ALPHA> {
         Self(n)
     }
 
+    pub fn argb(&self) -> u32 {
+        self.0
+    }
+
     /// Red component (0..255).
     pub fn r(&self) -> u8 {
         ((self.0 >> 16) & 0xFF) as u8

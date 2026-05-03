@@ -21,6 +21,7 @@ use crate::desktop_cover::DesktopCover;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
 use crate::prompt;
+use crate::utils::HWNDWrapper;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 mod icon;
@@ -331,12 +332,12 @@ impl Fence {
                 cover.base().hwnd()
             }
         };
-        debug!("{:?}", parent_hwnd);
+        debug!("parent_hwnd={:?}", parent_hwnd);
         Base::create_window(
             {
                 #[cfg(feature = "use-UpdateLayeredWindow")]
                 {
-                    WS_EX_LAYERED
+                    WS_EX_NOACTIVATE | WS_EX_LAYERED
                 }
                 #[cfg(not(feature = "use-UpdateLayeredWindow"))]
                 {
@@ -345,15 +346,7 @@ impl Fence {
             },
             register_classname("Fence"),
             PCWSTR::null(),
-            {
-                let mut ws = if !parent_hwnd.is_invalid() {
-                    WS_CHILD
-                } else {
-                    WS_POPUP
-                };
-                ws |= WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
-                ws
-            },
+            WS_POPUP | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
             state.area.x,
             state.area.y,
             state.area.width,
@@ -379,10 +372,21 @@ impl Fence {
                 for icon_state in state.icons {
                     fence.add_icon_with_path(&icon_state.title, icon_state.path.as_deref());
                 }
-                /* #[cfg(feature = "use-UpdateLayeredWindow")]
+                #[cfg(feature = "use-UpdateLayeredWindow")]
                 {
                     fence.paint_with_alpha();
-                } */
+                    unsafe {
+                        let _ = SetWindowPos(
+                            fence.base().hwnd(),
+                            Some(HWND_BOTTOM),
+                            0,
+                            0,
+                            0,
+                            0,
+                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+                        );
+                    }
+                }
                 Ok(fence)
             },
         )
@@ -441,10 +445,16 @@ impl Fence {
             let pixel_count = (width * height) as usize;
             let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, pixel_count);
 
-            let color = (127 << 24) | (0 << 16) | (0 << 8) | 127;
+            let config = App::config();
             for p in pixels.iter_mut() {
-                *p = color;
+                *p = config.fence.title_bar_bg_color.argb();
             }
+            SendMessageA(
+                hwnd,
+                WM_PRINT,
+                WPARAM(hdc_mem.0 as _),
+                LPARAM((PRF_CLIENT | PRF_CHILDREN | PRF_OWNED) as _),
+            );
 
             let mut size = SIZE {
                 cx: width,
