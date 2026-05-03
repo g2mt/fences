@@ -748,6 +748,152 @@ impl Fence {
             DefWindowProcW(hwnd, WM_MOVE, wparam, lparam)
         }
     }
+
+    pub fn on_command(self: &Arc<Self>, wparam: WPARAM, hit_type: Option<HitTest>) {
+        let command = (wparam.0 & 0xFFFF) as u16 as usize;
+        let mut should_save = false;
+
+        match command {
+            crate::desktop_cover::IDM_ADD_ICON => {
+                let title = format!("Icon #{}", self.icon_count());
+                self.add_icon(&title);
+                should_save = true;
+            }
+            crate::desktop_cover::IDM_RENAME_FENCE => {
+                let fence = self.clone();
+                let current_title = String::from(&fence.title() as &str);
+                App::get().executor().spawn(async move {
+                    if let Some(new_title) =
+                        prompt::input("Rename fence", "Enter new fence name:", &current_title)
+                            .await
+                    {
+                        if !new_title.is_empty() {
+                            fence.set_title(new_title.into());
+                            App::get().save_thread.get().unwrap().set_unsaved();
+                        }
+                    }
+                });
+            }
+            crate::desktop_cover::IDM_DELETE_FENCE => {
+                let result = unsafe {
+                    MessageBoxW(
+                        Some(self.base().hwnd()),
+                        w!("Are you sure you want to delete this fence?"),
+                        w!("Confirm Deletion"),
+                        MB_YESNO | MB_ICONQUESTION,
+                    )
+                };
+                if result == IDYES {
+                    let cover = App::get().cover.get().unwrap();
+                    let mut inner = cover.inner.lock();
+                    if let Some(pos) = inner.fences.iter().position(|f| Arc::ptr_eq(f, self)) {
+                        inner.fences.remove(pos);
+                    }
+                }
+                should_save = true;
+            }
+            crate::desktop_cover::IDM_RUN_ICON => {
+                if let Some(HitTest::Icon(icon_idx)) = hit_type {
+                    if let Some(icon) = self.icon_by_index(icon_idx) {
+                        icon.run();
+                    }
+                }
+            }
+            crate::desktop_cover::IDM_RENAME_ICON => {
+                if let Some(HitTest::Icon(icon_idx)) = hit_type {
+                    if let Some(icon) = self.icon_by_index(icon_idx) {
+                        let current_title = String::from(&icon.title() as &str);
+                        App::get().executor().spawn(async move {
+                            if let Some(new_title) =
+                                prompt::input("Rename icon", "Enter new icon name:", &current_title)
+                                    .await
+                            {
+                                if !new_title.is_empty() {
+                                    icon.set_title(new_title.into());
+                                    App::get().save_thread.get().unwrap().set_unsaved();
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+            crate::desktop_cover::IDM_SET_ICON_PATH => {
+                if let Some(HitTest::Icon(icon_idx)) = hit_type {
+                    if let Some(icon) = self.icon_by_index(icon_idx) {
+                        icon.set_info_from_selector();
+                        should_save = true;
+                    }
+                }
+            }
+            crate::desktop_cover::IDM_DELETE_ICON => {
+                if let Some(HitTest::Icon(icon_idx)) = hit_type {
+                    self.remove_icon(icon_idx);
+                    should_save = true;
+                }
+            }
+            crate::desktop_cover::IDM_IMPORT => {
+                if self.imported_from().is_some() {
+                    self.show_import_existing_dialog();
+                } else {
+                    let fence = self.clone();
+                    App::get().executor().spawn(async move {
+                        fence.show_import_from_dialog().await;
+                    });
+                }
+                should_save = true;
+            }
+            crate::desktop_cover::IDM_IMPORT_FROM => {
+                let fence = self.clone();
+                App::get().executor().spawn(async move {
+                    fence.show_import_from_dialog().await;
+                });
+                should_save = true;
+            }
+            crate::desktop_cover::IDM_STICKY_NONE
+            | crate::desktop_cover::IDM_STICKY_TOPLEFT
+            | crate::desktop_cover::IDM_STICKY_TOPRIGHT
+            | crate::desktop_cover::IDM_STICKY_BOTTOMLEFT
+            | crate::desktop_cover::IDM_STICKY_BOTTOMRIGHT => {
+                use crate::config::state::FenceStickyPosition;
+                let sticky = match command {
+                    crate::desktop_cover::IDM_STICKY_TOPLEFT => Some(FenceStickyPosition::TopLeft),
+                    crate::desktop_cover::IDM_STICKY_TOPRIGHT => {
+                        Some(FenceStickyPosition::TopRight)
+                    }
+                    crate::desktop_cover::IDM_STICKY_BOTTOMLEFT => {
+                        Some(FenceStickyPosition::BottomLeft)
+                    }
+                    crate::desktop_cover::IDM_STICKY_BOTTOMRIGHT => {
+                        Some(FenceStickyPosition::BottomRight)
+                    }
+                    _ => None,
+                };
+                self.set_sticky(sticky);
+                should_save = true;
+            }
+            crate::desktop_cover::IDM_OPEN_EXPLORER => {
+                if let Some(import_path) = self.imported_from() {
+                    let path_wide: Vec<u16> =
+                        import_path.encode_utf16().chain(std::iter::once(0)).collect();
+                    unsafe {
+                        let _ = ShellExecuteW(
+                            None,
+                            w!("open"),
+                            PCWSTR(path_wide.as_ptr()),
+                            PCWSTR::null(),
+                            PCWSTR::null(),
+                            SW_SHOWNORMAL,
+                        );
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        if should_save {
+            App::get().save_thread.get().unwrap().set_unsaved();
+        }
+    }
 }
 
 impl Window for Fence {

@@ -581,10 +581,11 @@ impl DesktopCover {
         LRESULT(0)
     }
 
-    fn trigger_fence_command(&self, wparam: WPARAM) {
+    fn trigger_fence_command(&self, wparam: WPARAM, hit_type: Option<HitTest>) {
         let inner = self.inner.lock();
-        let fence = inner.fences.last().unwrap();
-        fence.on_command(wparam);
+        if let Some(fence) = inner.fences.last() {
+            fence.on_command(wparam, hit_type);
+        }
     }
 
     fn on_command(&self, wparam: WPARAM) -> LRESULT {
@@ -628,171 +629,22 @@ impl DesktopCover {
                     }
                 });
             }
-            IDM_ADD_ICON => {
-                let inner = self.inner.lock();
-                if let Some(fence) = inner.fences.last() {
-                    let title = format!("Icon #{}", fence.icon_count());
-                    fence.add_icon(&title);
-                }
-                should_save = true;
-            }
-            IDM_RENAME_FENCE => {
-                let inner = self.inner.lock();
-                if let Some(fence) = inner.fences.last() {
-                    let fence = fence.clone();
-                    let current_title = String::from(&fence.title() as &str);
-                    self.executor.spawn(self, async move {
-                        if let Some(new_title) =
-                            prompt::input("Rename fence", "Enter new fence name:", &current_title)
-                                .await
-                        {
-                            if !new_title.is_empty() {
-                                fence.set_title(new_title.into());
-                                App::get().save_thread.get().unwrap().set_unsaved();
-                            }
-                        }
-                    });
-                }
-            }
-            IDM_DELETE_FENCE => {
-                let result = unsafe {
-                    MessageBoxW(
-                        Some(hwnd),
-                        w!("Are you sure you want to delete this fence?"),
-                        w!("Confirm Deletion"),
-                        MB_YESNO | MB_ICONQUESTION,
-                    )
-                };
-                if result == IDYES {
-                    let mut inner = self.inner.lock();
-                    inner.fences.pop();
-                }
-                should_save = true;
-            }
-            IDM_RUN_ICON => {
-                if let Some(HitTest::Icon(icon_idx)) = hit_type {
-                    let inner = self.inner.lock();
-                    let icon = inner
-                        .fences
-                        .last()
-                        .unwrap()
-                        .icon_by_index(icon_idx)
-                        .unwrap();
-                    icon.run();
-                } else {
-                    error!("IDM_RUN_ICON: invalid state");
-                }
-            }
-            IDM_RENAME_ICON => {
-                if let Some(HitTest::Icon(icon_idx)) = hit_type {
-                    let inner = self.inner.lock();
-                    let icon = inner
-                        .fences
-                        .last()
-                        .unwrap()
-                        .icon_by_index(icon_idx)
-                        .unwrap();
-                    let current_title = String::from(&icon.title() as &str);
-                    self.executor.spawn(self, async move {
-                        if let Some(new_title) =
-                            prompt::input("Rename icon", "Enter new icon name:", &current_title)
-                                .await
-                        {
-                            if !new_title.is_empty() {
-                                icon.set_title(new_title.into());
-                                App::get().save_thread.get().unwrap().set_unsaved();
-                            }
-                        }
-                    });
-                } else {
-                    error!("IDM_RENAME_ICON: invalid state");
-                }
-            }
-            IDM_SET_ICON_PATH => {
-                if let Some(HitTest::Icon(icon_idx)) = hit_type {
-                    let inner = self.inner.lock();
-                    let icon = inner
-                        .fences
-                        .last()
-                        .unwrap()
-                        .icon_by_index(icon_idx)
-                        .unwrap();
-                    icon.set_info_from_selector();
-                } else {
-                    error!("IDM_SET_ICON_PATH: invalid state");
-                }
-                should_save = true;
-            }
-            IDM_DELETE_ICON => {
-                if let Some(HitTest::Icon(icon_idx)) = hit_type {
-                    let inner = self.inner.lock();
-                    let fence = inner.fences.last().unwrap();
-                    fence.remove_icon(icon_idx);
-                } else {
-                    error!("IDM_DELETE_ICON: invalid state");
-                }
-                should_save = true;
-            }
-            IDM_IMPORT => {
-                let inner = self.inner.lock();
-                let fence = inner.fences.last().unwrap();
-                if fence.imported_from().is_some() {
-                    fence.show_import_existing_dialog();
-                } else {
-                    let fence: Arc<Fence> = fence.clone();
-                    self.executor.spawn(self, async move {
-                        fence.show_import_from_dialog().await;
-                    });
-                }
-                should_save = true;
-            }
-            IDM_IMPORT_FROM => {
-                debug!("import from");
-                let fence: Arc<Fence> = self.inner.lock().fences.last().unwrap().clone();
-                self.executor.spawn(self, async move {
-                    fence.show_import_from_dialog().await;
-                });
-                should_save = true;
-            }
-            IDM_STICKY_NONE
+            IDM_ADD_ICON
+            | IDM_RENAME_FENCE
+            | IDM_DELETE_FENCE
+            | IDM_RUN_ICON
+            | IDM_RENAME_ICON
+            | IDM_SET_ICON_PATH
+            | IDM_DELETE_ICON
+            | IDM_IMPORT
+            | IDM_IMPORT_FROM
+            | IDM_STICKY_NONE
             | IDM_STICKY_TOPLEFT
             | IDM_STICKY_TOPRIGHT
             | IDM_STICKY_BOTTOMLEFT
-            | IDM_STICKY_BOTTOMRIGHT => {
-                use crate::config::state::FenceStickyPosition;
-                let sticky = match command {
-                    IDM_STICKY_TOPLEFT => Some(FenceStickyPosition::TopLeft),
-                    IDM_STICKY_TOPRIGHT => Some(FenceStickyPosition::TopRight),
-                    IDM_STICKY_BOTTOMLEFT => Some(FenceStickyPosition::BottomLeft),
-                    IDM_STICKY_BOTTOMRIGHT => Some(FenceStickyPosition::BottomRight),
-                    _ => None,
-                };
-                let inner = self.inner.lock();
-                if let Some(fence) = inner.fences.last() {
-                    fence.set_sticky(sticky);
-                }
-                should_save = true;
-            }
-            IDM_OPEN_EXPLORER => {
-                let fence = self.inner.lock().fences.last().cloned();
-                if let Some(fence) = fence {
-                    if let Some(import_path) = fence.imported_from() {
-                        let path_wide: Vec<u16> = import_path
-                            .encode_utf16()
-                            .chain(std::iter::once(0))
-                            .collect();
-                        unsafe {
-                            ShellExecuteW(
-                                None,
-                                w!("open"),
-                                PCWSTR(path_wide.as_ptr()),
-                                PCWSTR::null(),
-                                PCWSTR::null(),
-                                SW_SHOWNORMAL,
-                            );
-                        }
-                    }
-                }
+            | IDM_STICKY_BOTTOMRIGHT
+            | IDM_OPEN_EXPLORER => {
+                self.trigger_fence_command(wparam, hit_type);
             }
             IDM_RELOAD => {
                 // Spawn a new instance of the same executable
