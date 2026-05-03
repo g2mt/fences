@@ -768,7 +768,7 @@ impl Fence {
             IDM_RENAME_FENCE => {
                 let fence = self.clone();
                 let current_title = String::from(&fence.title() as &str);
-                cover.executor().spawn(cover, async move {
+                cover.executor().spawn(async move {
                     if let Some(new_title) =
                         prompt::input("Rename fence", "Enter new fence name:", &current_title).await
                     {
@@ -781,7 +781,7 @@ impl Fence {
             }
             IDM_DELETE_FENCE => {
                 let fence = self.clone();
-                cover.executor().spawn(cover, async move {
+                cover.executor().spawn(async move {
                     let result = prompt::confirm(
                         None,
                         w!("Are you sure you want to delete this fence?"),
@@ -807,7 +807,7 @@ impl Fence {
                 if let HitType::Icon(icon_idx) = hit_type {
                     if let Some(icon) = self.icon_by_index(icon_idx) {
                         let current_title = String::from(&icon.title() as &str);
-                        cover.executor().spawn(cover, async move {
+                        cover.executor().spawn(async move {
                             if let Some(new_title) =
                                 prompt::input("Rename icon", "Enter new icon name:", &current_title)
                                     .await
@@ -840,7 +840,7 @@ impl Fence {
                     self.show_import_existing_dialog();
                 } else {
                     let fence = self.clone();
-                    cover.executor().spawn(cover, async move {
+                    cover.executor().spawn(async move {
                         fence.show_import_from_dialog().await;
                     });
                 }
@@ -848,7 +848,7 @@ impl Fence {
             }
             IDM_IMPORT_FROM => {
                 let fence = self.clone();
-                cover.executor().spawn(cover, async move {
+                cover.executor().spawn(async move {
                     fence.show_import_from_dialog().await;
                 });
                 should_save = true;
