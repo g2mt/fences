@@ -577,10 +577,10 @@ impl DesktopCover {
         LRESULT(0)
     }
 
-    fn trigger_fence_command(&self, wparam: WPARAM, hit_type: HitType) -> bool {
+    fn trigger_fence_command(&self, command: usize, hit_type: HitType) -> bool {
         let inner = self.inner.lock();
         if let Some(fence) = inner.fences.last() {
-            fence.on_command(self, wparam, hit_type)
+            fence.on_command(self, command, hit_type)
         } else {
             false
         }
@@ -641,7 +641,7 @@ impl DesktopCover {
                     let mut inner = self.inner.lock();
                     inner.hit_type.take()
                 } {
-                    should_save = self.trigger_fence_command(wparam, hit_type);
+                    should_save = self.trigger_fence_command(command, hit_type);
                 }
             }
             IDM_RELOAD => {

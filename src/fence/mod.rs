@@ -781,7 +781,6 @@ impl Fence {
             }
             IDM_DELETE_FENCE => {
                 let fence = self.clone();
-                let cover_clone = cover.clone();
                 cover.executor().spawn(cover, async move {
                     let result = prompt::confirm(
                         None,
@@ -791,8 +790,9 @@ impl Fence {
                     )
                     .await;
                     if result == IDYES {
-                        cover_clone.remove_fence(&fence);
-                        App::get().save_thread.get().unwrap().set_unsaved();
+                        let app = App::get();
+                        app.cover.get().unwrap().remove_fence(&fence);
+                        app.save_thread.get().unwrap().set_unsaved();
                     }
                 });
             }
