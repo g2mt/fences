@@ -21,11 +21,11 @@ impl<const ACCEPTS_ALPHA: bool> Color<ACCEPTS_ALPHA> {
     }
 
     pub fn bgr(&self) -> u32 {
-        todo!()
+        (u32::from(self.b()) << 16) | (u32::from(self.g()) << 8) | u32::from(self.r())
     }
 
     pub fn abgr(&self) -> u32 {
-        todo!()
+        (u32::from(self.a()) << 24) | self.bgr()
     }
 
     pub fn argb(&self) -> u32 {
