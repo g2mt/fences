@@ -17,6 +17,7 @@ use crate::app::App;
 use crate::config::state::{AppState, FenceStickyPosition};
 use crate::fence::{Fence, HitTest};
 use crate::prompt;
+use crate::utils::HWNDWrapper;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Menus
@@ -66,20 +67,27 @@ impl DesktopCover {
         let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
         {
-            let bounds = App::get().screen_bounds();
+            let app = App::get();
+            let bounds = app.screen_bounds();
             bounds.width.store(width, Ordering::Relaxed);
             bounds.height.store(height, Ordering::Relaxed);
+            app.hwnd_shell.get_or_init(|| unsafe {
+                // https://stackoverflow.com/a/32589338
+                let progman = FindWindowW(w!("Progman"), PCWSTR::null()).unwrap_or_default();
+                HWNDWrapper(
+                    FindWindowExW(
+                        Some(progman),
+                        Some(HWND::default()),
+                        w!("SHELLDLL_DefView"),
+                        PCWSTR::null(),
+                    )
+                    .unwrap_or_default(),
+                )
+            });
         }
 
         Base::create_window(
-            {
-                let mut flags = WS_EX_NOACTIVATE | WS_EX_LAYERED;
-                #[cfg(feature = "use-UpdateLayeredWindow")]
-                {
-                    flags |= WS_EX_TRANSPARENT;
-                }
-                flags
-            },
+            WS_EX_NOACTIVATE | WS_EX_LAYERED,
             register_classname("BottomWindowClass"),
             w!("Desktop Cover"),
             WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN,
@@ -87,17 +95,7 @@ impl DesktopCover {
             0,
             width,
             height,
-            unsafe {
-                // https://stackoverflow.com/a/32589338
-                let progman = FindWindowW(w!("Progman"), PCWSTR::null()).unwrap_or_default();
-                FindWindowExW(
-                    Some(progman),
-                    Some(HWND::default()),
-                    w!("SHELLDLL_DefView"),
-                    PCWSTR::null(),
-                )
-                .unwrap_or_default()
-            },
+            App::get().hwnd_shell.get().unwrap().0,
             None,
             hinstance.into(),
             |base| {
@@ -121,11 +119,7 @@ impl DesktopCover {
                     nid.szTip[..len].copy_from_slice(&tip[..len]);
                     let _ = Shell_NotifyIconW(NIM_ADD, &nid);
 
-                    #[cfg(feature = "use-SetLayeredWindowAttributes")]
-                    {
-                        let _ =
-                            SetLayeredWindowAttributes(hwnd, COLORREF(0x00000000), 0, LWA_COLORKEY);
-                    }
+                    let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0x00000000), 0, LWA_COLORKEY);
 
                     let _ = SetWindowPos(
                         hwnd,
@@ -147,10 +141,11 @@ impl DesktopCover {
                     }),
                     executor: crate::fut::AsyncExecutor::new(),
                 });
+                /*
                 #[cfg(feature = "use-UpdateLayeredWindow")]
                 {
                     cover.paint_with_alpha();
-                }
+                } */
                 Ok(cover)
             },
         )
@@ -246,10 +241,11 @@ impl DesktopCover {
             );
         }
 
+        /*
         #[cfg(feature = "use-UpdateLayeredWindow")]
         {
             self.paint_with_alpha();
-        }
+        } */
 
         App::get().save_thread.get().unwrap().set_unsaved();
         LRESULT(0)
@@ -282,6 +278,7 @@ impl DesktopCover {
         }
     }
 
+    /*
     #[cfg(feature = "use-UpdateLayeredWindow")]
     pub fn paint_with_alpha(&self) {
         debug!("paint_with_alpha");
@@ -358,9 +355,9 @@ impl DesktopCover {
             let _ = ReleaseDC(None, hdc_screen);
         }
     }
+    */
 
     fn on_paint(&self) -> LRESULT {
-        #[cfg(feature = "use-SetLayeredWindowAttributes")]
         unsafe {
             let hwnd = self.base().hwnd();
             let mut ps: PAINTSTRUCT = std::mem::zeroed();

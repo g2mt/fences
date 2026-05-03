@@ -319,7 +319,17 @@ impl Fence {
     }
 
     pub fn from_state(cover: &DesktopCover, state: FenceState) -> Result<Arc<Self>> {
-        let parent_hwnd = cover.base().hwnd();
+        let parent_hwnd = {
+            #[cfg(feature = "use-UpdateLayeredWindow")]
+            unsafe {
+                App::get().hwnd_shell.get().unwrap().0
+            }
+            #[cfg(not(feature = "use-UpdateLayeredWindow"))]
+            {
+                cover.base().hwnd()
+            }
+        };
+        debug!("{:?}", parent_hwnd);
         let hinstance = unsafe {
             HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
         };
@@ -327,7 +337,13 @@ impl Fence {
             WINDOW_EX_STYLE(0),
             register_classname("Fence"),
             PCWSTR::null(),
-            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+            if !parent_hwnd.is_invalid() {
+                WS_CHILD
+            } else {
+                WS_POPUP
+            } | WS_VISIBLE
+                | WS_CLIPSIBLINGS
+                | WS_CLIPCHILDREN,
             state.area.x,
             state.area.y,
             state.area.width,

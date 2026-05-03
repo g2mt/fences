@@ -3,14 +3,14 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, LazyLock, OnceLock, Weak};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use parking_lot::{Mutex, MutexGuard};
 use tracing::debug;
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
 use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
 
 use crate::geo::Area;
 
@@ -283,8 +283,8 @@ impl Base {
 impl Drop for Base {
     fn drop(&mut self) {
         unsafe {
-            debug!("DestroyWindow({:?})", self.hwnd);
             if self.hwnd != HWND::default() {
+                debug!("DestroyWindow({:?})", self.hwnd);
                 let _ = DestroyWindow(self.hwnd);
             }
             self.hwnd = HWND::default();
