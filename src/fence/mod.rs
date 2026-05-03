@@ -27,6 +27,9 @@ use crate::window::{register_classname, Base, BaseRef, Window};
 mod icon;
 pub mod import_dialog;
 
+// Custom events
+pub const WM_USER_PAINT_WITH_ALPHA: u32 = WM_USER + 1;
+
 pub struct TitleBar {
     base: BaseRef,
     title: Mutex<Arc<str>>,
@@ -1007,6 +1010,8 @@ impl Window for Fence {
             WM_MOVE => self.on_move(wparam, lparam),
             #[cfg(not(feature = "use-UpdateLayeredWindow"))]
             WM_PAINT => self.on_paint(),
+            #[cfg(feature = "use-UpdateLayeredWindow")]
+            WM_USER_PAINT_WITH_ALPHA => self.paint_with_alpha(),
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
     }
