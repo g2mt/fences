@@ -114,6 +114,104 @@ impl Icon {
         }
     }
 
+    fn paint(&self, hdc: HDC) {
+        let hwnd = self.base().hwnd();
+        let mut rect: RECT = unsafe { std::mem::zeroed() };
+        let _ = unsafe { GetClientRect(hwnd, &mut rect) };
+
+        let mut pt = POINT { x: 0, y: 0 };
+        let _ = unsafe { ClientToScreen(hwnd, &mut pt) };
+
+        let config = App::config();
+        let selected = self.selected.load(Ordering::SeqCst);
+
+        let bg_color = if selected {
+            config.icon.selected_bg_color
+        } else {
+            config.icon.unselected_bg_color
+        };
+
+        if bg_color.a() < 255 {
+            let mirror = App::get().mirror.lock();
+            let screen_left = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
+            let screen_top = unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) };
+            let _ = unsafe {
+                BitBlt(
+                    hdc,
+                    0,
+                    0,
+                    rect.right - rect.left,
+                    rect.bottom - rect.top,
+                    Some(mirror.hdc()),
+                    pt.x - screen_left,
+                    pt.y - screen_top,
+                    SRCCOPY,
+                )
+            };
+        }
+        unsafe {
+            bg_color.paint_background(hdc, &rect);
+        }
+
+        let icon_draw_size = config.icon.icon_size_draw;
+        let width = rect.right - rect.left;
+
+        let state = self.state.lock();
+        let path = state.path.clone();
+
+        let mut hicon = HICON::default();
+        if let Some(ref path) = path {
+            let path_u16: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+            let mut shfi: SHFILEINFOW = unsafe { std::mem::zeroed() };
+            unsafe {
+                SHGetFileInfoW(
+                    PCWSTR(path_u16.as_ptr()),
+                    FILE_FLAGS_AND_ATTRIBUTES(0),
+                    Some(&mut shfi),
+                    std::mem::size_of::<SHFILEINFOW>() as u32,
+                    SHGFI_ICON | SHGFI_LARGEICON,
+                );
+            }
+            hicon = shfi.hIcon;
+        }
+
+        if hicon.is_invalid() {
+            hicon = unsafe { LoadIconW(None, IDI_APPLICATION).unwrap_or_default() };
+        }
+
+        let _ = unsafe {
+            DrawIconEx(
+                hdc,
+                (width - icon_draw_size) / 2,
+                0,
+                hicon,
+                icon_draw_size,
+                icon_draw_size,
+                0,
+                None,
+                DI_NORMAL,
+            )
+        };
+
+        if path.is_some() {
+            let _ = unsafe { DestroyIcon(hicon) };
+        }
+
+        unsafe {
+            SetBkMode(hdc, TRANSPARENT);
+            SetTextColor(hdc, config.icon.text_color.into());
+        }
+
+        let mut text_rect = rect;
+        text_rect.top += icon_draw_size;
+        App::get().draw_text(
+            hdc,
+            &state.title,
+            &mut text_rect,
+            DT_CENTER | DT_WORDBREAK | DT_NOPREFIX,
+        );
+    }
+
     pub fn set_info_from_selector(&self) {
         let mut file_buf = [0u16; MAX_PATH as usize];
         let mut ofn: OPENFILENAMEW = unsafe { std::mem::zeroed() };
@@ -163,96 +261,14 @@ impl Window for Icon {
             WM_PAINT => unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
-
-                let mut rect: RECT = std::mem::zeroed();
-                let _ = GetClientRect(hwnd, &mut rect);
-
-                let mut pt = POINT { x: 0, y: 0 };
-                let _ = ClientToScreen(hwnd, &mut pt);
-
-                let config = App::config();
-                let selected = self.selected.load(Ordering::SeqCst);
-
-                let bg_color = if selected {
-                    config.icon.selected_bg_color
-                } else {
-                    config.icon.unselected_bg_color
-                };
-
-                if bg_color.a() < 255 {
-                    let mirror = App::get().mirror.lock();
-                    let screen_left = GetSystemMetrics(SM_XVIRTUALSCREEN);
-                    let screen_top = GetSystemMetrics(SM_YVIRTUALSCREEN);
-                    let _ = BitBlt(
-                        hdc,
-                        0,
-                        0,
-                        rect.right - rect.left,
-                        rect.bottom - rect.top,
-                        Some(mirror.hdc()),
-                        pt.x - screen_left,
-                        pt.y - screen_top,
-                        SRCCOPY,
-                    );
-                }
-                bg_color.paint_background(hdc, &rect);
-
-                let icon_draw_size = config.icon.icon_size_draw;
-                let width = rect.right - rect.left;
-
-                let state = self.state.lock();
-                let path = state.path.clone();
-
-                let mut hicon = HICON::default();
-                if let Some(ref path) = path {
-                    let path_u16: Vec<u16> =
-                        path.encode_utf16().chain(std::iter::once(0)).collect();
-                    let mut shfi: SHFILEINFOW = std::mem::zeroed();
-                    SHGetFileInfoW(
-                        PCWSTR(path_u16.as_ptr()),
-                        FILE_FLAGS_AND_ATTRIBUTES(0),
-                        Some(&mut shfi),
-                        std::mem::size_of::<SHFILEINFOW>() as u32,
-                        SHGFI_ICON | SHGFI_LARGEICON,
-                    );
-                    hicon = shfi.hIcon;
-                }
-
-                if hicon.is_invalid() {
-                    hicon = LoadIconW(None, IDI_APPLICATION).unwrap_or_default();
-                }
-
-                let _ = DrawIconEx(
-                    hdc,
-                    (width - icon_draw_size) / 2,
-                    0,
-                    hicon,
-                    icon_draw_size,
-                    icon_draw_size,
-                    0,
-                    None,
-                    DI_NORMAL,
-                );
-
-                if path.is_some() {
-                    let _ = DestroyIcon(hicon);
-                }
-
-                SetBkMode(hdc, TRANSPARENT);
-                SetTextColor(hdc, config.icon.text_color.into());
-
-                let mut text_rect = rect;
-                text_rect.top += icon_draw_size;
-                App::get().draw_text(
-                    hdc,
-                    &state.title,
-                    &mut text_rect,
-                    DT_CENTER | DT_WORDBREAK | DT_NOPREFIX,
-                );
-
+                self.paint(hdc);
                 let _ = EndPaint(hwnd, &ps);
                 LRESULT(0)
             },
+            WM_PRINTCLIENT => {
+                self.paint(HDC(wparam.0 as _));
+                LRESULT(0)
+            }
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
     }
