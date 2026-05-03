@@ -97,18 +97,16 @@ impl Icon {
         self.base.redraw();
     }
 
+    #[cfg(windows)]
     pub fn run(&self) {
-        #[cfg(windows)]
         use std::os::windows::process::CommandExt;
 
-        #[cfg(windows)]
         use windows::Win32::System::Threading::CREATE_NO_WINDOW;
 
         if let Some(path) = self.path() {
             info!("Running {}", path);
             let mut command = Command::new("cmd");
             command.args(["/C", &path]);
-            #[cfg(windows)]
             command.creation_flags(CREATE_NO_WINDOW.0);
             let _ = command.spawn();
         } else {
