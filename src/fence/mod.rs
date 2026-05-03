@@ -82,8 +82,8 @@ impl TitleBar {
         let _ = unsafe { GetClientRect(hwnd, &mut rect) };
 
         let config = App::config();
-        config.fence.title_bar_bg_color.paint_background(hdc, &rect);
         unsafe {
+            config.fence.title_bar_bg_color.paint_background(hdc, &rect);
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, config.fence.title_text_color.into());
         }
@@ -190,6 +190,7 @@ impl ScrollArea {
         let _ = unsafe { ClientToScreen(hwnd, &mut pt) };
 
         let config = App::config();
+        #[cfg(not(feature = "use-UpdateLayeredWindow"))]
         if config.fence.scroll_area_bg_color.a() < 255 {
             let mirror = App::get().mirror.lock();
             let screen_left = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
@@ -208,10 +209,12 @@ impl ScrollArea {
                 )
             };
         }
-        config
-            .fence
-            .scroll_area_bg_color
-            .paint_background(hdc, &rect);
+        unsafe {
+            config
+                .fence
+                .scroll_area_bg_color
+                .paint_background(hdc, &rect);
+        }
     }
 }
 
