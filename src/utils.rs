@@ -1,27 +1,26 @@
 use std::sync::LazyLock;
+
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::{CreateFontIndirectW, HFONT};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
-static BUTTON_FONT: LazyLock<HFONT> = LazyLock::new(|| {
-    unsafe {
-        let mut ncm: NONCLIENTMETRICSW = std::mem::zeroed();
-        ncm.cbSize = std::mem::size_of::<NONCLIENTMETRICSW>() as u32;
-        SystemParametersInfoW(
-            SPI_GETNONCLIENTMETRICS,
-            std::mem::size_of::<NONCLIENTMETRICSW>() as u32,
-            (&mut ncm as *mut NONCLIENTMETRICSW) as *const core::ffi::c_void,
-            0,
-        );
-        CreateFontIndirectW(&ncm.lfMessageFont).unwrap()
-    }
-});
-
 #[derive(Copy, Clone)]
 pub(crate) struct HWNDWrapper(pub HWND);
 unsafe impl Send for HWNDWrapper {}
 unsafe impl Sync for HWNDWrapper {}
+
+static BUTTON_FONT: LazyLock<HFONT> = LazyLock::new(|| unsafe {
+    let mut ncm: NONCLIENTMETRICSW = std::mem::zeroed();
+    ncm.cbSize = std::mem::size_of::<NONCLIENTMETRICSW>() as u32;
+    SystemParametersInfoW(
+        SPI_GETNONCLIENTMETRICS,
+        std::mem::size_of::<NONCLIENTMETRICSW>() as u32,
+        (&mut ncm as *mut NONCLIENTMETRICSW) as *const core::ffi::c_void,
+        0,
+    );
+    CreateFontIndirectW(&ncm.lfMessageFont).unwrap()
+});
 
 pub fn create_button(
     text: &'static str,
