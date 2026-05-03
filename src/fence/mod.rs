@@ -9,6 +9,7 @@ use tracing::{debug, error};
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
@@ -319,6 +320,7 @@ impl Fence {
     }
 
     pub fn from_state(cover: &DesktopCover, state: FenceState) -> Result<Arc<Self>> {
+        let hinstance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
         let parent_hwnd = {
             #[cfg(feature = "use-UpdateLayeredWindow")]
             unsafe {
@@ -330,27 +332,35 @@ impl Fence {
             }
         };
         debug!("{:?}", parent_hwnd);
-        let hinstance = unsafe {
-            HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
-        };
         Base::create_window(
-            WINDOW_EX_STYLE(0),
+            {
+                #[cfg(feature = "use-UpdateLayeredWindow")]
+                {
+                    WS_EX_LAYERED
+                }
+                #[cfg(not(feature = "use-UpdateLayeredWindow"))]
+                {
+                    WINDOW_EX_STYLE(0)
+                }
+            },
             register_classname("Fence"),
             PCWSTR::null(),
-            if !parent_hwnd.is_invalid() {
-                WS_CHILD
-            } else {
-                WS_POPUP
-            } | WS_VISIBLE
-                | WS_CLIPSIBLINGS
-                | WS_CLIPCHILDREN,
+            {
+                let mut ws = if !parent_hwnd.is_invalid() {
+                    WS_CHILD
+                } else {
+                    WS_POPUP
+                };
+                ws |= WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
+                ws
+            },
             state.area.x,
             state.area.y,
             state.area.width,
             state.area.height,
             parent_hwnd,
             None,
-            hinstance,
+            hinstance.into(),
             |base| {
                 let title_bar = TitleBar::new(base.hwnd(), state.title.clone(), &state.area)?;
                 let scroll_area = ScrollArea::new(base.hwnd(), &state.area)?;
@@ -366,10 +376,13 @@ impl Fence {
                     title_bar,
                     scroll_area,
                 });
-
                 for icon_state in state.icons {
                     fence.add_icon_with_path(&icon_state.title, icon_state.path.as_deref());
                 }
+                /* #[cfg(feature = "use-UpdateLayeredWindow")]
+                {
+                    fence.paint_with_alpha();
+                } */
                 Ok(fence)
             },
         )
@@ -396,6 +409,71 @@ impl Fence {
                 .collect(),
             imported_from: inner.imported_from.clone(),
             sticky_pos: inner.sticky_pos,
+        }
+    }
+
+    #[cfg(feature = "use-UpdateLayeredWindow")]
+    pub fn paint_with_alpha(&self) {
+        debug!("paint_with_alpha");
+        // https://stackoverflow.com/a/18613002
+        let hwnd = self.base().hwnd();
+        unsafe {
+            let hdc_screen = GetDC(None);
+            let hdc_mem = CreateCompatibleDC(Some(hdc_screen));
+
+            let area = self.base.area();
+            let width = area.width.load(Ordering::Relaxed);
+            let height = area.height.load(Ordering::Relaxed);
+
+            let mut bmi: BITMAPINFO = std::mem::zeroed();
+            bmi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+            bmi.bmiHeader.biWidth = width;
+            bmi.bmiHeader.biHeight = -height; // top-down
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = BI_RGB.0;
+
+            let mut bits = std::ptr::null_mut();
+            let h_bitmap =
+                CreateDIBSection(Some(hdc_mem), &bmi, DIB_RGB_COLORS, &mut bits, None, 0).unwrap();
+            let old_bitmap = SelectObject(hdc_mem, h_bitmap.into());
+
+            let pixel_count = (width * height) as usize;
+            let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, pixel_count);
+
+            let color = (127 << 24) | (0 << 16) | (0 << 8) | 127;
+            for p in pixels.iter_mut() {
+                *p = color;
+            }
+
+            let mut size = SIZE {
+                cx: width,
+                cy: height,
+            };
+            let mut pt_src = POINT { x: 0, y: 0 };
+            let mut blend = BLENDFUNCTION {
+                BlendOp: AC_SRC_OVER as u8,
+                BlendFlags: 0,
+                SourceConstantAlpha: 255,
+                AlphaFormat: AC_SRC_ALPHA as u8,
+            };
+
+            let _ = UpdateLayeredWindow(
+                hwnd,
+                Some(hdc_screen),
+                None,
+                Some(&mut size),
+                Some(hdc_mem),
+                Some(&mut pt_src),
+                COLORREF(0),
+                Some(&mut blend),
+                ULW_ALPHA,
+            );
+
+            SelectObject(hdc_mem, old_bitmap);
+            let _ = DeleteObject(h_bitmap.into());
+            let _ = DeleteDC(hdc_mem);
+            let _ = ReleaseDC(None, hdc_screen);
         }
     }
 
@@ -755,6 +833,7 @@ impl Window for Fence {
                 let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             },
+            #[cfg(not(feature = "use-UpdateLayeredWindow"))]
             WM_PAINT => unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);

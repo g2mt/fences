@@ -163,7 +163,10 @@ impl Base {
             )
         };
         if hwnd.is_err() {
-            return Err(anyhow!("CreateWindowExW failed"));
+            return Err(anyhow!(
+                "CreateWindowExW failed, GetLastError()={:?}",
+                unsafe { GetLastError() }
+            ));
         }
         let hwnd = hwnd.unwrap();
         unsafe {

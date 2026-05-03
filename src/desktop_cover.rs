@@ -8,7 +8,7 @@ use tracing::{debug, error, info};
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::System::LibraryLoader::*;
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
@@ -277,85 +277,6 @@ impl DesktopCover {
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
     }
-
-    /*
-    #[cfg(feature = "use-UpdateLayeredWindow")]
-    pub fn paint_with_alpha(&self) {
-        debug!("paint_with_alpha");
-        // https://stackoverflow.com/a/18613002
-        let hwnd = self.base().hwnd();
-        unsafe {
-            let hdc_screen = GetDC(None);
-            let hdc_mem = CreateCompatibleDC(Some(hdc_screen));
-
-            let bounds = App::get().screen_bounds();
-            let width = bounds.width.load(Ordering::Relaxed);
-            let height = bounds.height.load(Ordering::Relaxed);
-
-            let mut bmi: BITMAPINFO = std::mem::zeroed();
-            bmi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
-            bmi.bmiHeader.biWidth = width;
-            bmi.bmiHeader.biHeight = -height; // top-down
-            bmi.bmiHeader.biPlanes = 1;
-            bmi.bmiHeader.biBitCount = 32;
-            bmi.bmiHeader.biCompression = BI_RGB.0;
-
-            let mut bits = std::ptr::null_mut();
-            let h_bitmap =
-                CreateDIBSection(Some(hdc_mem), &bmi, DIB_RGB_COLORS, &mut bits, None, 0).unwrap();
-            let old_bitmap = SelectObject(hdc_mem, h_bitmap.into());
-
-            let pixel_count = (width * height) as usize;
-            let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, pixel_count);
-
-            // rgba(0, 0, 1, 0.5) -> Pre-multiplied: R=0, G=0, B=0.5*1, A=127
-            // 0x7F000001 (AARRGGBB)
-            /* let color = (127 << 24) | (0 << 16) | (0 << 8) | 127;
-            for p in pixels.iter_mut() {
-                *p = color;
-            } */
-            let inner = self.inner.lock();
-            for fence in inner.fences.iter().rev() {
-                SendMessageA(
-                    fence.base().hwnd(),
-                    WM_PRINT,
-                    WPARAM(hdc_mem.0 as _),
-                    LPARAM((PRF_CLIENT | PRF_CHILDREN | PRF_OWNED) as _),
-                );
-            }
-            drop(inner);
-
-            let mut size = SIZE {
-                cx: width,
-                cy: height,
-            };
-            let mut pt_src = POINT { x: 0, y: 0 };
-            let mut blend = BLENDFUNCTION {
-                BlendOp: AC_SRC_OVER as u8,
-                BlendFlags: 0,
-                SourceConstantAlpha: 255,
-                AlphaFormat: AC_SRC_ALPHA as u8,
-            };
-
-            let _ = UpdateLayeredWindow(
-                hwnd,
-                Some(hdc_screen),
-                None,
-                Some(&mut size),
-                Some(hdc_mem),
-                Some(&mut pt_src),
-                COLORREF(0),
-                Some(&mut blend),
-                ULW_ALPHA,
-            );
-
-            SelectObject(hdc_mem, old_bitmap);
-            let _ = DeleteObject(h_bitmap.into());
-            let _ = DeleteDC(hdc_mem);
-            let _ = ReleaseDC(None, hdc_screen);
-        }
-    }
-    */
 
     fn on_paint(&self) -> LRESULT {
         unsafe {
