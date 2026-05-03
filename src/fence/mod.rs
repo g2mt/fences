@@ -741,11 +741,11 @@ impl Fence {
         LRESULT(0)
     }
 
-    fn on_move(&self, _wparam: WPARAM, _lparam: LPARAM) -> LRESULT {
+    fn on_move(&self, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         unsafe {
             let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
-            DefWindowProcW(hwnd, WM_MOVE, _wparam, _lparam)
+            DefWindowProcW(hwnd, WM_MOVE, wparam, lparam)
         }
     }
 }
