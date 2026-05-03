@@ -260,32 +260,28 @@ impl ImportDialog {
                 }
 
                 // Import button
-                unsafe {
-                    let _ = crate::utils::create_button(
-                        "Import",
-                        0,
-                        0,
-                        0,
-                        0,
-                        hwnd,
-                        Some(HMENU(ID_IMPORT_BTN as *mut core::ffi::c_void)),
-                        hinstance.into(),
-                    );
-                }
+                crate::utils::create_button(
+                    "Import",
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    Some(HMENU(ID_IMPORT_BTN as *mut core::ffi::c_void)),
+                    hinstance.into(),
+                );
 
                 // Cancel button
-                unsafe {
-                    let _ = crate::utils::create_button(
-                        "Cancel",
-                        0,
-                        0,
-                        0,
-                        0,
-                        hwnd,
-                        Some(HMENU(ID_CANCEL_BTN as *mut core::ffi::c_void)),
-                        hinstance.into(),
-                    );
-                }
+                crate::utils::create_button(
+                    "Cancel",
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    Some(HMENU(ID_CANCEL_BTN as *mut core::ffi::c_void)),
+                    hinstance.into(),
+                );
 
                 let dialog = Arc::new(Self {
                     base,

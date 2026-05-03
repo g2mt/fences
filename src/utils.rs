@@ -1,4 +1,5 @@
-use std::sync::LazyLock;
+use std::cell::LazyCell;
+use std::thread::LocalKey;
 
 use windows::core::*;
 use windows::Win32::Foundation::*;
@@ -10,17 +11,19 @@ pub(crate) struct HWNDWrapper(pub HWND);
 unsafe impl Send for HWNDWrapper {}
 unsafe impl Sync for HWNDWrapper {}
 
-static BUTTON_FONT: LazyLock<HFONT> = LazyLock::new(|| unsafe {
-    let mut ncm: NONCLIENTMETRICSW = std::mem::zeroed();
-    ncm.cbSize = std::mem::size_of::<NONCLIENTMETRICSW>() as u32;
-    SystemParametersInfoW(
-        SPI_GETNONCLIENTMETRICS,
-        std::mem::size_of::<NONCLIENTMETRICSW>() as u32,
-        (&mut ncm as *mut NONCLIENTMETRICSW) as *const core::ffi::c_void,
-        0,
-    );
-    CreateFontIndirectW(&ncm.lfMessageFont).unwrap()
-});
+thread_local! {
+    static BUTTON_FONT: LazyCell<HFONT> = LazyCell::new(|| unsafe {
+        let mut ncm: NONCLIENTMETRICSW = std::mem::zeroed();
+        ncm.cbSize = std::mem::size_of::<NONCLIENTMETRICSW>() as u32;
+        SystemParametersInfoW(
+            SPI_GETNONCLIENTMETRICS,
+            std::mem::size_of::<NONCLIENTMETRICSW>() as u32,
+            Some(&mut ncm as *mut NONCLIENTMETRICSW as *mut _),
+            Default::default(),
+        );
+        CreateFontIndirectW(&ncm.lfMessageFont)
+    });
+}
 
 pub fn create_button(
     text: &'static str,
@@ -51,12 +54,14 @@ pub fn create_button(
         .unwrap()
     };
     unsafe {
-        SendMessageW(
-            hwnd,
-            WM_SETFONT,
-            WPARAM((*BUTTON_FONT).0 as usize),
-            LPARAM(1),
-        );
+        BUTTON_FONT.with(|font| {
+            SendMessageW(
+                hwnd,
+                WM_SETFONT,
+                Some(WPARAM((*font).0 as _)),
+                Some(LPARAM(1)),
+            );
+        });
     }
     hwnd
 }
