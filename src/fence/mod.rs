@@ -111,11 +111,17 @@ impl Window for TitleBar {
 
                 #[cfg(feature = "use-UpdateLayeredWindow")]
                 {
-                    let _ = PostMessageW(GetParent(hwnd).ok(), WM_USER_PAINT_WITH_ALPHA, None, None);
+                    let _ = PostMessageW(
+                        GetParent(hwnd).ok(),
+                        WM_USER_PAINT_WITH_ALPHA,
+                        WPARAM(0),
+                        LPARAM(0),
+                    );
                 }
 
                 LRESULT(0)
             },
+            WM_PRINTCLIENT => todo!(),
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
     }
@@ -282,11 +288,17 @@ impl Window for ScrollArea {
 
                 #[cfg(feature = "use-UpdateLayeredWindow")]
                 {
-                    let _ = PostMessageW(GetParent(hwnd).ok(), WM_USER_PAINT_WITH_ALPHA, None, None);
+                    let _ = PostMessageW(
+                        GetParent(hwnd).ok(),
+                        WM_USER_PAINT_WITH_ALPHA,
+                        WPARAM(0),
+                        LPARAM(0),
+                    );
                 }
 
                 LRESULT(0)
             },
+            WM_PRINTCLIENT => todo!(),
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
     }
@@ -456,19 +468,18 @@ impl Fence {
             let h_bitmap =
                 CreateDIBSection(Some(hdc_mem), &bmi, DIB_RGB_COLORS, &mut bits, None, 0).unwrap();
             let old_bitmap = SelectObject(hdc_mem, h_bitmap.into());
-
             let pixel_count = (width * height) as usize;
             let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, pixel_count);
-
             let config = App::config();
             for p in pixels.iter_mut() {
-                *p = config.fence.title_bar_bg_color.argb();
+                // *p = config.fence.title_bar_bg_color.argb();
+                *p = (127 << 24) | (0 << 16) | (0 << 8) | 127;
             }
-            SendMessageA(
+            SendMessageW(
                 hwnd,
                 WM_PRINT,
-                WPARAM(hdc_mem.0 as _),
-                LPARAM((PRF_CLIENT | PRF_CHILDREN | PRF_OWNED) as _),
+                Some(WPARAM(hdc_mem.0 as _)),
+                Some(LPARAM((PRF_CLIENT | PRF_CHILDREN | PRF_OWNED) as _)),
             );
 
             let mut size = SIZE {
@@ -495,6 +506,7 @@ impl Fence {
                 ULW_ALPHA,
             );
 
+            // TODO: cache h_bitmap, hdc_mem
             SelectObject(hdc_mem, old_bitmap);
             let _ = DeleteObject(h_bitmap.into());
             let _ = DeleteDC(hdc_mem);
@@ -1023,7 +1035,10 @@ impl Window for Fence {
             #[cfg(not(feature = "use-UpdateLayeredWindow"))]
             WM_PAINT => self.on_paint(),
             #[cfg(feature = "use-UpdateLayeredWindow")]
-            WM_USER_PAINT_WITH_ALPHA => self.paint_with_alpha(),
+            WM_USER_PAINT_WITH_ALPHA => {
+                self.paint_with_alpha();
+                LRESULT(0)
+            }
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
     }
