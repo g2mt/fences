@@ -780,18 +780,21 @@ impl Fence {
                 });
             }
             IDM_DELETE_FENCE => {
-                let result = unsafe {
-                    MessageBoxW(
+                let fence = self.clone();
+                let cover_clone = cover.clone();
+                cover.executor().spawn(cover, async move {
+                    let result = prompt::confirm(
                         None,
                         w!("Are you sure you want to delete this fence?"),
                         w!("Confirm Deletion"),
                         MB_YESNO | MB_ICONQUESTION,
                     )
-                };
-                if result == IDYES {
-                    cover.remove_fence(self);
-                }
-                should_save = true;
+                    .await;
+                    if result == IDYES {
+                        cover_clone.remove_fence(&fence);
+                        App::get().save_thread.get().unwrap().set_unsaved();
+                    }
+                });
             }
             IDM_RUN_ICON => {
                 if let HitType::Icon(icon_idx) = hit_type {
