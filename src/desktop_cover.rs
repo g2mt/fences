@@ -14,32 +14,12 @@ use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::app::App;
+use crate::commands::*;
 use crate::config::state::{AppState, FenceStickyPosition};
-use crate::fence::{Fence, HitTest};
-use crate::prompt;
+use crate::fence::{Fence, HitType};
+use crate::fut::AsyncExecutor;
 use crate::utils::HWNDWrapper;
 use crate::window::{register_classname, Base, BaseRef, Window};
-
-// Menus
-pub const IDM_EXIT: usize = 101;
-pub const IDM_ADD_FENCE: usize = 102;
-pub const IDM_ADD_FENCE_FROM_FOLDER: usize = 103;
-pub const IDM_DELETE_FENCE: usize = 104;
-pub const IDM_ADD_ICON: usize = 105;
-pub const IDM_RUN_ICON: usize = 106;
-pub const IDM_DELETE_ICON: usize = 107;
-pub const IDM_RENAME_FENCE: usize = 108;
-pub const IDM_RENAME_ICON: usize = 109;
-pub const IDM_SET_ICON_PATH: usize = 110;
-pub const IDM_IMPORT: usize = 111;
-pub const IDM_IMPORT_FROM: usize = 112;
-pub const IDM_OPEN_EXPLORER: usize = 113;
-pub const IDM_STICKY_NONE: usize = 114;
-pub const IDM_STICKY_TOPLEFT: usize = 115;
-pub const IDM_STICKY_TOPRIGHT: usize = 116;
-pub const IDM_STICKY_BOTTOMLEFT: usize = 117;
-pub const IDM_STICKY_BOTTOMRIGHT: usize = 118;
-pub const IDM_RELOAD: usize = 119;
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
@@ -48,14 +28,14 @@ pub const WM_USER_WAKE_FUTURE: u32 = WM_USER + 2;
 pub struct DesktopCover {
     base: BaseRef,
     inner: Mutex<DesktopCoverInner>,
-    executor: crate::fut::AsyncExecutor,
+    executor: AsyncExecutor,
 }
 
 struct DesktopCoverInner {
     /// List of fences currently managed by the desktop cover.
     fences: Vec<Arc<Fence>>,
     /// The type of hit test result from the last interaction, used for dragging or context menus.
-    hit_type: Option<HitTest>,
+    hit_type: Option<HitType>,
     /// The last recorded mouse position in client coordinates.
     last_mouse_pos: POINT,
 }
@@ -139,7 +119,7 @@ impl DesktopCover {
                         hit_type: None,
                         last_mouse_pos: POINT { x: 0, y: 0 },
                     }),
-                    executor: crate::fut::AsyncExecutor::new(),
+                    executor: AsyncExecutor::new(HWNDWrapper(hwnd)),
                 });
                 /*
                 #[cfg(feature = "use-UpdateLayeredWindow")]
@@ -149,6 +129,10 @@ impl DesktopCover {
                 Ok(cover)
             },
         )
+    }
+
+    pub fn executor(&self) -> &AsyncExecutor {
+        &self.executor
     }
 
     pub fn state(&self) -> AppState {
@@ -173,6 +157,18 @@ impl DesktopCover {
 
         self.rearrange_fences(state.screen_width, state.screen_height);
         Ok(())
+    }
+
+    pub fn add_fence(&self, fence: Arc<Fence>) {
+        let mut inner = self.inner.lock();
+        inner.fences.push(fence);
+    }
+
+    pub fn remove_fence(&self, fence: &Arc<Fence>) {
+        let mut inner = self.inner.lock();
+        if let Some(pos) = inner.fences.iter().position(|f| Arc::ptr_eq(f, fence)) {
+            inner.fences.remove(pos);
+        }
     }
 
     pub fn rearrange_fences(&self, old_screen_width: i32, old_screen_height: i32) {
@@ -307,12 +303,12 @@ impl DesktopCover {
         for fence in inner.fences.iter().rev() {
             if let Some(hit) = fence.hit_test(pt.x, pt.y) {
                 let cursor_id = match hit {
-                    HitTest::TitleBar => IDC_SIZEALL,
-                    HitTest::Client | HitTest::Icon(_) => IDC_ARROW,
-                    HitTest::Left | HitTest::Right => IDC_SIZEWE,
-                    HitTest::Top | HitTest::Bottom => IDC_SIZENS,
-                    HitTest::TopLeft | HitTest::BottomRight => IDC_SIZENWSE,
-                    HitTest::TopRight | HitTest::BottomLeft => IDC_SIZENESW,
+                    HitType::TitleBar => IDC_SIZEALL,
+                    HitType::Client | HitType::Icon(_) => IDC_ARROW,
+                    HitType::Left | HitType::Right => IDC_SIZEWE,
+                    HitType::Top | HitType::Bottom => IDC_SIZENS,
+                    HitType::TopLeft | HitType::BottomRight => IDC_SIZENWSE,
+                    HitType::TopRight | HitType::BottomLeft => IDC_SIZENESW,
                 };
                 unsafe {
                     let cursor = LoadCursorW(None, cursor_id).unwrap_or_default();
@@ -330,7 +326,7 @@ impl DesktopCover {
 
         let mut inner = self.inner.lock();
         for fence in inner.fences.iter().rev() {
-            if let Some(hit @ HitTest::Icon(_)) = fence.hit_test(x, y) {
+            if let Some(hit @ HitType::Icon(_)) = fence.hit_test(x, y) {
                 inner.hit_type = Some(hit);
                 drop(inner);
                 self.on_command(WPARAM(IDM_RUN_ICON));
@@ -361,7 +357,7 @@ impl DesktopCover {
         if let Some((idx, hit)) = hit_idx {
             let fence = inner.fences.remove(idx);
 
-            if let HitTest::Icon(icon_idx) = hit {
+            if let HitType::Icon(icon_idx) = hit {
                 fence.select_icon(icon_idx);
             }
 
@@ -369,7 +365,7 @@ impl DesktopCover {
             inner.fences.push(fence);
 
             match hit {
-                HitTest::Client | HitTest::Icon(_) => {
+                HitType::Client | HitType::Icon(_) => {
                     inner.hit_type = Some(hit);
                 }
                 _ => {
@@ -395,17 +391,17 @@ impl DesktopCover {
 
             if let Some(fence) = inner.fences.last() {
                 match hit_type {
-                    HitTest::TitleBar => fence.base().move_by(dx, dy),
-                    HitTest::Left => fence.add_area(dx, 0, -dx, 0),
-                    HitTest::Right => fence.add_area(0, 0, dx, 0),
-                    HitTest::Top => fence.add_area(0, dy, 0, -dy),
-                    HitTest::Bottom => fence.add_area(0, 0, 0, dy),
-                    HitTest::TopLeft => fence.add_area(dx, dy, -dx, -dy),
-                    HitTest::TopRight => fence.add_area(0, dy, dx, -dy),
-                    HitTest::BottomLeft => fence.add_area(dx, 0, -dx, dy),
-                    HitTest::BottomRight => fence.add_area(0, 0, dx, dy),
-                    HitTest::Client => (),
-                    HitTest::Icon(_) => (),
+                    HitType::TitleBar => fence.base().move_by(dx, dy),
+                    HitType::Left => fence.add_area(dx, 0, -dx, 0),
+                    HitType::Right => fence.add_area(0, 0, dx, 0),
+                    HitType::Top => fence.add_area(0, dy, 0, -dy),
+                    HitType::Bottom => fence.add_area(0, 0, 0, dy),
+                    HitType::TopLeft => fence.add_area(dx, dy, -dx, -dy),
+                    HitType::TopRight => fence.add_area(0, dy, dx, -dy),
+                    HitType::BottomLeft => fence.add_area(dx, 0, -dx, dy),
+                    HitType::BottomRight => fence.add_area(0, 0, dx, dy),
+                    HitType::Client => (),
+                    HitType::Icon(_) => (),
                 }
             }
 
@@ -449,7 +445,7 @@ impl DesktopCover {
                 let fence = inner.fences.remove(idx);
 
                 fence.clear_selection();
-                if let HitTest::Icon(icon_idx) = hit {
+                if let HitType::Icon(icon_idx) = hit {
                     fence.select_icon(icon_idx);
                 }
 
@@ -466,7 +462,7 @@ impl DesktopCover {
             let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
 
             unsafe {
-                if let HitTest::Icon(_) = hit {
+                if let HitType::Icon(_) = hit {
                     let _ = AppendMenuW(h_menu, MF_STRING, IDM_RUN_ICON, w!("&Run"));
                     let _ = AppendMenuW(h_menu, MF_STRING, IDM_RENAME_ICON, w!("Re&name"));
                     let _ = AppendMenuW(h_menu, MF_STRING, IDM_SET_ICON_PATH, w!("Set &path"));
@@ -597,15 +593,19 @@ impl DesktopCover {
         LRESULT(0)
     }
 
+    fn trigger_fence_command(&self, command: usize, hit_type: HitType) -> bool {
+        let inner = self.inner.lock();
+        if let Some(fence) = inner.fences.last() {
+            fence.on_command(self, command, hit_type)
+        } else {
+            false
+        }
+    }
+
     fn on_command(&self, wparam: WPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         let command = (wparam.0 & 0xFFFF) as u16 as usize;
         debug!("command: {}", command);
-        let hit_type;
-        {
-            let mut inner = self.inner.lock();
-            hit_type = inner.hit_type.take();
-        }
 
         let mut should_save = false;
         match command {
@@ -615,14 +615,14 @@ impl DesktopCover {
             IDM_ADD_FENCE => {
                 let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
                 let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
-                if let Ok(fence) = Fence::new(self, width / 2 - 150, height / 2 - 75, "Untitled") {
-                    let mut inner = self.inner.lock();
-                    inner.fences.push(fence);
+                match Fence::new(self, width / 2 - 150, height / 2 - 75, "Untitled") {
+                    Ok(fence) => self.add_fence(fence),
+                    Err(err) => error!("spawning fence: {:?}", err),
                 }
                 should_save = true;
             }
             IDM_ADD_FENCE_FROM_FOLDER => {
-                self.executor.spawn(self, async move {
+                self.executor.spawn(async move {
                     debug!("IDM_ADD_FENCE_FROM_FOLDER async spawn");
                     let cover = App::get().cover.get().unwrap();
                     match Fence::from_folder_selector(&cover).await {
@@ -638,170 +638,26 @@ impl DesktopCover {
                     }
                 });
             }
-            IDM_ADD_ICON => {
-                let inner = self.inner.lock();
-                if let Some(fence) = inner.fences.last() {
-                    let title = format!("Icon #{}", fence.icon_count());
-                    fence.add_icon(&title);
-                }
-                should_save = true;
-            }
-            IDM_RENAME_FENCE => {
-                let inner = self.inner.lock();
-                if let Some(fence) = inner.fences.last() {
-                    let fence = fence.clone();
-                    let current_title = String::from(&fence.title() as &str);
-                    self.executor.spawn(self, async move {
-                        if let Some(new_title) =
-                            prompt::input("Rename fence", "Enter new fence name:", &current_title)
-                                .await
-                        {
-                            if !new_title.is_empty() {
-                                fence.set_title(new_title.into());
-                                App::get().save_thread.get().unwrap().set_unsaved();
-                            }
-                        }
-                    });
-                }
-            }
-            IDM_DELETE_FENCE => {
-                let result = unsafe {
-                    MessageBoxW(
-                        Some(hwnd),
-                        w!("Are you sure you want to delete this fence?"),
-                        w!("Confirm Deletion"),
-                        MB_YESNO | MB_ICONQUESTION,
-                    )
-                };
-                if result == IDYES {
-                    let mut inner = self.inner.lock();
-                    inner.fences.pop();
-                }
-                should_save = true;
-            }
-            IDM_RUN_ICON => {
-                if let Some(HitTest::Icon(icon_idx)) = hit_type {
-                    let inner = self.inner.lock();
-                    let icon = inner
-                        .fences
-                        .last()
-                        .unwrap()
-                        .icon_by_index(icon_idx)
-                        .unwrap();
-                    icon.run();
-                } else {
-                    error!("IDM_RUN_ICON: invalid state");
-                }
-            }
-            IDM_RENAME_ICON => {
-                if let Some(HitTest::Icon(icon_idx)) = hit_type {
-                    let inner = self.inner.lock();
-                    let icon = inner
-                        .fences
-                        .last()
-                        .unwrap()
-                        .icon_by_index(icon_idx)
-                        .unwrap();
-                    let current_title = String::from(&icon.title() as &str);
-                    self.executor.spawn(self, async move {
-                        if let Some(new_title) =
-                            prompt::input("Rename icon", "Enter new icon name:", &current_title)
-                                .await
-                        {
-                            if !new_title.is_empty() {
-                                icon.set_title(new_title.into());
-                                App::get().save_thread.get().unwrap().set_unsaved();
-                            }
-                        }
-                    });
-                } else {
-                    error!("IDM_RENAME_ICON: invalid state");
-                }
-            }
-            IDM_SET_ICON_PATH => {
-                if let Some(HitTest::Icon(icon_idx)) = hit_type {
-                    let inner = self.inner.lock();
-                    let icon = inner
-                        .fences
-                        .last()
-                        .unwrap()
-                        .icon_by_index(icon_idx)
-                        .unwrap();
-                    icon.set_info_from_selector();
-                } else {
-                    error!("IDM_SET_ICON_PATH: invalid state");
-                }
-                should_save = true;
-            }
-            IDM_DELETE_ICON => {
-                if let Some(HitTest::Icon(icon_idx)) = hit_type {
-                    let inner = self.inner.lock();
-                    let fence = inner.fences.last().unwrap();
-                    fence.remove_icon(icon_idx);
-                } else {
-                    error!("IDM_DELETE_ICON: invalid state");
-                }
-                should_save = true;
-            }
-            IDM_IMPORT => {
-                let inner = self.inner.lock();
-                let fence = inner.fences.last().unwrap();
-                if fence.imported_from().is_some() {
-                    fence.show_import_existing_dialog();
-                } else {
-                    let fence: Arc<Fence> = fence.clone();
-                    self.executor.spawn(self, async move {
-                        fence.show_import_from_dialog().await;
-                    });
-                }
-                should_save = true;
-            }
-            IDM_IMPORT_FROM => {
-                debug!("import from");
-                let fence: Arc<Fence> = self.inner.lock().fences.last().unwrap().clone();
-                self.executor.spawn(self, async move {
-                    fence.show_import_from_dialog().await;
-                });
-                should_save = true;
-            }
-            IDM_STICKY_NONE
+            IDM_ADD_ICON
+            | IDM_RENAME_FENCE
+            | IDM_DELETE_FENCE
+            | IDM_RUN_ICON
+            | IDM_RENAME_ICON
+            | IDM_SET_ICON_PATH
+            | IDM_DELETE_ICON
+            | IDM_IMPORT
+            | IDM_IMPORT_FROM
+            | IDM_STICKY_NONE
             | IDM_STICKY_TOPLEFT
             | IDM_STICKY_TOPRIGHT
             | IDM_STICKY_BOTTOMLEFT
-            | IDM_STICKY_BOTTOMRIGHT => {
-                use crate::config::state::FenceStickyPosition;
-                let sticky = match command {
-                    IDM_STICKY_TOPLEFT => Some(FenceStickyPosition::TopLeft),
-                    IDM_STICKY_TOPRIGHT => Some(FenceStickyPosition::TopRight),
-                    IDM_STICKY_BOTTOMLEFT => Some(FenceStickyPosition::BottomLeft),
-                    IDM_STICKY_BOTTOMRIGHT => Some(FenceStickyPosition::BottomRight),
-                    _ => None,
-                };
-                let inner = self.inner.lock();
-                if let Some(fence) = inner.fences.last() {
-                    fence.set_sticky(sticky);
-                }
-                should_save = true;
-            }
-            IDM_OPEN_EXPLORER => {
-                let fence = self.inner.lock().fences.last().cloned();
-                if let Some(fence) = fence {
-                    if let Some(import_path) = fence.imported_from() {
-                        let path_wide: Vec<u16> = import_path
-                            .encode_utf16()
-                            .chain(std::iter::once(0))
-                            .collect();
-                        unsafe {
-                            ShellExecuteW(
-                                None,
-                                w!("open"),
-                                PCWSTR(path_wide.as_ptr()),
-                                PCWSTR::null(),
-                                PCWSTR::null(),
-                                SW_SHOWNORMAL,
-                            );
-                        }
-                    }
+            | IDM_STICKY_BOTTOMRIGHT
+            | IDM_OPEN_EXPLORER => {
+                if let Some(hit_type) = {
+                    let mut inner = self.inner.lock();
+                    inner.hit_type.take()
+                } {
+                    should_save = self.trigger_fence_command(command, hit_type);
                 }
             }
             IDM_RELOAD => {
@@ -844,7 +700,7 @@ impl Window for DesktopCover {
             WM_RBUTTONUP => self.on_rbutton_up(lparam),
             WM_USER_SHELLICON => self.on_shell_icon(lparam),
             WM_USER_WAKE_FUTURE => {
-                self.executor.poll_all(self);
+                self.executor.poll_all();
                 LRESULT(0)
             }
             WM_COMMAND => self.on_command(wparam),

@@ -103,10 +103,7 @@ unsafe extern "system" fn input_wndproc(
             let _ = SetWindowTextW(data.edit_hwnd, PCWSTR(default_utf16.as_ptr()));
             DefWindowProcW(hwnd, msg, wparam, lparam)
         },
-        WM_DESTROY => unsafe {
-            PostQuitMessage(0);
-            LRESULT(0)
-        },
+        WM_DESTROY => LRESULT(0),
         WM_COMMAND => unsafe {
             let id = (wparam.0 as u32) & 0xFFFF;
             let hi = ((wparam.0 as u32) >> 16) as u16;
