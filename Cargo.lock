@@ -61,7 +61,6 @@ name = "fences"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "cfg-if",
  "parking_lot",
  "serde",
  "serde_json",

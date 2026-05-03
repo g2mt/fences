@@ -3,7 +3,6 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use anyhow::Result;
-use cfg_if::cfg_if;
 use parking_lot::Mutex;
 use tracing::{debug, error, info};
 use windows::core::*;
@@ -73,7 +72,14 @@ impl DesktopCover {
         }
 
         Base::create_window(
-            WS_EX_NOACTIVATE | WS_EX_LAYERED,
+            {
+                let mut flags = WS_EX_NOACTIVATE | WS_EX_LAYERED;
+                #[cfg(feature = "use-UpdateLayeredWindow")]
+                {
+                    flags |= WS_EX_TRANSPARENT;
+                }
+                flags
+            },
             register_classname("BottomWindowClass"),
             w!("Desktop Cover"),
             WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN,
@@ -115,27 +121,10 @@ impl DesktopCover {
                     nid.szTip[..len].copy_from_slice(&tip[..len]);
                     let _ = Shell_NotifyIconW(NIM_ADD, &nid);
 
-                    cfg_if! {
-                        if #[cfg(feature = "use-UpdateLayeredWindow")] {
-                            let _ = UpdateLayeredWindow(
-                                hwnd,
-                                None,
-                                None,
-                                None,
-                                None,
-                                None,
-                                COLORREF(0x00000000),
-                                None,
-                                ULW_OPAQUE,
-                            );
-                        } else if #[cfg(feature = "use-SetLayeredWindowAttributes")] {
-                            let _ = SetLayeredWindowAttributes(
-                                hwnd,
-                                COLORREF(0x00000000),
-                                0,
-                                LWA_COLORKEY
-                            );
-                        }
+                    #[cfg(feature = "use-SetLayeredWindowAttributes")]
+                    {
+                        let _ =
+                            SetLayeredWindowAttributes(hwnd, COLORREF(0x00000000), 0, LWA_COLORKEY);
                     }
 
                     let _ = SetWindowPos(
@@ -158,7 +147,10 @@ impl DesktopCover {
                     }),
                     executor: crate::fut::AsyncExecutor::new(),
                 });
-
+                #[cfg(feature = "use-UpdateLayeredWindow")]
+                {
+                    cover.paint_with_alpha();
+                }
                 Ok(cover)
             },
         )
@@ -254,73 +246,12 @@ impl DesktopCover {
             );
         }
 
-        App::get().save_thread.get().unwrap().set_unsaved();
-        LRESULT(0)
-    }
-
-    fn on_size(&self) -> LRESULT {
         #[cfg(feature = "use-UpdateLayeredWindow")]
-        unsafe {
-            let hwnd = self.base().hwnd();
-            let hdc_screen = GetDC(None);
-            let hdc_mem = CreateCompatibleDC(Some(hdc_screen));
-
-            let bounds = App::get().screen_bounds();
-            let width = bounds.width.load(Ordering::Relaxed);
-            let height = bounds.height.load(Ordering::Relaxed);
-
-            let mut bmi: BITMAPINFO = std::mem::zeroed();
-            bmi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
-            bmi.bmiHeader.biWidth = width;
-            bmi.bmiHeader.biHeight = -height; // top-down
-            bmi.bmiHeader.biPlanes = 1;
-            bmi.bmiHeader.biBitCount = 32;
-            bmi.bmiHeader.biCompression = BI_RGB.0;
-
-            let mut bits = std::ptr::null_mut();
-            let h_bitmap =
-                CreateDIBSection(Some(hdc_mem), &bmi, DIB_RGB_COLORS, &mut bits, None, 0).unwrap();
-            let old_bitmap = SelectObject(hdc_mem, h_bitmap);
-
-            let pixel_count = (width * height) as usize;
-            let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, pixel_count);
-
-            // rgba(0, 0, 1, 0.5) -> Pre-multiplied: R=0, G=0, B=0.5*1, A=127
-            // 0x7F000001 (AARRGGBB)
-            let color = (127 << 24) | (0 << 16) | (0 << 8) | 127;
-            for p in pixels.iter_mut() {
-                *p = color;
-            }
-
-            let mut size = SIZE {
-                cx: width,
-                cy: height,
-            };
-            let mut pt_src = POINT { x: 0, y: 0 };
-            let mut blend = BLENDFUNCTION {
-                BlendOp: AC_SRC_OVER as u8,
-                BlendFlags: 0,
-                SourceConstantAlpha: 255,
-                AlphaFormat: AC_SRC_ALPHA as u8,
-            };
-
-            let _ = UpdateLayeredWindow(
-                hwnd,
-                Some(hdc_screen),
-                None,
-                Some(&mut size),
-                Some(hdc_mem),
-                Some(&mut pt_src),
-                COLORREF(0),
-                Some(&mut blend),
-                ULW_ALPHA,
-            );
-
-            SelectObject(hdc_mem, old_bitmap);
-            let _ = DeleteObject(h_bitmap);
-            let _ = DeleteDC(hdc_mem);
-            let _ = ReleaseDC(None, hdc_screen);
+        {
+            self.paint_with_alpha();
         }
+
+        App::get().save_thread.get().unwrap().set_unsaved();
         LRESULT(0)
     }
 
@@ -351,7 +282,85 @@ impl DesktopCover {
         }
     }
 
+    #[cfg(feature = "use-UpdateLayeredWindow")]
+    pub fn paint_with_alpha(&self) {
+        debug!("paint_with_alpha");
+        // https://stackoverflow.com/a/18613002
+        let hwnd = self.base().hwnd();
+        unsafe {
+            let hdc_screen = GetDC(None);
+            let hdc_mem = CreateCompatibleDC(Some(hdc_screen));
+
+            let bounds = App::get().screen_bounds();
+            let width = bounds.width.load(Ordering::Relaxed);
+            let height = bounds.height.load(Ordering::Relaxed);
+
+            let mut bmi: BITMAPINFO = std::mem::zeroed();
+            bmi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+            bmi.bmiHeader.biWidth = width;
+            bmi.bmiHeader.biHeight = -height; // top-down
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = BI_RGB.0;
+
+            let mut bits = std::ptr::null_mut();
+            let h_bitmap =
+                CreateDIBSection(Some(hdc_mem), &bmi, DIB_RGB_COLORS, &mut bits, None, 0).unwrap();
+            let old_bitmap = SelectObject(hdc_mem, h_bitmap.into());
+
+            let pixel_count = (width * height) as usize;
+            let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, pixel_count);
+
+            // rgba(0, 0, 1, 0.5) -> Pre-multiplied: R=0, G=0, B=0.5*1, A=127
+            // 0x7F000001 (AARRGGBB)
+            /* let color = (127 << 24) | (0 << 16) | (0 << 8) | 127;
+            for p in pixels.iter_mut() {
+                *p = color;
+            } */
+            let inner = self.inner.lock();
+            for fence in inner.fences.iter().rev() {
+                SendMessageA(
+                    fence.base().hwnd(),
+                    WM_PRINT,
+                    WPARAM(hdc_mem.0 as _),
+                    LPARAM((PRF_CLIENT | PRF_CHILDREN | PRF_OWNED) as _),
+                );
+            }
+            drop(inner);
+
+            let mut size = SIZE {
+                cx: width,
+                cy: height,
+            };
+            let mut pt_src = POINT { x: 0, y: 0 };
+            let mut blend = BLENDFUNCTION {
+                BlendOp: AC_SRC_OVER as u8,
+                BlendFlags: 0,
+                SourceConstantAlpha: 255,
+                AlphaFormat: AC_SRC_ALPHA as u8,
+            };
+
+            let _ = UpdateLayeredWindow(
+                hwnd,
+                Some(hdc_screen),
+                None,
+                Some(&mut size),
+                Some(hdc_mem),
+                Some(&mut pt_src),
+                COLORREF(0),
+                Some(&mut blend),
+                ULW_ALPHA,
+            );
+
+            SelectObject(hdc_mem, old_bitmap);
+            let _ = DeleteObject(h_bitmap.into());
+            let _ = DeleteDC(hdc_mem);
+            let _ = ReleaseDC(None, hdc_screen);
+        }
+    }
+
     fn on_paint(&self) -> LRESULT {
+        #[cfg(feature = "use-SetLayeredWindowAttributes")]
         unsafe {
             let hwnd = self.base().hwnd();
             let mut ps: PAINTSTRUCT = std::mem::zeroed();
@@ -905,7 +914,6 @@ impl Window for DesktopCover {
         match msg {
             WM_CLOSE => LRESULT(0),
             WM_DISPLAYCHANGE => self.on_display_change(),
-            WM_SIZE => self.on_size(),
             WM_DESTROY => self.on_destroy(),
             WM_WINDOWPOSCHANGING => self.on_window_pos_changing(msg, wparam, lparam),
             WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),

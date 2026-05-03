@@ -11,7 +11,6 @@ serde_json = "1.0.149"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.23"
 parking_lot = { version = "0.12.5", features = ["deadlock_detection"] }
-cfg-if = "1.0.4"
 
 [dependencies.windows]
 version = ">=0.61"
