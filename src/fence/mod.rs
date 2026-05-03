@@ -855,7 +855,6 @@ impl Fence {
             | IDM_STICKY_TOPRIGHT
             | IDM_STICKY_BOTTOMLEFT
             | IDM_STICKY_BOTTOMRIGHT => {
-                use crate::config::state::FenceStickyPosition;
                 let sticky = match command {
                     IDM_STICKY_TOPLEFT => Some(FenceStickyPosition::TopLeft),
                     IDM_STICKY_TOPRIGHT => Some(FenceStickyPosition::TopRight),
