@@ -75,6 +75,28 @@ impl TitleBar {
         *self.title.lock() = title;
         self.base.redraw();
     }
+
+    fn paint(&self, hdc: HDC) {
+        let hwnd = self.base().hwnd();
+        let mut rect: RECT = unsafe { std::mem::zeroed() };
+        let _ = unsafe { GetClientRect(hwnd, &mut rect) };
+
+        let config = App::config();
+        config.fence.title_bar_bg_color.paint_background(hdc, &rect);
+        unsafe {
+            SetBkMode(hdc, TRANSPARENT);
+            SetTextColor(hdc, config.fence.title_text_color.into());
+        }
+
+        let mut text_rect = rect;
+        text_rect.left += 5;
+        App::get().draw_text(
+            hdc,
+            &self.title.lock(),
+            &mut text_rect,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        );
+    }
 }
 
 impl Window for TitleBar {
@@ -89,24 +111,7 @@ impl Window for TitleBar {
             WM_PAINT => unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
-
-                let mut rect: RECT = std::mem::zeroed();
-                let _ = GetClientRect(hwnd, &mut rect);
-
-                let config = App::config();
-                config.fence.title_bar_bg_color.paint_background(hdc, &rect);
-                SetBkMode(hdc, TRANSPARENT);
-                SetTextColor(hdc, config.fence.title_text_color.into());
-
-                let mut text_rect = rect;
-                text_rect.left += 5;
-                App::get().draw_text(
-                    hdc,
-                    &self.title.lock(),
-                    &mut text_rect,
-                    DT_LEFT | DT_VCENTER | DT_SINGLELINE,
-                );
-
+                self.paint(hdc);
                 let _ = EndPaint(hwnd, &ps);
 
                 #[cfg(feature = "use-UpdateLayeredWindow")]
@@ -121,7 +126,10 @@ impl Window for TitleBar {
 
                 LRESULT(0)
             },
-            WM_PRINTCLIENT => todo!(),
+            WM_PRINTCLIENT => {
+                self.paint(HDC(wparam.0 as _));
+                LRESULT(0)
+            }
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
     }
@@ -171,6 +179,39 @@ impl ScrollArea {
             fence_area.width - (border * 2),
             fence_area.height - title_h - border,
         )
+    }
+
+    fn paint(&self, hdc: HDC) {
+        let hwnd = self.base().hwnd();
+        let mut rect: RECT = unsafe { std::mem::zeroed() };
+        let _ = unsafe { GetClientRect(hwnd, &mut rect) };
+
+        let mut pt = POINT { x: 0, y: 0 };
+        let _ = unsafe { ClientToScreen(hwnd, &mut pt) };
+
+        let config = App::config();
+        if config.fence.scroll_area_bg_color.a() < 255 {
+            let mirror = App::get().mirror.lock();
+            let screen_left = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
+            let screen_top = unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) };
+            let _ = unsafe {
+                BitBlt(
+                    hdc,
+                    0,
+                    0,
+                    rect.right - rect.left,
+                    rect.bottom - rect.top,
+                    Some(mirror.hdc()),
+                    pt.x - screen_left,
+                    pt.y - screen_top,
+                    SRCCOPY,
+                )
+            };
+        }
+        config
+            .fence
+            .scroll_area_bg_color
+            .paint_background(hdc, &rect);
     }
 }
 
@@ -255,35 +296,7 @@ impl Window for ScrollArea {
             WM_PAINT => unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
-
-                let mut rect: RECT = std::mem::zeroed();
-                let _ = GetClientRect(hwnd, &mut rect);
-
-                let mut pt = POINT { x: 0, y: 0 };
-                let _ = ClientToScreen(hwnd, &mut pt);
-
-                let config = App::config();
-                if config.fence.scroll_area_bg_color.a() < 255 {
-                    let mirror = App::get().mirror.lock();
-                    let screen_left = GetSystemMetrics(SM_XVIRTUALSCREEN);
-                    let screen_top = GetSystemMetrics(SM_YVIRTUALSCREEN);
-                    let _ = BitBlt(
-                        hdc,
-                        0,
-                        0,
-                        rect.right - rect.left,
-                        rect.bottom - rect.top,
-                        Some(mirror.hdc()),
-                        pt.x - screen_left,
-                        pt.y - screen_top,
-                        SRCCOPY,
-                    );
-                }
-                config
-                    .fence
-                    .scroll_area_bg_color
-                    .paint_background(hdc, &rect);
-
+                self.paint(hdc);
                 let _ = EndPaint(hwnd, &ps);
 
                 #[cfg(feature = "use-UpdateLayeredWindow")]
@@ -298,7 +311,10 @@ impl Window for ScrollArea {
 
                 LRESULT(0)
             },
-            WM_PRINTCLIENT => todo!(),
+            WM_PRINTCLIENT => {
+                self.paint(HDC(wparam.0 as _));
+                LRESULT(0)
+            }
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
     }
