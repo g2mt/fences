@@ -754,11 +754,9 @@ impl Fence {
     pub fn on_command(
         self: &Arc<Self>,
         cover: &DesktopCover,
-        wparam: WPARAM,
+        command: usize,
         hit_type: HitType,
     ) -> bool {
-        let command = (wparam.0 & 0xFFFF) as u16 as usize;
-
         let mut should_save = false;
 
         match command {
@@ -784,14 +782,13 @@ impl Fence {
             IDM_DELETE_FENCE => {
                 let result = unsafe {
                     MessageBoxW(
-                        Some(self.base().hwnd()),
+                        None,
                         w!("Are you sure you want to delete this fence?"),
                         w!("Confirm Deletion"),
                         MB_YESNO | MB_ICONQUESTION,
                     )
                 };
                 if result == IDYES {
-                    let cover = App::get().cover.get().unwrap();
                     cover.remove_fence(self);
                 }
                 should_save = true;
@@ -887,7 +884,9 @@ impl Fence {
                     }
                 }
             }
-            _ => {}
+            other => {
+                panic!("invalid command: {}", other);
+            }
         }
 
         should_save
