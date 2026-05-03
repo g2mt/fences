@@ -50,7 +50,7 @@ impl TitleBar {
             area.height,
             parent_hwnd,
             None,
-            hinstance,
+            hinstance.into(),
             |base| {
                 Ok(Arc::new(Self {
                     base,
