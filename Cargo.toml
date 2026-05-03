@@ -4,15 +4,6 @@ version = "0.1.0"
 edition = "2024"
 build = "build.rs"
 
-[package.metadata.winresource]
-CompanyName = ""
-FileDescription = "Minimal desktop fence application"
-FileVersion = "1"
-InternalName = "FENCES.EXE"
-OriginalFilename = "FENCES.EXE"
-ProductName = "Desktop Fences"
-ProductVersion = "0.1.0"
-
 [dependencies]
 anyhow = "1.0.102"
 serde = { version = "1.0.228", features = ["derive", "rc"] }
