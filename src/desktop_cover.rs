@@ -117,6 +117,17 @@ impl DesktopCover {
 
                     cfg_if! {
                         if #[cfg(feature = "use-UpdateLayeredWindow")] {
+                            let _ = UpdateLayeredWindow(
+                                hwnd,
+                                None,
+                                None,
+                                None,
+                                None,
+                                None,
+                                COLORREF(0x00000000),
+                                None,
+                                ULW_OPAQUE,
+                            );
                         } else if #[cfg(feature = "use-SetLayeredWindowAttributes")] {
                             let _ = SetLayeredWindowAttributes(
                                 hwnd,
@@ -244,6 +255,25 @@ impl DesktopCover {
         }
 
         App::get().save_thread.get().unwrap().set_unsaved();
+        LRESULT(0)
+    }
+
+    fn on_size(&self) -> LRESULT {
+        #[cfg(feature = "use-UpdateLayeredWindow")]
+        unsafe {
+            let hwnd = self.base().hwnd();
+            let _ = UpdateLayeredWindow(
+                hwnd,
+                None,
+                None,
+                None,
+                None,
+                None,
+                COLORREF(0x00000000),
+                None,
+                ULW_OPAQUE,
+            );
+        }
         LRESULT(0)
     }
 
@@ -828,6 +858,7 @@ impl Window for DesktopCover {
         match msg {
             WM_CLOSE => LRESULT(0),
             WM_DISPLAYCHANGE => self.on_display_change(),
+            WM_SIZE => self.on_size(),
             WM_DESTROY => self.on_destroy(),
             WM_WINDOWPOSCHANGING => self.on_window_pos_changing(msg, wparam, lparam),
             WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),
