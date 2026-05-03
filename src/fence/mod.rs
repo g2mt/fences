@@ -11,9 +11,11 @@ use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::*;
+use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::app::App;
+use crate::commands::*;
 use crate::config::state::{FenceState, FenceStickyPosition, IconState};
 use crate::desktop_cover::DesktopCover;
 use crate::fence::icon::Icon;
@@ -50,7 +52,7 @@ impl TitleBar {
             area.height,
             parent_hwnd,
             None,
-            hinstance,
+            hinstance.into(),
             |base| {
                 Ok(Arc::new(Self {
                     base,
@@ -275,7 +277,7 @@ impl Window for ScrollArea {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub enum HitTest {
+pub enum HitType {
     TitleBar,
     Client,
     Icon(usize),
@@ -382,7 +384,7 @@ impl Fence {
         }
     }
 
-    pub fn hit_test(&self, x: i32, y: i32) -> Option<HitTest> {
+    pub fn hit_test(&self, x: i32, y: i32) -> Option<HitType> {
         let config = App::config();
         let border = config.fence.border_thickness;
         let title_h = config.fence.title_bar_height;
@@ -398,17 +400,17 @@ impl Fence {
         let on_bottom = y >= rect.bottom - border;
 
         let hit = match (on_left, on_right, on_top, on_bottom) {
-            (true, _, true, _) => HitTest::TopLeft,
-            (_, true, true, _) => HitTest::TopRight,
-            (true, _, _, true) => HitTest::BottomLeft,
-            (_, true, _, true) => HitTest::BottomRight,
-            (true, _, _, _) => HitTest::Left,
-            (_, true, _, _) => HitTest::Right,
-            (_, _, true, _) => HitTest::Top,
-            (_, _, _, true) => HitTest::Bottom,
+            (true, _, true, _) => HitType::TopLeft,
+            (_, true, true, _) => HitType::TopRight,
+            (true, _, _, true) => HitType::BottomLeft,
+            (_, true, _, true) => HitType::BottomRight,
+            (true, _, _, _) => HitType::Left,
+            (_, true, _, _) => HitType::Right,
+            (_, _, true, _) => HitType::Top,
+            (_, _, _, true) => HitType::Bottom,
             _ => {
                 if y < rect.top + title_h {
-                    HitTest::TitleBar
+                    HitType::TitleBar
                 } else {
                     let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
                     si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
@@ -423,11 +425,11 @@ impl Fence {
                     let inner = self.inner.lock();
                     for (i, icon) in inner.icons.iter().enumerate() {
                         if icon.hit_test(rel_x, rel_y) {
-                            icon_hit = Some(HitTest::Icon(i));
+                            icon_hit = Some(HitType::Icon(i));
                             break;
                         }
                     }
-                    icon_hit.unwrap_or(HitTest::Client)
+                    icon_hit.unwrap_or(HitType::Client)
                 }
             }
         };
@@ -749,23 +751,28 @@ impl Fence {
         }
     }
 
-    pub fn on_command(self: &Arc<Self>, wparam: WPARAM, hit_type: Option<HitTest>) {
+    pub fn on_command(
+        self: &Arc<Self>,
+        cover: &DesktopCover,
+        wparam: WPARAM,
+        hit_type: HitType,
+    ) -> bool {
         let command = (wparam.0 & 0xFFFF) as u16 as usize;
+
         let mut should_save = false;
 
         match command {
-            crate::desktop_cover::IDM_ADD_ICON => {
+            IDM_ADD_ICON => {
                 let title = format!("Icon #{}", self.icon_count());
                 self.add_icon(&title);
                 should_save = true;
             }
-            crate::desktop_cover::IDM_RENAME_FENCE => {
+            IDM_RENAME_FENCE => {
                 let fence = self.clone();
                 let current_title = String::from(&fence.title() as &str);
-                App::get().executor().spawn(async move {
+                cover.executor().spawn(cover, async move {
                     if let Some(new_title) =
-                        prompt::input("Rename fence", "Enter new fence name:", &current_title)
-                            .await
+                        prompt::input("Rename fence", "Enter new fence name:", &current_title).await
                     {
                         if !new_title.is_empty() {
                             fence.set_title(new_title.into());
@@ -774,7 +781,7 @@ impl Fence {
                     }
                 });
             }
-            crate::desktop_cover::IDM_DELETE_FENCE => {
+            IDM_DELETE_FENCE => {
                 let result = unsafe {
                     MessageBoxW(
                         Some(self.base().hwnd()),
@@ -785,25 +792,22 @@ impl Fence {
                 };
                 if result == IDYES {
                     let cover = App::get().cover.get().unwrap();
-                    let mut inner = cover.inner.lock();
-                    if let Some(pos) = inner.fences.iter().position(|f| Arc::ptr_eq(f, self)) {
-                        inner.fences.remove(pos);
-                    }
+                    cover.remove_fence(self);
                 }
                 should_save = true;
             }
-            crate::desktop_cover::IDM_RUN_ICON => {
-                if let Some(HitTest::Icon(icon_idx)) = hit_type {
+            IDM_RUN_ICON => {
+                if let HitType::Icon(icon_idx) = hit_type {
                     if let Some(icon) = self.icon_by_index(icon_idx) {
                         icon.run();
                     }
                 }
             }
-            crate::desktop_cover::IDM_RENAME_ICON => {
-                if let Some(HitTest::Icon(icon_idx)) = hit_type {
+            IDM_RENAME_ICON => {
+                if let HitType::Icon(icon_idx) = hit_type {
                     if let Some(icon) = self.icon_by_index(icon_idx) {
                         let current_title = String::from(&icon.title() as &str);
-                        App::get().executor().spawn(async move {
+                        cover.executor().spawn(cover, async move {
                             if let Some(new_title) =
                                 prompt::input("Rename icon", "Enter new icon name:", &current_title)
                                     .await
@@ -817,64 +821,60 @@ impl Fence {
                     }
                 }
             }
-            crate::desktop_cover::IDM_SET_ICON_PATH => {
-                if let Some(HitTest::Icon(icon_idx)) = hit_type {
+            IDM_SET_ICON_PATH => {
+                if let HitType::Icon(icon_idx) = hit_type {
                     if let Some(icon) = self.icon_by_index(icon_idx) {
                         icon.set_info_from_selector();
                         should_save = true;
                     }
                 }
             }
-            crate::desktop_cover::IDM_DELETE_ICON => {
-                if let Some(HitTest::Icon(icon_idx)) = hit_type {
+            IDM_DELETE_ICON => {
+                if let HitType::Icon(icon_idx) = hit_type {
                     self.remove_icon(icon_idx);
                     should_save = true;
                 }
             }
-            crate::desktop_cover::IDM_IMPORT => {
+            IDM_IMPORT => {
                 if self.imported_from().is_some() {
                     self.show_import_existing_dialog();
                 } else {
                     let fence = self.clone();
-                    App::get().executor().spawn(async move {
+                    cover.executor().spawn(cover, async move {
                         fence.show_import_from_dialog().await;
                     });
                 }
                 should_save = true;
             }
-            crate::desktop_cover::IDM_IMPORT_FROM => {
+            IDM_IMPORT_FROM => {
                 let fence = self.clone();
-                App::get().executor().spawn(async move {
+                cover.executor().spawn(cover, async move {
                     fence.show_import_from_dialog().await;
                 });
                 should_save = true;
             }
-            crate::desktop_cover::IDM_STICKY_NONE
-            | crate::desktop_cover::IDM_STICKY_TOPLEFT
-            | crate::desktop_cover::IDM_STICKY_TOPRIGHT
-            | crate::desktop_cover::IDM_STICKY_BOTTOMLEFT
-            | crate::desktop_cover::IDM_STICKY_BOTTOMRIGHT => {
+            IDM_STICKY_NONE
+            | IDM_STICKY_TOPLEFT
+            | IDM_STICKY_TOPRIGHT
+            | IDM_STICKY_BOTTOMLEFT
+            | IDM_STICKY_BOTTOMRIGHT => {
                 use crate::config::state::FenceStickyPosition;
                 let sticky = match command {
-                    crate::desktop_cover::IDM_STICKY_TOPLEFT => Some(FenceStickyPosition::TopLeft),
-                    crate::desktop_cover::IDM_STICKY_TOPRIGHT => {
-                        Some(FenceStickyPosition::TopRight)
-                    }
-                    crate::desktop_cover::IDM_STICKY_BOTTOMLEFT => {
-                        Some(FenceStickyPosition::BottomLeft)
-                    }
-                    crate::desktop_cover::IDM_STICKY_BOTTOMRIGHT => {
-                        Some(FenceStickyPosition::BottomRight)
-                    }
+                    IDM_STICKY_TOPLEFT => Some(FenceStickyPosition::TopLeft),
+                    IDM_STICKY_TOPRIGHT => Some(FenceStickyPosition::TopRight),
+                    IDM_STICKY_BOTTOMLEFT => Some(FenceStickyPosition::BottomLeft),
+                    IDM_STICKY_BOTTOMRIGHT => Some(FenceStickyPosition::BottomRight),
                     _ => None,
                 };
                 self.set_sticky(sticky);
                 should_save = true;
             }
-            crate::desktop_cover::IDM_OPEN_EXPLORER => {
+            IDM_OPEN_EXPLORER => {
                 if let Some(import_path) = self.imported_from() {
-                    let path_wide: Vec<u16> =
-                        import_path.encode_utf16().chain(std::iter::once(0)).collect();
+                    let path_wide: Vec<u16> = import_path
+                        .encode_utf16()
+                        .chain(std::iter::once(0))
+                        .collect();
                     unsafe {
                         let _ = ShellExecuteW(
                             None,
@@ -890,9 +890,7 @@ impl Fence {
             _ => {}
         }
 
-        if should_save {
-            App::get().save_thread.get().unwrap().set_unsaved();
-        }
+        should_save
     }
 }
 
