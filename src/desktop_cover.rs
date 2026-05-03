@@ -286,7 +286,7 @@ impl DesktopCover {
 
             // rgba(0, 0, 1, 0.5) -> Pre-multiplied: R=0, G=0, B=0.5*1, A=127
             // 0x7F000001 (AARRGGBB)
-            let color = (127 << 24) | (0 << 16) | (0 << 8) | 1;
+            let color = (127 << 24) | (0 << 16) | (0 << 8) | 127;
             for p in pixels.iter_mut() {
                 *p = color;
             }
