@@ -798,35 +798,32 @@ impl Fence {
             }
             IDM_RUN_ICON => {
                 if let HitType::Icon(icon_idx) = hit_type {
-                    if let Some(icon) = self.icon_by_index(icon_idx) {
-                        icon.run();
-                    }
+                    let icon = self.icon_by_index(icon_idx).unwrap();
+                    icon.run();
                 }
             }
             IDM_RENAME_ICON => {
                 if let HitType::Icon(icon_idx) = hit_type {
-                    if let Some(icon) = self.icon_by_index(icon_idx) {
-                        let current_title = String::from(&icon.title() as &str);
-                        cover.executor().spawn(async move {
-                            if let Some(new_title) =
-                                prompt::input("Rename icon", "Enter new icon name:", &current_title)
-                                    .await
-                            {
-                                if !new_title.is_empty() {
-                                    icon.set_title(new_title.into());
-                                    App::get().save_thread.get().unwrap().set_unsaved();
-                                }
+                    let icon = self.icon_by_index(icon_idx).unwrap();
+                    let current_title = String::from(&icon.title() as &str);
+                    cover.executor().spawn(async move {
+                        if let Some(new_title) =
+                            prompt::input("Rename icon", "Enter new icon name:", &current_title)
+                                .await
+                        {
+                            if !new_title.is_empty() {
+                                icon.set_title(new_title.into());
+                                App::get().save_thread.get().unwrap().set_unsaved();
                             }
-                        });
-                    }
+                        }
+                    });
                 }
             }
             IDM_SET_ICON_PATH => {
                 if let HitType::Icon(icon_idx) = hit_type {
-                    if let Some(icon) = self.icon_by_index(icon_idx) {
-                        icon.set_info_from_selector();
-                        should_save = true;
-                    }
+                    let icon = self.icon_by_index(icon_idx).unwrap();
+                    icon.set_info_from_selector();
+                    should_save = true;
                 }
             }
             IDM_DELETE_ICON => {
