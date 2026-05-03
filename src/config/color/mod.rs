@@ -20,26 +20,30 @@ impl<const ACCEPTS_ALPHA: bool> Color<ACCEPTS_ALPHA> {
         Self(n)
     }
 
+    pub fn bgr(&self) -> u32 {
+        todo!()
+    }
+
+    pub fn abgr(&self) -> u32 {
+        todo!()
+    }
+
     pub fn argb(&self) -> u32 {
         self.0
     }
 
-    /// Red component (0..255).
     pub fn r(&self) -> u8 {
         ((self.0 >> 16) & 0xFF) as u8
     }
 
-    /// Green component (0..255).
     pub fn g(&self) -> u8 {
         ((self.0 >> 8) & 0xFF) as u8
     }
 
-    /// Blue component (0..255).
     pub fn b(&self) -> u8 {
         (self.0 & 0xFF) as u8
     }
 
-    /// Alpha component (0..255).
     pub fn a(&self) -> u8 {
         ((self.0 >> 24) & 0xFF) as u8
     }
@@ -51,10 +55,8 @@ impl<const ACCEPTS_ALPHA: bool> Serialize for Color<ACCEPTS_ALPHA> {
         S: Serializer,
     {
         let s = if ACCEPTS_ALPHA {
-            // Include alpha when allowed
             format!("#{:08X}", self.0)
         } else {
-            // Omit alpha component
             format!("#{:06X}", self.0 & 0x00FFFFFF)
         };
         serializer.serialize_str(&s)
@@ -88,12 +90,9 @@ impl<'de, const ACCEPTS_ALPHA: bool> Deserialize<'de> for Color<ACCEPTS_ALPHA> {
                     .ok_or_else(|| E::custom("missing leading #"))?;
                 let value = match hex.len() {
                     6 => {
-                        // #RRGGBB – parse and store as AARRGGBB with opaque alpha
                         let rgb = u32::from_str_radix(hex, 16)
                             .map_err(|_| E::custom("invalid hex digits"))?;
-                        let a = if ACCEPTS_ALPHA { 0xFF } else { 0x0 };
-                        // (a << 24) | rgb  gives AARRGGBB, because rgb = 0x00RRGGBB
-                        Ok(Color((a << 24) | rgb))
+                        Ok(Color((0xFF << 24) | rgb))
                     }
                     8 => {
                         if !ACCEPTS_ALPHA {
@@ -101,7 +100,6 @@ impl<'de, const ACCEPTS_ALPHA: bool> Deserialize<'de> for Color<ACCEPTS_ALPHA> {
                                 "alpha channel not accepted, use #RRGGBB format",
                             ));
                         }
-                        // #AARRGGBB – already in AARRGGBB order
                         let aarrggbb = u32::from_str_radix(hex, 16)
                             .map_err(|_| E::custom("invalid hex digits"))?;
                         Ok(Color(aarrggbb))
@@ -120,15 +118,8 @@ impl Color<true> {
     pub unsafe fn paint_background(&self, hdc: HDC, rect: &RECT) {
         unsafe {
             let alpha = self.a();
-            let color_ref = {
-                let r = self.r() as u32;
-                let g = self.g() as u32;
-                let b = self.b() as u32;
-                COLORREF(r | (g << 8) | (b << 16))
-            };
-
             if alpha == 255 {
-                let brush = CreateSolidBrush(color_ref);
+                let brush = CreateSolidBrush(COLORREF(self.abgr()));
                 FillRect(hdc, rect, brush);
                 let _ = DeleteObject(brush.into());
             } else if alpha > 0 {
@@ -138,7 +129,7 @@ impl Color<true> {
                 let bitmap = CreateCompatibleBitmap(hdc, width, height);
                 SelectObject(mem_dc, bitmap.into());
 
-                let brush = CreateSolidBrush(color_ref);
+                let brush = CreateSolidBrush(COLORREF(self.bgr()));
                 let local_rect = RECT {
                     left: 0,
                     top: 0,
@@ -166,21 +157,9 @@ impl Color<true> {
 impl Color<false> {
     pub unsafe fn paint_background(&self, hdc: HDC, rect: &RECT) {
         unsafe {
-            let r = self.r() as u32;
-            let g = self.g() as u32;
-            let b = self.b() as u32;
-            let brush = CreateSolidBrush(COLORREF(r | (g << 8) | (b << 16)));
+            let brush = CreateSolidBrush(COLORREF(self.abgr()));
             FillRect(hdc, rect, brush);
             let _ = DeleteObject(brush.into());
         }
-    }
-}
-
-impl<const ACCEPTS_ALPHA: bool> Into<COLORREF> for Color<ACCEPTS_ALPHA> {
-    fn into(self) -> COLORREF {
-        let r = self.r() as u32;
-        let g = self.g() as u32;
-        let b = self.b() as u32;
-        COLORREF(r | (g << 8) | (b << 16))
     }
 }
