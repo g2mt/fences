@@ -113,7 +113,7 @@ impl DesktopCover {
                         hit_type: None,
                         last_mouse_pos: POINT { x: 0, y: 0 },
                     }),
-                    executor: crate::fut::AsyncExecutor::new(),
+                    executor: crate::fut::AsyncExecutor::new(HWNDWrapper(hwnd)),
                 });
 
                 Ok(cover)
@@ -606,7 +606,7 @@ impl DesktopCover {
                 should_save = true;
             }
             IDM_ADD_FENCE_FROM_FOLDER => {
-                self.executor.spawn(self, async move {
+                self.executor.spawn(async move {
                     debug!("IDM_ADD_FENCE_FROM_FOLDER async spawn");
                     let cover = App::get().cover.get().unwrap();
                     match Fence::from_folder_selector(&cover).await {
@@ -684,7 +684,7 @@ impl Window for DesktopCover {
             WM_RBUTTONUP => self.on_rbutton_up(lparam),
             WM_USER_SHELLICON => self.on_shell_icon(lparam),
             WM_USER_WAKE_FUTURE => {
-                self.executor.poll_all(self);
+                self.executor.poll_all();
                 LRESULT(0)
             }
             WM_COMMAND => self.on_command(wparam),

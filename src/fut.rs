@@ -54,20 +54,22 @@ impl std::task::Wake for WindowWaker {
 
 pub struct AsyncExecutor {
     pub tasks: Mutex<Vec<Pin<Box<dyn Future<Output = ()> + Send>>>>,
+    hwnd_w: HWNDWrapper,
 }
 
 impl AsyncExecutor {
-    pub fn new() -> Self {
+    pub fn new(hwnd_w: HWNDWrapper) -> Self {
         Self {
             tasks: Mutex::new(Vec::new()),
+            hwnd_w,
         }
     }
 
-    pub fn spawn(&self, cover: &DesktopCover, fut: impl Future<Output = ()> + Send + 'static) {
+    pub fn spawn(&self, fut: impl Future<Output = ()> + Send + 'static) {
         self.tasks.lock().push(Box::pin(fut));
         unsafe {
             let _ = PostMessageW(
-                Some(cover.base().hwnd()),
+                Some(self.hwnd_w.0),
                 WM_USER_WAKE_FUTURE,
                 WPARAM(0),
                 LPARAM(0),
@@ -75,10 +77,10 @@ impl AsyncExecutor {
         }
     }
 
-    pub fn poll_all(&self, cover: &DesktopCover) {
+    pub fn poll_all(&self) {
         let mut tasks = self.tasks.lock();
         let waker = Arc::new(WindowWaker {
-            hwnd_w: HWNDWrapper(cover.base().hwnd()),
+            hwnd_w: self.hwnd_w,
         })
         .into();
         let mut cx = Context::from_waker(&waker);
