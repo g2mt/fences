@@ -165,6 +165,18 @@ impl DesktopCover {
         Ok(())
     }
 
+    pub fn add_fence(&self, fence: Arc<Fence>) {
+        let mut inner = self.inner.lock();
+        inner.fences.push(fence);
+    }
+
+    pub fn remove_fence(&self, fence: &Arc<Fence>) {
+        let mut inner = self.inner.lock();
+        if let Some(pos) = inner.fences.iter().position(|f| Arc::ptr_eq(f, fence)) {
+            inner.fences.remove(pos);
+        }
+    }
+
     pub fn rearrange_fences(&self, old_screen_width: i32, old_screen_height: i32) {
         let inner = self.inner.lock();
         let bounds = App::get().screen_bounds();
