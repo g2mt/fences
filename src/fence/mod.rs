@@ -9,6 +9,7 @@ use tracing::{debug, error};
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
@@ -30,9 +31,7 @@ pub struct TitleBar {
 
 impl TitleBar {
     pub fn new(parent_hwnd: HWND, title: Arc<str>, fence_area: &Area<i32>) -> Result<Arc<Self>> {
-        let hinstance = unsafe {
-            HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
-        };
+        let hinstance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
         let area = Self::area_from_fence_area(fence_area);
         Base::create_window(
             WINDOW_EX_STYLE(0),
