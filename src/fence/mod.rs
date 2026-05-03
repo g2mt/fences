@@ -723,6 +723,31 @@ impl Fence {
         unsafe { SetScrollInfo(self.scroll_area.base().hwnd(), SB_VERT, &si, true) };
         drop(inner);
     }
+
+    fn on_paint(&self) -> LRESULT {
+        let hwnd = self.base().hwnd();
+        unsafe {
+            let mut ps: PAINTSTRUCT = std::mem::zeroed();
+            let hdc = BeginPaint(hwnd, &mut ps);
+
+            let mut rect: RECT = std::mem::zeroed();
+            let _ = GetClientRect(hwnd, &mut rect);
+
+            let config = App::config();
+            config.fence.fence_bg_color.paint_background(hdc, &rect);
+
+            let _ = EndPaint(hwnd, &ps);
+        }
+        LRESULT(0)
+    }
+
+    fn on_move(&self, _wparam: WPARAM, _lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().hwnd();
+        unsafe {
+            let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
+            DefWindowProcW(hwnd, WM_MOVE, _wparam, _lparam)
+        }
+    }
 }
 
 impl Window for Fence {
@@ -734,23 +759,8 @@ impl Window for Fence {
         let hwnd = self.base().hwnd();
         match msg {
             WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
-            WM_MOVE => unsafe {
-                let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
-                DefWindowProcW(hwnd, msg, wparam, lparam)
-            },
-            WM_PAINT => unsafe {
-                let mut ps: PAINTSTRUCT = std::mem::zeroed();
-                let hdc = BeginPaint(hwnd, &mut ps);
-
-                let mut rect: RECT = std::mem::zeroed();
-                let _ = GetClientRect(hwnd, &mut rect);
-
-                let config = App::config();
-                config.fence.fence_bg_color.paint_background(hdc, &rect);
-
-                let _ = EndPaint(hwnd, &ps);
-                LRESULT(0)
-            },
+            WM_MOVE => self.on_move(wparam, lparam),
+            WM_PAINT => self.on_paint(),
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
     }
