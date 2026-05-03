@@ -263,7 +263,7 @@ impl DesktopCover {
         unsafe {
             let hwnd = self.base().hwnd();
             let hdc_screen = GetDC(None);
-            let hdc_mem = CreateCompatibleDC(hdc_screen);
+            let hdc_mem = CreateCompatibleDC(Some(hdc_screen));
 
             let bounds = App::get().screen_bounds();
             let width = bounds.width.load(Ordering::Relaxed);
@@ -275,10 +275,11 @@ impl DesktopCover {
             bmi.bmiHeader.biHeight = -height; // top-down
             bmi.bmiHeader.biPlanes = 1;
             bmi.bmiHeader.biBitCount = 32;
-            bmi.bmiHeader.biCompression = BI_RGB as u32;
+            bmi.bmiHeader.biCompression = BI_RGB.0;
 
             let mut bits = std::ptr::null_mut();
-            let h_bitmap = CreateDIBSection(hdc_mem, &bmi, DIB_RGB_COLORS, &mut bits, None, 0);
+            let h_bitmap =
+                CreateDIBSection(Some(hdc_mem), &bmi, DIB_RGB_COLORS, &mut bits, None, 0).unwrap();
             let old_bitmap = SelectObject(hdc_mem, h_bitmap);
 
             let pixel_count = (width * height) as usize;
@@ -305,10 +306,10 @@ impl DesktopCover {
 
             let _ = UpdateLayeredWindow(
                 hwnd,
-                hdc_screen,
+                Some(hdc_screen),
                 None,
                 Some(&mut size),
-                hdc_mem,
+                Some(hdc_mem),
                 Some(&mut pt_src),
                 COLORREF(0),
                 Some(&mut blend),
