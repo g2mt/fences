@@ -262,17 +262,63 @@ impl DesktopCover {
         #[cfg(feature = "use-UpdateLayeredWindow")]
         unsafe {
             let hwnd = self.base().hwnd();
+            let hdc_screen = GetDC(None);
+            let hdc_mem = CreateCompatibleDC(hdc_screen);
+
+            let bounds = App::get().screen_bounds();
+            let width = bounds.width.load(Ordering::Relaxed);
+            let height = bounds.height.load(Ordering::Relaxed);
+
+            let mut bmi: BITMAPINFO = std::mem::zeroed();
+            bmi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+            bmi.bmiHeader.biWidth = width;
+            bmi.bmiHeader.biHeight = -height; // top-down
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = BI_RGB as u32;
+
+            let mut bits = std::ptr::null_mut();
+            let h_bitmap = CreateDIBSection(hdc_mem, &bmi, DIB_RGB_COLORS, &mut bits, None, 0);
+            let old_bitmap = SelectObject(hdc_mem, h_bitmap);
+
+            let pixel_count = (width * height) as usize;
+            let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, pixel_count);
+
+            // rgba(0, 0, 1, 0.5) -> Pre-multiplied: R=0, G=0, B=0.5*1, A=127
+            // 0x7F000001 (AARRGGBB)
+            let color = (127 << 24) | (0 << 16) | (0 << 8) | 1;
+            for p in pixels.iter_mut() {
+                *p = color;
+            }
+
+            let mut size = SIZE {
+                cx: width,
+                cy: height,
+            };
+            let mut pt_src = POINT { x: 0, y: 0 };
+            let mut blend = BLENDFUNCTION {
+                BlendOp: AC_SRC_OVER as u8,
+                BlendFlags: 0,
+                SourceConstantAlpha: 255,
+                AlphaFormat: AC_SRC_ALPHA as u8,
+            };
+
             let _ = UpdateLayeredWindow(
                 hwnd,
+                hdc_screen,
                 None,
-                None,
-                None,
-                None,
-                None,
-                COLORREF(0x00000000),
-                None,
-                ULW_OPAQUE,
+                Some(&mut size),
+                hdc_mem,
+                Some(&mut pt_src),
+                COLORREF(0),
+                Some(&mut blend),
+                ULW_ALPHA,
             );
+
+            SelectObject(hdc_mem, old_bitmap);
+            let _ = DeleteObject(h_bitmap);
+            let _ = DeleteDC(hdc_mem);
+            let _ = ReleaseDC(None, hdc_screen);
         }
         LRESULT(0)
     }
