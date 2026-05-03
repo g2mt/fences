@@ -269,7 +269,7 @@ impl ImportDialog {
                         0,
                         hwnd,
                         Some(HMENU(ID_IMPORT_BTN as *mut core::ffi::c_void)),
-                        hinstance,
+                        hinstance.into(),
                     );
                 }
 
@@ -283,7 +283,7 @@ impl ImportDialog {
                         0,
                         hwnd,
                         Some(HMENU(ID_CANCEL_BTN as *mut core::ffi::c_void)),
-                        hinstance,
+                        hinstance.into(),
                     );
                 }
 

@@ -1,15 +1,15 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use parking_lot::Mutex;
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
-use crate::utils;
 
 use crate::fut::{PromptFuture, PromptState};
+use crate::utils;
 
 const ID_EDIT: u32 = 101;
 const ID_OK: u32 = 1;
@@ -30,6 +30,8 @@ unsafe extern "system" fn input_wndproc(
 ) -> LRESULT {
     match msg {
         WM_NCCREATE => unsafe {
+            let hinstance = GetModuleHandleW(None).unwrap_or_default();
+
             // Store the InputDialogData pointer passed through lParam
             let cs = lparam.0 as *const CREATESTRUCTW;
             let data = &mut *((*cs).lpCreateParams as *mut InputDialogData);
@@ -78,7 +80,7 @@ unsafe extern "system" fn input_wndproc(
                 25,
                 hwnd,
                 Some(HMENU(ID_OK as *mut core::ffi::c_void)),
-                GetModuleHandleW(None).unwrap_or_default(),
+                hinstance.into(),
             );
 
             // Create Cancel button
@@ -90,7 +92,7 @@ unsafe extern "system" fn input_wndproc(
                 25,
                 hwnd,
                 Some(HMENU(ID_CANCEL as *mut core::ffi::c_void)),
-                GetModuleHandleW(None).unwrap_or_default(),
+                hinstance.into(),
             );
 
             // Set the edit's initial text
