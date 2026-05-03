@@ -3,6 +3,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use anyhow::Result;
+use cfg_if::cfg_if;
 use parking_lot::Mutex;
 use tracing::{debug, error, info};
 use windows::core::*;
@@ -114,7 +115,18 @@ impl DesktopCover {
                     nid.szTip[..len].copy_from_slice(&tip[..len]);
                     let _ = Shell_NotifyIconW(NIM_ADD, &nid);
 
-                    let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0x00000000), 0, LWA_COLORKEY);
+                    cfg_if! {
+                        if #[cfg(feature = "use-UpdateLayeredWindow")] {
+                        } else if #[cfg(feature = "use-SetLayeredWindowAttributes")] {
+                            let _ = SetLayeredWindowAttributes(
+                                hwnd,
+                                COLORREF(0x00000000),
+                                0,
+                                LWA_COLORKEY
+                            );
+                        }
+                    }
+
                     let _ = SetWindowPos(
                         hwnd,
                         Some(HWND_BOTTOM),
