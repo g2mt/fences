@@ -108,6 +108,12 @@ impl Window for TitleBar {
                 );
 
                 let _ = EndPaint(hwnd, &ps);
+
+                #[cfg(feature = "use-UpdateLayeredWindow")]
+                {
+                    let _ = PostMessageW(GetParent(hwnd).ok(), WM_USER_PAINT_WITH_ALPHA, None, None);
+                }
+
                 LRESULT(0)
             },
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
@@ -273,6 +279,12 @@ impl Window for ScrollArea {
                     .paint_background(hdc, &rect);
 
                 let _ = EndPaint(hwnd, &ps);
+
+                #[cfg(feature = "use-UpdateLayeredWindow")]
+                {
+                    let _ = PostMessageW(GetParent(hwnd).ok(), WM_USER_PAINT_WITH_ALPHA, None, None);
+                }
+
                 LRESULT(0)
             },
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
