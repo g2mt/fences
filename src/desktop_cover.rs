@@ -17,6 +17,7 @@ use crate::app::App;
 use crate::commands::*;
 use crate::config::state::{AppState, FenceStickyPosition};
 use crate::fence::{Fence, HitType};
+use crate::fut::AsyncExecutor;
 use crate::prompt;
 use crate::utils::HWNDWrapper;
 use crate::window::{register_classname, Base, BaseRef, Window};
@@ -28,7 +29,7 @@ pub const WM_USER_WAKE_FUTURE: u32 = WM_USER + 2;
 pub struct DesktopCover {
     base: BaseRef,
     inner: Mutex<DesktopCoverInner>,
-    executor: crate::fut::AsyncExecutor,
+    executor: AsyncExecutor,
 }
 
 struct DesktopCoverInner {
@@ -114,7 +115,7 @@ impl DesktopCover {
                         hit_type: None,
                         last_mouse_pos: POINT { x: 0, y: 0 },
                     }),
-                    executor: crate::fut::AsyncExecutor::new(HWNDWrapper(hwnd)),
+                    executor: AsyncExecutor::new(HWNDWrapper(hwnd)),
                 });
 
                 Ok(cover)
@@ -122,7 +123,7 @@ impl DesktopCover {
         )
     }
 
-    pub fn executor(&self) -> &crate::fut::AsyncExecutor {
+    pub fn executor(&self) -> &AsyncExecutor {
         &self.executor
     }
 
