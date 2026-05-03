@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::Mutex;
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
@@ -9,9 +10,8 @@ use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
 
-use crate::window::{Base, BaseRef, Window, register_classname_ex};
+use crate::window::{register_classname_ex, Base, BaseRef, Window};
 
 const ID_LISTVIEW: u32 = 1001;
 const ID_IMPORT_BTN: u32 = 1002;
@@ -54,7 +54,7 @@ impl ImportDialog {
         items: Vec<ImportItem>,
         on_import: impl Fn(Vec<ImportItem>) + Send + Sync + 'static,
     ) -> Result<Arc<Self>> {
-        let h_instance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
+        let hinstance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
 
         // Center dialog on screen
         let bounds = crate::app::App::get().screen_bounds();
@@ -86,7 +86,7 @@ impl ImportDialog {
             dlg_h,
             HWND::default(),
             None,
-            h_instance.into(),
+            hinstance.into(),
             |base| {
                 let hwnd = base.hwnd();
                 let himagelist = unsafe {
@@ -109,7 +109,7 @@ impl ImportDialog {
                         0,
                         Some(hwnd),
                         Some(HMENU(ID_LISTVIEW as *mut core::ffi::c_void)),
-                        Some(h_instance.into()),
+                        Some(hinstance.into()),
                         None,
                     )
                     .unwrap_or_default()
@@ -273,7 +273,7 @@ impl ImportDialog {
                         0,
                         Some(hwnd),
                         Some(HMENU(ID_IMPORT_BTN as *mut core::ffi::c_void)),
-                        Some(h_instance.into()),
+                        Some(hinstance.into()),
                         None,
                     );
                 }
@@ -293,7 +293,7 @@ impl ImportDialog {
                         0,
                         Some(hwnd),
                         Some(HMENU(ID_CANCEL_BTN as *mut core::ffi::c_void)),
-                        Some(h_instance.into()),
+                        Some(hinstance.into()),
                         None,
                     );
                 }
