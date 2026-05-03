@@ -7,6 +7,7 @@ use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::*;
+use crate::utils;
 
 use crate::fut::{PromptFuture, PromptState};
 
@@ -69,19 +70,15 @@ unsafe extern "system" fn input_wndproc(
             data.edit_hwnd = edit;
 
             // Create OK button
-            let _ = CreateWindowExW(
-                WINDOW_EX_STYLE(0),
-                w!("BUTTON"),
-                w!("OK"),
-                WS_VISIBLE | WS_CHILD | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+            let _ = crate::utils::create_button(
+                "OK",
                 50,
                 80,
                 60,
                 25,
-                Some(hwnd),
+                hwnd,
                 Some(HMENU(ID_OK as *mut core::ffi::c_void)),
-                Some(GetModuleHandleW(None).unwrap_or_default().into()),
-                None,
+                GetModuleHandleW(None).unwrap_or_default(),
             );
 
             // Create Cancel button

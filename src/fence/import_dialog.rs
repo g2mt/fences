@@ -11,6 +11,7 @@ use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
+use crate::utils;
 use crate::window::{register_classname_ex, Base, BaseRef, Window};
 
 const ID_LISTVIEW: u32 = 1001;
@@ -259,42 +260,30 @@ impl ImportDialog {
                 }
 
                 // Import button
-                let import_text: Vec<u16> =
-                    "Import".encode_utf16().chain(std::iter::once(0)).collect();
                 unsafe {
-                    let _ = CreateWindowExW(
-                        WINDOW_EX_STYLE(0),
-                        w!("BUTTON"),
-                        PCWSTR(import_text.as_ptr()),
-                        WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
+                    let _ = crate::utils::create_button(
+                        "Import",
                         0,
                         0,
                         0,
                         0,
-                        Some(hwnd),
+                        hwnd,
                         Some(HMENU(ID_IMPORT_BTN as *mut core::ffi::c_void)),
-                        Some(hinstance.into()),
-                        None,
+                        hinstance,
                     );
                 }
 
                 // Cancel button
-                let cancel_text: Vec<u16> =
-                    "Cancel".encode_utf16().chain(std::iter::once(0)).collect();
                 unsafe {
-                    let _ = CreateWindowExW(
-                        WINDOW_EX_STYLE(0),
-                        w!("BUTTON"),
-                        PCWSTR(cancel_text.as_ptr()),
-                        WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
+                    let _ = crate::utils::create_button(
+                        "Cancel",
                         0,
                         0,
                         0,
                         0,
-                        Some(hwnd),
+                        hwnd,
                         Some(HMENU(ID_CANCEL_BTN as *mut core::ffi::c_void)),
-                        Some(hinstance.into()),
-                        None,
+                        hinstance,
                     );
                 }
 
