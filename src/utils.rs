@@ -1,6 +1,22 @@
+use std::sync::LazyLock;
 use windows::core::*;
 use windows::Win32::Foundation::*;
+use windows::Win32::Graphics::Gdi::{CreateFontIndirectW, HFONT};
 use windows::Win32::UI::WindowsAndMessaging::*;
+
+static BUTTON_FONT: LazyLock<HFONT> = LazyLock::new(|| {
+    unsafe {
+        let mut ncm: NONCLIENTMETRICSW = std::mem::zeroed();
+        ncm.cbSize = std::mem::size_of::<NONCLIENTMETRICSW>() as u32;
+        SystemParametersInfoW(
+            SPI_GETNONCLIENTMETRICS,
+            std::mem::size_of::<NONCLIENTMETRICSW>() as u32,
+            (&mut ncm as *mut NONCLIENTMETRICSW) as *const core::ffi::c_void,
+            0,
+        );
+        CreateFontIndirectW(&ncm.lfMessageFont).unwrap()
+    }
+});
 
 #[derive(Copy, Clone)]
 pub(crate) struct HWNDWrapper(pub HWND);
@@ -18,7 +34,7 @@ pub fn create_button(
     hinstance: HINSTANCE,
 ) -> HWND {
     let text_u16: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
-    unsafe {
+    let hwnd = unsafe {
         CreateWindowExW(
             WINDOW_EX_STYLE(0),
             w!("BUTTON"),
@@ -34,5 +50,14 @@ pub fn create_button(
             None,
         )
         .unwrap()
+    };
+    unsafe {
+        SendMessageW(
+            hwnd,
+            WM_SETFONT,
+            WPARAM((*BUTTON_FONT).0 as usize),
+            LPARAM(1),
+        );
     }
+    hwnd
 }
