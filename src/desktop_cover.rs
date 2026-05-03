@@ -18,7 +18,6 @@ use crate::commands::*;
 use crate::config::state::{AppState, FenceStickyPosition};
 use crate::fence::{Fence, HitType};
 use crate::fut::AsyncExecutor;
-use crate::prompt;
 use crate::utils::HWNDWrapper;
 use crate::window::{register_classname, Base, BaseRef, Window};
 

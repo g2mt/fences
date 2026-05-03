@@ -7,9 +7,8 @@ use parking_lot::Mutex;
 use windows::Win32::Foundation::{LPARAM, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
 
-use crate::desktop_cover::{DesktopCover, WM_USER_WAKE_FUTURE};
+use crate::desktop_cover::WM_USER_WAKE_FUTURE;
 use crate::utils::HWNDWrapper;
-use crate::window::Window;
 
 pub struct PromptState<T> {
     pub result: Option<T>,
