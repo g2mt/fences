@@ -90,14 +90,17 @@ impl ScrollArea {
         let available_width = width - (fence_padding * 2);
         let cols = (available_width / (icon_size + fence_spacing)).max(1);
 
-        for (i, icon) in self.icons.lock().iter().enumerate() {
-            let col = i as i32 % cols;
-            let row = i as i32 / cols;
+        {
+            let icons = self.icons.lock();
+            for (i, icon) in icons.iter().enumerate() {
+                let col = i as i32 % cols;
+                let row = i as i32 / cols;
 
-            let x = fence_padding + col * (icon_size + fence_spacing);
-            let y = fence_padding + row * (icon_size + fence_spacing);
+                let x = fence_padding + col * (icon_size + fence_spacing);
+                let y = fence_padding + row * (icon_size + fence_spacing);
 
-            icon.base().resize_to(x, y, icon_size, icon_size);
+                icon.base().resize_to(x, y, icon_size, icon_size);
+            }
         }
         self.update_scroll_info();
     }
