@@ -325,7 +325,7 @@ impl Window for ScrollArea {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum HitType {
     TitleBar,
     Client,
@@ -536,20 +536,16 @@ impl Fence {
         }
     }
 
-    pub fn hit_test(&self, x: i32, y: i32) -> Option<HitType> {
+    pub fn hit_test(&self, rel_x: i32, rel_y: i32) -> Option<HitType> {
         let config = App::config();
         let border = config.fence.border_thickness;
         let title_h = config.fence.title_bar_height;
 
-        let rect = self.base.rect();
-        if x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom {
-            return None;
-        }
-
-        let on_left = x < rect.left + border;
-        let on_right = x >= rect.right - border;
-        let on_top = y < rect.top + border;
-        let on_bottom = y >= rect.bottom - border;
+        let area = self.base().area();
+        let on_left = rel_x < border;
+        let on_right = rel_x >= area.width.load(Ordering::Relaxed) + border;
+        let on_top = rel_y < border;
+        let on_bottom = rel_y >= area.height.load(Ordering::Relaxed) + border;
 
         let hit = match (on_left, on_right, on_top, on_bottom) {
             (true, _, true, _) => HitType::TopLeft,
@@ -561,7 +557,7 @@ impl Fence {
             (_, _, true, _) => HitType::Top,
             (_, _, _, true) => HitType::Bottom,
             _ => {
-                if y < rect.top + title_h {
+                if rel_y < title_h {
                     HitType::TitleBar
                 } else {
                     let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
@@ -571,12 +567,11 @@ impl Fence {
                         let _ = GetScrollInfo(self.scroll_area.base().hwnd(), SB_VERT, &mut si);
                     };
 
-                    let rel_x = x - rect.left;
-                    let rel_y = y - (rect.top + title_h) + si.nPos;
+                    let scroll_y = rel_y - title_h + si.nPos;
                     let mut icon_hit = None;
                     let inner = self.inner.lock();
                     for (i, icon) in inner.icons.iter().enumerate() {
-                        if icon.hit_test(rel_x, rel_y) {
+                        if icon.hit_test(rel_x, scroll_y) {
                             icon_hit = Some(HitType::Icon(i));
                             break;
                         }
@@ -911,8 +906,10 @@ impl Fence {
             let _ = GetCursorPos(&mut pt);
             let _ = ScreenToClient(hwnd, &mut pt);
         };
+        debug!("pt={:?}", pt);
 
         if let Some(hit) = self.hit_test(pt.x, pt.y) {
+            debug!("hit={:?}", hit);
             let cursor_id = match hit {
                 HitType::TitleBar => IDC_SIZEALL,
                 HitType::Client | HitType::Icon(_) => IDC_ARROW,
@@ -1204,6 +1201,7 @@ impl Window for Fence {
             };
         }
         match msg {
+            #[cfg(not(feature = "use-UpdateLayeredWindow"))]
             WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
             WM_MOVE => self.on_move(wparam, lparam),
             #[cfg(not(feature = "use-UpdateLayeredWindow"))]

@@ -178,7 +178,10 @@ impl AppFences {
         // Find fence in reverse order
         let mut hit_idx: Option<(usize, HitType)> = None;
         for (i, fence) in self.items.iter().enumerate().rev() {
-            if let Some(hit) = fence.hit_test(x, y) {
+            let area = fence.base().area();
+            let ax = area.x.load(Ordering::Relaxed);
+            let ay = area.y.load(Ordering::Relaxed);
+            if let Some(hit) = fence.hit_test(x - ax, y - ay) {
                 hit_idx = Some((i, hit));
                 break;
             }
