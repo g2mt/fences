@@ -123,7 +123,6 @@ impl DesktopCover {
     }
 
     pub fn capture_mouse(&self, fence: Arc<Fence>, last_mouse_pos: POINT) {
-        debug!("captured");
         *self.captured_mouse_state.lock() = Some(CapturedMouseState {
             fence,
             last_mouse_pos,
@@ -256,7 +255,6 @@ impl DesktopCover {
     fn on_command(&self, wparam: WPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         let command = (wparam.0 & 0xFFFF) as u16 as usize;
-        debug!("command: {}", command);
 
         let mut should_save = false;
         match command {
@@ -274,7 +272,6 @@ impl DesktopCover {
             }
             IDM_ADD_FENCE_FROM_FOLDER => {
                 self.executor.spawn(async move {
-                    debug!("IDM_ADD_FENCE_FROM_FOLDER async spawn");
                     let cover = App::get().cover.get().unwrap();
                     match Fence::from_folder_selector(&cover).await {
                         Ok(Some(fence)) => {
@@ -313,7 +310,6 @@ impl Window for DesktopCover {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        debug!("{:x}", msg);
         match msg {
             WM_CLOSE => LRESULT(0),
             WM_DISPLAYCHANGE => self.on_display_change(),
@@ -323,7 +319,6 @@ impl Window for DesktopCover {
             WM_PAINT => self.on_paint(),
             #[cfg(not(feature = "use-UpdateLayeredWindow"))]
             WM_MOUSEMOVE => {
-                debug!("move");
                 let mut pt = POINT { x: 0, y: 0 };
                 unsafe {
                     // for consistency with Fence, the absolute point is used
@@ -342,7 +337,6 @@ impl Window for DesktopCover {
             }
             #[cfg(not(feature = "use-UpdateLayeredWindow"))]
             WM_LBUTTONUP => {
-                debug!("release");
                 if let Some(CapturedMouseState {
                     fence,
                     last_mouse_pos,

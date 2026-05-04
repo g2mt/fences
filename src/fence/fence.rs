@@ -448,7 +448,6 @@ impl Fence {
     }
 
     pub async fn show_import_from_dialog(self: &Arc<Self>) {
-        debug!("called");
         if let Some(path_str) = prompt::browse_for_folder().await {
             self.set_imported_from(Some(Arc::from(path_str.as_str())));
             self.show_import_existing_dialog();
@@ -687,7 +686,6 @@ impl Fence {
     }
 
     fn on_command(self: &Arc<Self>, cover: &DesktopCover, command: usize, hit_type: Hit) -> bool {
-        debug!("command={}", command);
         let mut should_save = false;
 
         match command {
@@ -829,7 +827,6 @@ impl Window for Fence {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        debug!("{:x}", msg);
         let hwnd = self.base().hwnd();
         match msg {
             WM_MOVE => unsafe {
@@ -859,7 +856,6 @@ impl Window for Fence {
                 LRESULT(0)
             }
             WM_LBUTTONDOWN => {
-                debug!("moues down");
                 let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
                 let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
