@@ -50,8 +50,8 @@ pub struct Fence {
     base: BaseRef,
     title_bar: Arc<TitleBar>,
     scroll_area: Arc<ScrollArea>,
-    imported_from: OnceLock<Option<Arc<str>>>,
-    sticky_pos: OnceLock<Option<FenceStickyPosition>>,
+    imported_from: Mutex<Option<Arc<str>>>,
+    sticky_pos: Mutex<Option<FenceStickyPosition>>,
     last_mouse_pos: Mutex<POINT>,
     drag_hit: Mutex<Option<HitType>>,
 }
@@ -113,8 +113,8 @@ impl Fence {
                     base,
                     title_bar,
                     scroll_area,
-                    imported_from: OnceLock::from(state.imported_from.clone()),
-                    sticky_pos: OnceLock::from(state.sticky_pos),
+                    imported_from: Mutex::new(state.imported_from.clone()),
+                    sticky_pos: Mutex::new(state.sticky_pos),
                     last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
                     drag_hit: Mutex::new(None),
                 });
@@ -291,11 +291,11 @@ impl Fence {
     }
 
     pub fn sticky(&self) -> Option<crate::config::state::FenceStickyPosition> {
-        *self.sticky_pos.get().unwrap_or(&None)
+        *self.sticky_pos.lock()
     }
 
     pub fn set_sticky(&self, sticky: Option<crate::config::state::FenceStickyPosition>) {
-        let _ = self.sticky_pos.set(sticky);
+        *self.sticky_pos.lock() = sticky;
     }
 
     pub fn add_icon(&self, title: &str) {
@@ -354,11 +354,11 @@ impl Fence {
     }
 
     pub fn imported_from(&self) -> Option<Arc<str>> {
-        self.imported_from.get().cloned().flatten()
+        self.imported_from.lock().clone()
     }
 
     pub fn set_imported_from(&self, imported_from: Option<Arc<str>>) {
-        let _ = self.imported_from.set(imported_from);
+        *self.imported_from.lock() = imported_from;
     }
 
     pub fn show_import_existing_dialog(self: &Arc<Self>) {
