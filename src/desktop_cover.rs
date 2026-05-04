@@ -126,7 +126,7 @@ impl DesktopCover {
         let fences = App::get().fences.lock();
         let bounds = App::get().screen_bounds();
         AppState {
-            fences: fences.items.iter().map(|f| f.get_state()).collect(),
+            fences: fences.items().iter().map(|f| f.get_state()).collect(),
             screen_width: bounds.width.load(Ordering::Relaxed),
             screen_height: bounds.height.load(Ordering::Relaxed),
         }
@@ -134,18 +134,9 @@ impl DesktopCover {
 
     pub fn set_state(&self, state: &AppState) -> Result<()> {
         let mut fences = Vec::new();
-        for f_state in &state.fences {
-            let fence = Fence::from_state(self, f_state.clone())?;
-            fences.push(fence);
-        }
-        {
-            let mut app_fences = App::get().fences.lock();
-            app_fences.items = fences;
-        }
-        App::get()
-            .fences
-            .lock()
-            .rearrange_fences(state.screen_width, state.screen_height);
+        App::get().fences.lock();
+        fences.set_state(self, &state.fences);
+        fences.rearrange(state.screen_width, state.screen_height);
         Ok(())
     }
 
@@ -158,10 +149,7 @@ impl DesktopCover {
         let bounds = App::get().screen_bounds();
         let old_width = bounds.width.swap(width, Ordering::Relaxed);
         let old_height = bounds.height.swap(height, Ordering::Relaxed);
-        App::get()
-            .fences
-            .lock()
-            .rearrange_fences(old_width, old_height);
+        App::get().fences.lock().rearrange(old_width, old_height);
 
         unsafe {
             let _ = SetWindowPos(
@@ -238,7 +226,7 @@ impl DesktopCover {
         };
 
         let fences = App::get().fences.lock();
-        for fence in fences.items.iter().rev() {
+        for fence in fences.items().iter().rev() {
             if let Some(hit) = fence.hit_test(pt.x, pt.y) {
                 let cursor_id = match hit {
                     HitType::TitleBar => IDC_SIZEALL,
@@ -263,7 +251,7 @@ impl DesktopCover {
         let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
         let mut fences = App::get().fences.lock();
-        for fence in fences.items.iter().rev() {
+        for fence in fences.items().iter().rev() {
             if let Some(hit @ HitType::Icon(_)) = fence.hit_test(x, y) {
                 fences.hit_type = Some(hit);
                 drop(fences);
@@ -281,14 +269,14 @@ impl DesktopCover {
 
         let mut fences = App::get().fences.lock();
         let mut hit_idx = None;
-        for (i, fence) in fences.items.iter().enumerate().rev() {
+        for (i, fence) in fences.items().iter().enumerate().rev() {
             if let Some(hit) = fence.hit_test(x, y) {
                 hit_idx = Some((i, hit));
                 break;
             }
         }
 
-        for fence in &fences.items {
+        for fence in &fences.items() {
             fence.clear_selection();
         }
 
@@ -322,7 +310,7 @@ impl DesktopCover {
 
     fn on_mouse_move(&self, lparam: LPARAM) -> LRESULT {
         let mut fences = App::get().fences.lock();
-        if let Some(hit_type) = fences.hit_type {
+        if let Some(hit_type) = fences.hit_type() {
             let x = (lparam.0 & 0xFFFF) as i16 as i32;
             let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
@@ -330,7 +318,7 @@ impl DesktopCover {
             let dx = x - last.x;
             let dy = y - last.y;
 
-            if let Some(fence) = fences.items.last() {
+            if let Some(fence) = fences.items().last() {
                 match hit_type {
                     HitType::TitleBar => fence.base().move_by(dx, dy),
                     HitType::Left => fence.add_area(dx, 0, -dx, 0),
@@ -355,8 +343,7 @@ impl DesktopCover {
 
     fn on_lbutton_up(&self) -> LRESULT {
         let mut fences = App::get().fences.lock();
-        if fences.hit_type.is_some() {
-            fences.hit_type = None;
+        if fences.release_hit_type().is_some() {
             unsafe {
                 let _ = ReleaseCapture();
             };
@@ -372,7 +359,7 @@ impl DesktopCover {
         let mut hit_idx = None;
         {
             let fences = App::get().fences.lock();
-            for (i, fence) in fences.items.iter().enumerate().rev() {
+            for (i, fence) in fences.items().iter().enumerate().rev() {
                 if let Some(hit) = fence.hit_test(x, y) {
                     hit_idx = Some((i, hit));
                     break;
@@ -390,7 +377,7 @@ impl DesktopCover {
             }
 
             fence.base().bring_to_front();
-            fences.items.push(fence);
+            fences.items.push(fence.clone());
 
             fences.hit_type = Some(hit);
             drop(fences);
@@ -410,14 +397,7 @@ impl DesktopCover {
                 } else {
                     let _ = AppendMenuW(h_menu, MF_STRING, IDM_IMPORT, w!("&Import"));
                     let _ = AppendMenuW(h_menu, MF_STRING, IDM_IMPORT_FROM, w!("Import &from..."));
-                    let has_import_path = {
-                        let fences = App::get().fences.lock();
-                        fences
-                            .items
-                            .last()
-                            .map_or(false, |f| f.imported_from().is_some())
-                    };
-                    let open_explorer_flags = if has_import_path {
+                    let open_explorer_flags = if fence.imported_from().is_some() {
                         MF_STRING
                     } else {
                         MF_STRING | MF_GRAYED
@@ -432,13 +412,8 @@ impl DesktopCover {
                     let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR::null());
 
                     let h_sticky_menu = CreatePopupMenu().unwrap_or_default();
-                    let current_sticky = {
-                        let fences = App::get().fences.lock();
-                        fences.items.last().and_then(|f| f.sticky())
-                    };
-
                     let checky_sticky = |pos: Option<FenceStickyPosition>| {
-                        if current_sticky == pos {
+                        if fence.sticky() == pos {
                             MF_CHECKED
                         } else {
                             MF_UNCHECKED
@@ -538,7 +513,7 @@ impl DesktopCover {
 
     fn trigger_fence_command(&self, command: usize, hit_type: HitType) -> bool {
         let fences = App::get().fences.lock();
-        if let Some(fence) = fences.items.last() {
+        if let Some(fence) = fences.items().last() {
             fence.on_command(self, command, hit_type)
         } else {
             false
@@ -559,7 +534,7 @@ impl DesktopCover {
                 let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
                 let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
                 match Fence::new(self, width / 2 - 150, height / 2 - 75, "Untitled") {
-                    Ok(fence) => App::get().fences.lock().add_fence(fence),
+                    Ok(fence) => App::get().fences.lock().add(fence),
                     Err(err) => error!("spawning fence: {:?}", err),
                 }
                 should_save = true;
@@ -570,9 +545,9 @@ impl DesktopCover {
                     let cover = App::get().cover.get().unwrap();
                     match Fence::from_folder_selector(&cover).await {
                         Ok(Some(fence)) => {
-                            let mut fences = App::get().fences.lock();
-                            fences.items.push(fence);
-                            App::get().save_thread.get().unwrap().set_unsaved();
+                            let app = App::get();
+                            app.fences.lock().add(fence);
+                            app.save_thread.get().unwrap().set_unsaved();
                         }
                         Err(e) => {
                             error!("Error adding fence: {:?}", e);
@@ -596,12 +571,10 @@ impl DesktopCover {
             | IDM_STICKY_BOTTOMLEFT
             | IDM_STICKY_BOTTOMRIGHT
             | IDM_OPEN_EXPLORER => {
-                let hit_type = {
-                    let mut fences = App::get().fences.lock();
-                    fences.hit_type.take()
-                };
-                if let Some(hit_type) = hit_type {
+                if let Some(hit_type) = App::get().fences.lock().release_hit_type() {
                     should_save = self.trigger_fence_command(command, hit_type);
+                } else {
+                    error!("command {} expects hit type", command);
                 }
             }
             IDM_RELOAD => {

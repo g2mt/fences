@@ -10,7 +10,7 @@ use windows::Win32::Graphics::Gdi::*;
 
 use crate::config::config::Config;
 use crate::config::save_thread::SaveThread;
-use crate::config::state::{AppState, FenceStickyPosition};
+use crate::config::state::{AppState, FenceState, FenceStickyPosition};
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
 use crate::fence::import_dialog::ImportDialog;
@@ -155,23 +155,50 @@ impl App {
 #[derive(Default)]
 pub struct AppFences {
     /// List of fences currently managed by the desktop cover.
-    pub items: Vec<Arc<Fence>>,
+    items: Vec<Arc<Fence>>,
     /// The type of hit test result from the last interaction, used for dragging or context menus.
-    pub hit_type: Option<HitType>,
+    hit_type: Option<HitType>,
 }
 
 impl AppFences {
-    pub fn add_fence(&mut self, fence: Arc<Fence>) {
-        self.items.push(fence);
+    pub fn items(&self) -> &[Arc<Fence>] {
+        &self.items
     }
 
-    pub fn remove_fence(&mut self, fence: &Arc<Fence>) {
+    pub fn hit_type(&self) -> Option<&HitType> {
+        self.hit_type.as_ref()
+    }
+
+    pub fn select(&mut self, x: i32, y: i32) -> Option<HitType> {
+        todo!()
+    }
+
+    #[must_use]
+    pub fn release_hit_type(&mut self) -> Option<HitType> {
+        self.hit_type.take()
+    }
+
+    pub fn set_state(&mut self, cover: &DesktopCover, fence_states: &[FenceState]) {
+        for f_state in &fence_states {
+            let fence = Fence::from_state(cover, f_state.clone())?;
+            self.push(fence);
+        }
+        self.items = fences;
+    }
+
+    pub fn add(&mut self, fence: Arc<Fence>) {
+        self.items.push(fence);
+        self.hit_type = None;
+    }
+
+    pub fn remove(&mut self, fence: &Arc<Fence>) {
         if let Some(pos) = self.items.iter().position(|f| Arc::ptr_eq(f, fence)) {
             self.items.remove(pos);
         }
+        self.hit_type = None;
     }
 
-    pub fn rearrange_fences(&mut self, old_screen_width: i32, old_screen_height: i32) {
+    pub fn rearrange(&mut self, old_screen_width: i32, old_screen_height: i32) {
         let bounds = App::get().screen_bounds();
         let new_width = bounds.width.load(Ordering::Relaxed);
         let new_height = bounds.height.load(Ordering::Relaxed);
