@@ -181,7 +181,7 @@ pub struct Fence {
     imported_from: Mutex<Option<Arc<str>>>,
     sticky_pos: Mutex<Option<FenceStickyPosition>>,
     last_mouse_pos: Mutex<POINT>,
-    drag_hit: Mutex<Option<Hit>>,
+    hitman: HitManager,
 }
 
 impl Fence {
@@ -244,7 +244,7 @@ impl Fence {
                     imported_from: Mutex::new(state.imported_from.clone()),
                     sticky_pos: Mutex::new(state.sticky_pos),
                     last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
-                    drag_hit: Mutex::new(None),
+                    hitman: HitManager::new(),
                 });
                 for icon_state in state.icons {
                     fence.add_icon_with_path(&icon_state.title, icon_state.path.as_deref());
@@ -831,33 +831,16 @@ impl Window for Fence {
                     let _ = ScreenToClient(hwnd, &mut pt);
                 };
 
-                if let Some(hit) = self.hit_test(pt.x, pt.y) {
-                    let cursor_id = match hit {
-                        Hit::TitleBar => IDC_SIZEALL,
-                        Hit::Client | Hit::Icon(_) => IDC_ARROW,
-                        Hit::Left | Hit::Right => IDC_SIZEWE,
-                        Hit::Top | Hit::Bottom => IDC_SIZENS,
-                        Hit::TopLeft | Hit::BottomRight => IDC_SIZENWSE,
-                        Hit::TopRight | Hit::BottomLeft => IDC_SIZENESW,
-                    };
-                    unsafe {
-                        let cursor = LoadCursorW(None, cursor_id).unwrap_or_default();
-                        SetCursor(Some(cursor));
-                    }
-                    return LRESULT(TRUE.0 as isize);
+                let cursor = self.hitman.on_set_cursor(self, pt.x, pt.y);
+                unsafe {
+                    SetCursor(Some(cursor));
                 }
-                unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+                LRESULT(TRUE.0 as isize)
             }
             WM_LBUTTONDBLCLK => {
                 let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
                 let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
-
-                if let Some(hit @ Hit::Icon(_)) = self.hit_test(rel_x, rel_y) {
-                    let cover = App::get().cover.get().unwrap();
-                    Weak::upgrade(&self.self_weak)
-                        .unwrap()
-                        .on_command(cover, IDM_RUN_ICON, hit);
-                }
+                self.hitman.on_lbutton_dblclk(self, rel_x, rel_y);
                 LRESULT(0)
             }
             WM_LBUTTONDOWN => {
@@ -868,18 +851,10 @@ impl Window for Fence {
                     let _ = GetCursorPos(&mut pt);
                 };
 
-                if let Some(hit) = self.hit_test(rel_x, rel_y) {
-                    let old = std::mem::replace(&mut *self.drag_hit.lock(), Some(hit));
-                    if let Some(Hit::Icon(old_idx)) = old {
-                        if let Some(icon) = self.scroll_area.icons().get(old_idx) {
-                            icon.set_selected(false);
-                        }
-                    }
+                self.hitman.on_lbutton_down(self, rel_x, rel_y);
+                if let Some(hit) = *self.hitman.m.lock() {
                     match hit {
-                        Hit::Client => (),
-                        Hit::Icon(idx) => {
-                            self.select_icon(idx);
-                        }
+                        Hit::Client | Hit::Icon(_) => (),
                         _ => {
                             let mut last = self.last_mouse_pos.lock();
                             *last = pt;
@@ -887,12 +862,6 @@ impl Window for Fence {
                             unsafe {
                                 let _ = SetCapture(hwnd);
                             };
-                        }
-                    }
-                } else {
-                    if let Some(Hit::Icon(old_idx)) = (*self.drag_hit.lock()).take() {
-                        if let Some(icon) = self.scroll_area.icons().get(old_idx) {
-                            icon.set_selected(false);
                         }
                     }
                 }
@@ -907,8 +876,8 @@ impl Window for Fence {
                     let _ = GetCursorPos(&mut pt);
                 };
 
-                let drag_lock = self.drag_hit.lock();
-                if let Some(hit_type) = *drag_lock {
+                let hitman_lock = self.hitman.m.lock();
+                if let Some(hit_type) = *hitman_lock {
                     let mut last = self.last_mouse_pos.lock();
                     let dx = pt.x - last.x;
                     let dy = pt.y - last.y;
@@ -935,7 +904,9 @@ impl Window for Fence {
                 LRESULT(0)
             }
             WM_LBUTTONUP => {
-                *self.drag_hit.lock() = None;
+                let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
+                let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+                self.hitman.on_lbutton_up(self, rel_x, rel_y);
                 unsafe {
                     let _ = ReleaseCapture();
                 };
@@ -944,22 +915,7 @@ impl Window for Fence {
             WM_RBUTTONUP => {
                 let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
                 let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
-
-                if let Some(hit) = self.hit_test(rel_x, rel_y) {
-                    *self.drag_hit.lock() = Some(hit);
-                    let mut pt = POINT { x: rel_x, y: rel_y };
-                    unsafe {
-                        let _ = ClientToScreen(hwnd, &mut pt);
-                    };
-
-                    if let Hit::Icon(idx) = hit {
-                        if let Some(icon) = self.scroll_area.icons().get(idx) {
-                            icon.show_context_menu(pt.x, pt.y);
-                        }
-                    } else {
-                        self.show_context_menu(pt.x, pt.y);
-                    }
-                }
+                self.hitman.on_rbutton_up(self, rel_x, rel_y);
                 LRESULT(0)
             }
             #[cfg(not(feature = "use-UpdateLayeredWindow"))]
@@ -980,7 +936,7 @@ impl Window for Fence {
             }
             WM_COMMAND => {
                 let command = (wparam.0 & 0xFFFF) as u16 as usize;
-                if let Some(hit) = self.drag_hit.lock().take() {
+                if let Some(hit) = self.hitman.m.lock().take() {
                     let cover = App::get().cover.get().unwrap();
                     Weak::upgrade(&self.self_weak)
                         .unwrap()
