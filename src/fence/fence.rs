@@ -174,7 +174,26 @@ impl HitManager {
 
     /// Reacts based on the dragging movement of the mouse
     fn on_mouse_move(&self, fence: &Fence, dx: i32, dy: i32) {
-        todo!()
+        let hitman_lock = self.m.lock();
+        if let Some(hit_type) = *hitman_lock {
+            match hit_type {
+                Hit::TitleBar => {
+                    fence.base().move_by(dx, dy);
+                }
+                Hit::Left => fence.add_area(dx, 0, -dx, 0),
+                Hit::Right => fence.add_area(0, 0, dx, 0),
+                Hit::Top => fence.add_area(0, dy, 0, -dy),
+                Hit::Bottom => fence.add_area(0, 0, 0, dy),
+                Hit::TopLeft => fence.add_area(dx, dy, -dx, -dy),
+                Hit::TopRight => fence.add_area(0, dy, dx, -dy),
+                Hit::BottomLeft => fence.add_area(dx, 0, -dx, dy),
+                Hit::BottomRight => fence.add_area(0, 0, dx, dy),
+                Hit::Client | Hit::Icon(_) => return,
+            }
+
+            fence.base().redraw();
+            App::get().save_thread.get().unwrap().set_unsaved();
+        }
     }
 }
 
@@ -873,31 +892,13 @@ impl Window for Fence {
                     let _ = GetCursorPos(&mut pt);
                 };
 
-                let hitman_lock = self.hitman.m.lock();
-                if let Some(hit_type) = *hitman_lock {
-                    let mut last = self.last_mouse_pos.lock();
-                    let dx = pt.x - last.x;
-                    let dy = pt.y - last.y;
+                let mut last = self.last_mouse_pos.lock();
+                let dx = pt.x - last.x;
+                let dy = pt.y - last.y;
+                *last = pt;
+                drop(last);
 
-                    match hit_type {
-                        Hit::TitleBar => {
-                            self.base().move_by(dx, dy);
-                        }
-                        Hit::Left => self.add_area(dx, 0, -dx, 0),
-                        Hit::Right => self.add_area(0, 0, dx, 0),
-                        Hit::Top => self.add_area(0, dy, 0, -dy),
-                        Hit::Bottom => self.add_area(0, 0, 0, dy),
-                        Hit::TopLeft => self.add_area(dx, dy, -dx, -dy),
-                        Hit::TopRight => self.add_area(0, dy, dx, -dy),
-                        Hit::BottomLeft => self.add_area(dx, 0, -dx, dy),
-                        Hit::BottomRight => self.add_area(0, 0, dx, dy),
-                        Hit::Client | Hit::Icon(_) => (),
-                    }
-
-                    self.base().redraw();
-                    App::get().save_thread.get().unwrap().set_unsaved();
-                    *last = pt;
-                }
+                self.hitman.on_mouse_move(self, dx, dy);
                 LRESULT(0)
             }
             WM_LBUTTONUP => {
