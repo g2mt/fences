@@ -255,6 +255,7 @@ impl DesktopCover {
     fn on_command(&self, wparam: WPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         let command = (wparam.0 & 0xFFFF) as u16 as usize;
+        debug!("command={}", command);
 
         let mut should_save = false;
         match command {

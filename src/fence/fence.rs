@@ -107,6 +107,10 @@ impl HitManager {
         }
     }
 
+    fn unfocus(&self) -> Option<Hit> {
+        self.m.lock().take()
+    }
+
     /// Updates the Hit value based on relative mouse position, returning the copied Hit value
     pub fn update_hit(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> Option<Hit> {
         let hit = Hit::from_pos_in_fence(fence, rel_x, rel_y);
@@ -165,7 +169,6 @@ impl HitManager {
         } else {
             fence.show_context_menu(pt.x, pt.y);
         }
-        *self.m.lock() = None;
     }
 
     /// Returns the cursor at that specific location for
@@ -933,6 +936,13 @@ impl Window for Fence {
             WM_USER_PAINT_WITH_ALPHA => {
                 self.paint_with_alpha();
                 LRESULT(0)
+            }
+            WM_ACTIVATE => {
+                let activation = (wparam.0 & 0xFFFF) as u16 as u32;
+                if activation == WA_INACTIVE {
+                    self.hitman.unfocus();
+                }
+                unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
             WM_COMMAND => {
                 let command = (wparam.0 & 0xFFFF) as u16 as usize;
