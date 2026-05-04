@@ -118,6 +118,12 @@ impl Color<true> {
     pub unsafe fn paint_background(&self, hdc: HDC, rect: &RECT) {
         unsafe {
             let alpha = self.a();
+            if alpha == 255 {
+                let brush = CreateSolidBrush(COLORREF(self.bgr()));
+                FillRect(hdc, rect, brush);
+                let _ = DeleteObject(brush.into());
+                return;
+            }
             let mem_dc = CreateCompatibleDC(Some(hdc));
             let width = rect.right - rect.left;
             let height = rect.bottom - rect.top;
@@ -144,16 +150,6 @@ impl Color<true> {
 
             let _ = DeleteObject(bitmap.into());
             let _ = DeleteDC(mem_dc);
-        }
-    }
-}
-
-impl Color<false> {
-    pub unsafe fn paint_background(&self, hdc: HDC, rect: &RECT) {
-        unsafe {
-            let brush = CreateSolidBrush(COLORREF(self.abgr()));
-            FillRect(hdc, rect, brush);
-            let _ = DeleteObject(brush.into());
         }
     }
 }
