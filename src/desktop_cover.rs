@@ -550,7 +550,19 @@ impl Window for DesktopCover {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().hwnd();
+        #[cfg(not(feature = "use-UpdateLayeredWindow"))]
+        'handle_fences: {
+            let ret = match msg {
+                WM_SETCURSOR => self.on_set_cursor(msg, wparam, lparam),
+                WM_LBUTTONDBLCLK => self.on_lbutton_dblclk(lparam),
+                WM_LBUTTONDOWN => self.on_lbutton_down(lparam),
+                WM_MOUSEMOVE => self.on_mouse_move(lparam),
+                WM_LBUTTONUP => self.on_lbutton_up(),
+                WM_RBUTTONUP => self.on_rbutton_up(lparam),
+                _ => break 'handle_fences,
+            };
+            return ret;
+        }
         match msg {
             WM_CLOSE => LRESULT(0),
             WM_DISPLAYCHANGE => self.on_display_change(),
@@ -558,19 +570,13 @@ impl Window for DesktopCover {
             WM_WINDOWPOSCHANGING => self.on_window_pos_changing(msg, wparam, lparam),
             WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),
             WM_PAINT => self.on_paint(),
-            WM_SETCURSOR => self.on_set_cursor(msg, wparam, lparam),
-            WM_LBUTTONDBLCLK => self.on_lbutton_dblclk(lparam),
-            WM_LBUTTONDOWN => self.on_lbutton_down(lparam),
-            WM_MOUSEMOVE => self.on_mouse_move(lparam),
-            WM_LBUTTONUP => self.on_lbutton_up(),
-            WM_RBUTTONUP => self.on_rbutton_up(lparam),
             WM_USER_SHELLICON => self.on_shell_icon(lparam),
             WM_USER_WAKE_FUTURE => {
                 self.executor.poll_all();
                 LRESULT(0)
             }
             WM_COMMAND => self.on_command(wparam),
-            _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+            _ => unsafe { DefWindowProcW(self.base().hwnd(), msg, wparam, lparam) },
         }
     }
 }
