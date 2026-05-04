@@ -1,8 +1,10 @@
-pub mod fence;
-pub mod fences;
+mod fence;
+mod fence_list;
 mod icon;
-pub mod import_dialog;
-pub mod scroll_area;
-pub mod title_bar;
+mod import_dialog;
+mod scroll_area;
+mod title_bar;
 
 pub use fence::Fence;
+pub use fence_list::FenceList;
+pub use import_dialog::ImportDialog;

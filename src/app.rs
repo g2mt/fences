@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicI32;
 use std::sync::{Arc, LazyLock, OnceLock};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use parking_lot::Mutex;
 use tracing::{error, info, warn};
 use windows::Win32::Foundation::RECT;
@@ -13,10 +13,9 @@ use crate::config::save_thread::SaveThread;
 use crate::config::state::AppState;
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
-use crate::fence::fences::Fences;
-use crate::fence::import_dialog::ImportDialog;
+use crate::fence::{FenceList, ImportDialog};
 use crate::geo::Bounds;
-use crate::paths::{STATE_PATH, app_file};
+use crate::paths::{app_file, STATE_PATH};
 use crate::utils::HWNDWrapper;
 
 #[derive(Default)]
@@ -29,7 +28,7 @@ pub struct App {
     pub config: OnceLock<Arc<Config>>,
     pub import_dialog: Mutex<Option<Arc<ImportDialog>>>,
     pub id_path: OnceLock<PathBuf>,
-    pub fences: Mutex<Fences>,
+    pub fences: Mutex<FenceList>,
 }
 
 /// Assume that the singleton is always initialized and the [App::get()] api to access.

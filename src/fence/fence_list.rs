@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use anyhow::Result;
 use tracing::info;
@@ -11,12 +11,12 @@ use crate::fence::fence::Fence;
 use crate::window::Window;
 
 #[derive(Default)]
-pub struct Fences {
+pub struct FenceList {
     /// List of fences currently managed by the desktop cover.
     items: Vec<Arc<Fence>>,
 }
 
-impl Fences {
+impl FenceList {
     pub fn items(&self) -> &[Arc<Fence>] {
         &self.items
     }
