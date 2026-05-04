@@ -111,17 +111,25 @@ impl HitManager {
     /// Updates the Hit value based on relative mouse position, returning the copied Hit value
     fn update_hit(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> Option<Hit> {
         let hit = Hit::from_pos_in_fence(fence, rel_x, rel_y);
-        *self.m.lock() = hit;
+        let old_hit = std::mem::replace(&mut *self.m.lock(), hit);
+
+        if old_hit != hit {
+            for icon in fence.scroll_area.icons() {
+                icon.set_selected(false);
+            }
+            if let Some(Hit::Icon(idx)) = hit {
+                if let Some(icon) = fence.scroll_area.icons().get(idx) {
+                    icon.set_selected(true);
+                }
+            }
+        }
+
         hit
     }
 
     /// Handles changing the Hit value from left mouse button down
     fn on_lbutton_down(&self, fence: &Fence, rel_x: i32, rel_y: i32) {
-        let hit = self.update_hit(fence, rel_x, rel_y);
-        fence.clear_selection();
-        if let Some(Hit::Icon(idx)) = hit {
-            fence.select_icon(idx);
-        }
+        self.update_hit(fence, rel_x, rel_y);
     }
 
     /// Unsets the Hit value from left mouse button up
@@ -347,17 +355,6 @@ impl Fence {
         self.scroll_area.reflow_icons();
     }
 
-    pub fn clear_selection(&self) {
-        for icon in self.scroll_area.icons() {
-            icon.set_selected(false);
-        }
-    }
-
-    pub fn select_icon(&self, index: usize) {
-        if let Some(icon) = self.scroll_area.icons().get(index) {
-            icon.set_selected(true);
-        }
-    }
 
     pub fn imported_from(&self) -> Option<Arc<str>> {
         self.imported_from.lock().clone()
