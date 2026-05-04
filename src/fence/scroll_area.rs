@@ -58,6 +58,10 @@ impl ScrollArea {
         self.icons.lock()
     }
 
+    pub fn icon_by_index(&self, index: usize) -> Option<Arc<Icon>> {
+        self.icons.lock().get(index).cloned()
+    }
+
     pub fn add_icon(&self, title: &str, path: Option<&str>) {
         self.icons
             .lock()

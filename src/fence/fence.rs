@@ -592,10 +592,6 @@ impl Fence {
         }
     }
 
-    pub fn icon_by_index(&self, index: usize) -> Option<Arc<Icon>> {
-        self.scroll_area.icons().get(index).cloned()
-    }
-
     /// Shows the context menu at absolute mouse position x, y
     pub fn show_context_menu(&self, x: i32, y: i32) {
         let hwnd = self.base().hwnd();
@@ -725,13 +721,13 @@ impl Fence {
             }
             IDM_RUN_ICON => {
                 if let Hit::Icon(icon_idx) = hit_type {
-                    let icon = self.icon_by_index(icon_idx).unwrap();
+                    let icon = self.scroll_area.icon_by_index(icon_idx).unwrap();
                     icon.run();
                 }
             }
             IDM_RENAME_ICON => {
                 if let Hit::Icon(icon_idx) = hit_type {
-                    let icon = self.icon_by_index(icon_idx).unwrap();
+                    let icon = self.scroll_area.icon_by_index(icon_idx).unwrap();
                     let current_title = String::from(&icon.title() as &str);
                     cover.executor().spawn(async move {
                         if let Some(new_title) =
@@ -748,7 +744,7 @@ impl Fence {
             }
             IDM_SET_ICON_PATH => {
                 if let Hit::Icon(icon_idx) = hit_type {
-                    let icon = self.icon_by_index(icon_idx).unwrap();
+                    let icon = self.scroll_area.icon_by_index(icon_idx).unwrap();
                     icon.set_info_from_selector();
                     should_save = true;
                 }
@@ -825,6 +821,7 @@ impl Window for Fence {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        debug!("msg={}", msg);
         let hwnd = self.base().hwnd();
         match msg {
             WM_MOVE => unsafe {
@@ -909,6 +906,7 @@ impl Window for Fence {
             }
             #[cfg(not(feature = "use-UpdateLayeredWindow"))]
             WM_PAINT => unsafe {
+                debug!("on_paint");
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
                 let mut rect: RECT = std::mem::zeroed();
