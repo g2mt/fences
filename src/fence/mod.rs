@@ -1196,6 +1196,9 @@ impl Window for Fence {
             let ret = match msg {
                 WM_SETCURSOR => return self.on_set_cursor(msg, wparam, lparam),
                 WM_LBUTTONDBLCLK => return self.on_lbutton_dblclk(lparam),
+                WM_LBUTTONDOWN => return self.on_lbutton_down(lparam),
+                WM_MOUSEMOVE => return self.on_mouse_move(lparam),
+                WM_LBUTTONUP => return self.on_lbutton_up(),
                 WM_RBUTTONUP => return self.on_rbutton_up(lparam),
                 _ => (),
             };
