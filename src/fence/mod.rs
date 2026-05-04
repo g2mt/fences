@@ -901,6 +901,172 @@ impl Fence {
         }
     }
 
+    #[cfg(feature = "use-UpdateLayeredWindow")]
+    fn on_set_cursor(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().hwnd();
+        let mut pt = POINT { x: 0, y: 0 };
+        unsafe {
+            let _ = GetCursorPos(&mut pt);
+            let _ = ScreenToClient(hwnd, &mut pt);
+        };
+
+        if let Some(hit) = self.hit_test(pt.x, pt.y) {
+            let cursor_id = match hit {
+                HitType::TitleBar => IDC_SIZEALL,
+                HitType::Client | HitType::Icon(_) => IDC_ARROW,
+                HitType::Left | HitType::Right => IDC_SIZEWE,
+                HitType::Top | HitType::Bottom => IDC_SIZENS,
+                HitType::TopLeft | HitType::BottomRight => IDC_SIZENWSE,
+                HitType::TopRight | HitType::BottomLeft => IDC_SIZENESW,
+            };
+            unsafe {
+                let cursor = LoadCursorW(None, cursor_id).unwrap_or_default();
+                SetCursor(Some(cursor));
+            }
+            return LRESULT(TRUE.0 as isize);
+        }
+        unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+    }
+
+    #[cfg(feature = "use-UpdateLayeredWindow")]
+    fn on_lbutton_dblclk(&self, lparam: LPARAM) -> LRESULT {
+        let x = (lparam.0 & 0xFFFF) as i16 as i32;
+        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+
+        if let Some(HitType::Icon(_)) = self.hit_test(x, y) {
+            let cover = App::get().cover.get().unwrap();
+            self.on_command(cover, IDM_RUN_ICON, HitType::Icon(0)); // index doesn't matter for run
+        }
+        LRESULT(0)
+    }
+
+    #[cfg(feature = "use-UpdateLayeredWindow")]
+    fn on_lbutton_down(&self, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().hwnd();
+        let x = (lparam.0 & 0xFFFF) as i16 as i32;
+        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+
+        if let Some(hit) = self.hit_test(x, y) {
+            match hit {
+                HitType::Client | HitType::Icon(_) => {
+                    // nothing extra needed
+                }
+                _ => {
+                    let mut fences = App::get().fences.lock();
+                    // We need to track which fence is being dragged globally
+                    // but for this specific window, we just set the hit type
+                    fences.select(x + self.base.rect().left, y + self.base.rect().top);
+                    unsafe {
+                        SetCapture(hwnd);
+                    };
+                }
+            }
+        }
+        LRESULT(0)
+    }
+
+    #[cfg(feature = "use-UpdateLayeredWindow")]
+    fn on_rbutton_up(&self, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().hwnd();
+        let x = (lparam.0 & 0xFFFF) as i16 as i32;
+        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+
+        if let Some(hit) = self.hit_test(x, y) {
+            let mut pt = POINT { x, y };
+            unsafe {
+                let _ = ClientToScreen(hwnd, &mut pt);
+            };
+            let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
+
+            unsafe {
+                if let HitType::Icon(_) = hit {
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_RUN_ICON, w!("&Run"));
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_RENAME_ICON, w!("Re&name"));
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_SET_ICON_PATH, w!("Set &path"));
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_DELETE_ICON, w!("&Delete"));
+                } else {
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_IMPORT, w!("&Import"));
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_IMPORT_FROM, w!("Import &from..."));
+                    let open_explorer_flags = if self.imported_from().is_some() {
+                        MF_STRING
+                    } else {
+                        MF_STRING | MF_GRAYED
+                    };
+                    let _ = AppendMenuW(
+                        h_menu,
+                        open_explorer_flags,
+                        IDM_OPEN_EXPLORER,
+                        w!("Open in Explorer"),
+                    );
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
+                    let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR::null());
+
+                    let h_sticky_menu = CreatePopupMenu().unwrap_or_default();
+                    let checky_sticky = |pos: Option<FenceStickyPosition>| {
+                        if self.sticky() == pos {
+                            MF_CHECKED
+                        } else {
+                            MF_UNCHECKED
+                        }
+                    };
+
+                    let _ = AppendMenuW(
+                        h_sticky_menu,
+                        MF_STRING | checky_sticky(None),
+                        IDM_STICKY_NONE,
+                        w!("None"),
+                    );
+                    let _ = AppendMenuW(
+                        h_sticky_menu,
+                        MF_STRING | checky_sticky(Some(FenceStickyPosition::TopLeft)),
+                        IDM_STICKY_TOPLEFT,
+                        w!("Top Left"),
+                    );
+                    let _ = AppendMenuW(
+                        h_sticky_menu,
+                        MF_STRING | checky_sticky(Some(FenceStickyPosition::TopRight)),
+                        IDM_STICKY_TOPRIGHT,
+                        w!("Top Right"),
+                    );
+                    let _ = AppendMenuW(
+                        h_sticky_menu,
+                        MF_STRING | checky_sticky(Some(FenceStickyPosition::BottomLeft)),
+                        IDM_STICKY_BOTTOMLEFT,
+                        w!("Bottom Left"),
+                    );
+                    let _ = AppendMenuW(
+                        h_sticky_menu,
+                        MF_STRING | checky_sticky(Some(FenceStickyPosition::BottomRight)),
+                        IDM_STICKY_BOTTOMRIGHT,
+                        w!("Bottom Right"),
+                    );
+
+                    let _ = AppendMenuW(
+                        h_menu,
+                        MF_POPUP,
+                        h_sticky_menu.0 as usize,
+                        w!("Sticky position"),
+                    );
+
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_RENAME_FENCE, w!("Re&name fence"));
+                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
+                }
+                let _ = SetForegroundWindow(hwnd);
+                let _ = TrackPopupMenu(
+                    h_menu,
+                    TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+                    pt.x,
+                    pt.y,
+                    Some(0),
+                    hwnd,
+                    None,
+                );
+                let _ = DestroyMenu(h_menu);
+            }
+        }
+        LRESULT(0)
+    }
+
     pub fn on_command(
         self: &Arc<Self>,
         cover: &DesktopCover,
@@ -1048,6 +1214,19 @@ impl Window for Fence {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        #[cfg(feature = "use-UpdateLayeredWindow")]
+        {
+            let ret = match msg {
+                WM_SETCURSOR => self.on_set_cursor(msg, wparam, lparam),
+                WM_LBUTTONDBLCLK => self.on_lbutton_dblclk(lparam),
+                WM_LBUTTONDOWN => self.on_lbutton_down(lparam),
+                WM_RBUTTONUP => self.on_rbutton_up(lparam),
+                _ => LRESULT(-1),
+            };
+            if ret != LRESULT(-1) {
+                return ret;
+            }
+        }
         match msg {
             WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
             WM_MOVE => self.on_move(wparam, lparam),
