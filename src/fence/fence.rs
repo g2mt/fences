@@ -81,7 +81,7 @@ impl Hit {
                     let mut icon_hit = None;
                     let icons = fence.scroll_area.icons();
                     for (i, icon) in icons.iter().enumerate() {
-                        if icon.hit_test(rel_x, scroll_y) {
+                        if icon.contains_point(rel_x, scroll_y) {
                             icon_hit = Some(Self::Icon(i));
                             break;
                         }
@@ -598,10 +598,6 @@ impl Fence {
             let _ = DeleteDC(hdc_mem);
             let _ = ReleaseDC(None, hdc_screen);
         }
-    }
-
-    pub fn hit_test(&self, rel_x: i32, rel_y: i32) -> Option<Hit> {
-        Hit::from_pos_in_fence(self, rel_x, rel_y)
     }
 
     pub fn icon_by_index(&self, index: usize) -> Option<Arc<Icon>> {
