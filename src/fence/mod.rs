@@ -11,6 +11,7 @@ use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::*;
+use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
@@ -896,35 +897,61 @@ impl Fence {
 
     fn on_lbutton_down(&self, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
-        let x = (lparam.0 & 0xFFFF) as i16 as i32;
-        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+        let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
+        let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+        let mut pt = POINT { x: 0, y: 0 };
+        unsafe {
+            let _ = GetCursorPos(&mut pt);
+        };
 
-        if let Some(hit) = self.hit_test(x, y) {
-            *self.drag_hit.lock() = Some(hit);
-            if let HitType::Client | HitType::Icon(_) = hit {
-                // nothing extra needed
-            } else {
-                let mut last = self.last_mouse_pos.lock();
-                *last = POINT { x, y };
-                drop(last);
-                unsafe {
-                    let _ = SetCapture(hwnd);
-                };
+        if let Some(hit) = self.hit_test(rel_x, rel_y) {
+            let old = std::mem::replace(&mut *self.drag_hit.lock(), Some(hit));
+            if let Some(HitType::Icon(old_idx)) = old {
+                let inner = self.inner.lock();
+                if let Some(icon) = inner.icons.get(old_idx) {
+                    icon.set_selected(false);
+                }
             }
+            match hit {
+                HitType::Client => (), // skip
+                HitType::Icon(idx) => {
+                    self.select_icon(idx);
+                }
+                _ => {
+                    let mut last = self.last_mouse_pos.lock();
+                    *last = pt;
+                    drop(last);
+                    unsafe {
+                        let _ = SetCapture(hwnd);
+                    };
+                }
+            }
+        } else {
+            if let Some(HitType::Icon(old_idx)) = (*self.drag_hit.lock()).take() {
+                let inner = self.inner.lock();
+                if let Some(icon) = inner.icons.get(old_idx) {
+                    icon.set_selected(false);
+                }
+            }
+        }
+        unsafe {
+            let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
         }
         LRESULT(0)
     }
 
     fn on_mouse_move(&self, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
-        let x = (lparam.0 & 0xFFFF) as i16 as i32;
-        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+        let mut pt = POINT { x: 0, y: 0 };
+        unsafe {
+            let _ = GetCursorPos(&mut pt);
+        };
 
         let mut drag_lock = self.drag_hit.lock();
         if let Some(hit_type) = *drag_lock {
             let mut last = self.last_mouse_pos.lock();
-            let dx = x - last.x;
-            let dy = y - last.y;
+            let dx = pt.x - last.x;
+            let dy = pt.y - last.y;
 
             match hit_type {
                 HitType::TitleBar => {
@@ -943,7 +970,7 @@ impl Fence {
 
             self.base().redraw();
             App::get().save_thread.get().unwrap().set_unsaved();
-            *last = POINT { x, y };
+            *last = pt;
         }
         LRESULT(0)
     }
@@ -995,10 +1022,10 @@ impl Fence {
 
     #[cfg(feature = "use-UpdateLayeredWindow")]
     fn on_lbutton_dblclk(&self, lparam: LPARAM) -> LRESULT {
-        let x = (lparam.0 & 0xFFFF) as i16 as i32;
-        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+        let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
+        let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
-        if let Some(hit @ HitType::Icon(_)) = self.hit_test(x, y) {
+        if let Some(hit @ HitType::Icon(_)) = self.hit_test(rel_x, rel_y) {
             let cover = App::get().cover.get().unwrap();
             Weak::upgrade(&self.self_weak)
                 .unwrap()
@@ -1010,11 +1037,11 @@ impl Fence {
     #[cfg(feature = "use-UpdateLayeredWindow")]
     fn on_rbutton_up(&self, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
-        let x = (lparam.0 & 0xFFFF) as i16 as i32;
-        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+        let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
+        let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
-        if let Some(hit) = self.hit_test(x, y) {
-            let mut pt = POINT { x, y };
+        if let Some(hit) = self.hit_test(rel_x, rel_y) {
+            let mut pt = POINT { x: rel_x, y: rel_y };
             unsafe {
                 let _ = ClientToScreen(hwnd, &mut pt);
             };
