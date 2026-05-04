@@ -14,11 +14,74 @@ const ID_EDIT: u32 = 101;
 const ID_OK: u32 = 1;
 const ID_CANCEL: u32 = 2;
 
+const MARGIN: i32 = 10;
+const GAP: i32 = 6;
+const LABEL_HEIGHT: i32 = 20;
+const EDIT_HEIGHT: i32 = 22;
+const BTN_WIDTH: i32 = 70;
+const BTN_HEIGHT: i32 = 26;
+
+const DLG_WIDTH: i32 = 360;
+const DLG_HEIGHT: i32 = 170;
+
 struct InputDialogData {
     message_utf16: Vec<u16>,
     default_text: String,
+    label_hwnd: HWND,
     edit_hwnd: HWND,
+    ok_hwnd: HWND,
+    cancel_hwnd: HWND,
     state: Arc<Mutex<crate::fut::PromptState<Option<String>>>>,
+}
+
+fn layout_widgets(hwnd: HWND, data: &InputDialogData) {
+    let mut rect = RECT::default();
+    unsafe {
+        let _ = GetClientRect(hwnd, &mut rect);
+    };
+
+    let width = rect.right - rect.left;
+    let height = rect.bottom - rect.top;
+
+    unsafe {
+        let _ = MoveWindow(
+            data.label_hwnd,
+            MARGIN,
+            MARGIN,
+            width - 2 * MARGIN,
+            LABEL_HEIGHT,
+            true,
+        );
+
+        let edit_y = MARGIN + LABEL_HEIGHT + GAP;
+        let _ = MoveWindow(
+            data.edit_hwnd,
+            MARGIN,
+            edit_y,
+            width - 2 * MARGIN,
+            EDIT_HEIGHT,
+            true,
+        );
+
+        let btn_y = height - MARGIN - BTN_HEIGHT;
+        let _ = MoveWindow(
+            data.cancel_hwnd,
+            width - MARGIN - BTN_WIDTH,
+            btn_y,
+            BTN_WIDTH,
+            BTN_HEIGHT,
+            true,
+        );
+
+        let _ = MoveWindow(
+            data.ok_hwnd,
+            width - 2 * MARGIN - 2 * BTN_WIDTH,
+            btn_y,
+            BTN_WIDTH,
+            BTN_HEIGHT,
+            true,
+        );
+    }
 }
 
 unsafe extern "system" fn input_wndproc(
@@ -31,26 +94,27 @@ unsafe extern "system" fn input_wndproc(
         WM_NCCREATE => unsafe {
             let hinstance = GetModuleHandleW(None).unwrap_or_default();
 
-            // Store the InputDialogData pointer passed through lParam
             let cs = lparam.0 as *const CREATESTRUCTW;
             let data = &mut *((*cs).lpCreateParams as *mut InputDialogData);
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, data as *mut InputDialogData as isize);
 
             // Create a static message label
-            let _ = CreateWindowExW(
+            let label = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
                 w!("STATIC"),
                 PCWSTR(data.message_utf16.as_ptr()),
                 WS_VISIBLE | WS_CHILD,
-                10,
-                10,
-                200,
-                20,
+                0,
+                0,
+                0,
+                0,
                 Some(hwnd),
                 None,
                 Some(GetModuleHandleW(None).unwrap_or_default().into()),
                 None,
-            );
+            )
+            .unwrap_or_default();
+            data.label_hwnd = label;
 
             // Create edit control
             let edit = CreateWindowExW(
@@ -58,10 +122,10 @@ unsafe extern "system" fn input_wndproc(
                 w!("EDIT"),
                 None,
                 WS_VISIBLE | WS_CHILD | WS_BORDER | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                10,
-                40,
-                200,
-                20,
+                0,
+                0,
+                0,
+                0,
                 Some(hwnd),
                 Some(HMENU(ID_EDIT as *mut core::ffi::c_void)),
                 Some(GetModuleHandleW(None).unwrap_or_default().into()),
@@ -71,28 +135,30 @@ unsafe extern "system" fn input_wndproc(
             data.edit_hwnd = edit;
 
             // Create OK button
-            let _ = crate::utils::create_button(
+            let ok_btn = crate::utils::create_button(
                 "OK",
-                50,
-                80,
-                60,
-                25,
+                0,
+                0,
+                0,
+                0,
                 hwnd,
                 Some(HMENU(ID_OK as *mut core::ffi::c_void)),
                 hinstance.into(),
             );
+            data.ok_hwnd = ok_btn;
 
             // Create Cancel button
-            let _ = crate::utils::create_button(
+            let cancel_btn = crate::utils::create_button(
                 "Cancel",
-                130,
-                80,
-                60,
-                25,
+                0,
+                0,
+                0,
+                0,
                 hwnd,
                 Some(HMENU(ID_CANCEL as *mut core::ffi::c_void)),
                 hinstance.into(),
             );
+            data.cancel_hwnd = cancel_btn;
 
             // Set the edit's initial text
             let default_utf16: Vec<u16> = data
@@ -101,7 +167,18 @@ unsafe extern "system" fn input_wndproc(
                 .chain(std::iter::once(0))
                 .collect();
             let _ = SetWindowTextW(data.edit_hwnd, PCWSTR(default_utf16.as_ptr()));
+
+            layout_widgets(hwnd, data);
+
             DefWindowProcW(hwnd, msg, wparam, lparam)
+        },
+        WM_SIZE => unsafe {
+            let data_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut InputDialogData;
+            if !data_ptr.is_null() {
+                let data = &*data_ptr;
+                layout_widgets(hwnd, data);
+            }
+            LRESULT(0)
         },
         WM_DESTROY => LRESULT(0),
         WM_COMMAND => unsafe {
@@ -169,10 +246,20 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
             RegisterClassW(&wc);
         }
 
+        // Center dialog on screen
+        let bounds = crate::app::App::get().screen_bounds();
+        let screen_w = bounds.width.load(std::sync::atomic::Ordering::Relaxed);
+        let screen_h = bounds.height.load(std::sync::atomic::Ordering::Relaxed);
+        let dlg_x = (screen_w - DLG_WIDTH) / 2;
+        let dlg_y = (screen_h - DLG_HEIGHT) / 2;
+
         let data_ptr = Box::into_raw(Box::new(InputDialogData {
             message_utf16: message.encode_utf16().chain(std::iter::once(0)).collect(),
             default_text: default.to_string(),
+            label_hwnd: HWND::default(),
             edit_hwnd: HWND::default(),
+            ok_hwnd: HWND::default(),
+            cancel_hwnd: HWND::default(),
             state: state.clone(),
         }));
 
@@ -181,11 +268,11 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
             WS_EX_CLIENTEDGE,
             w!("InputDialogClass"),
             PCWSTR(title_utf16.as_ptr()),
-            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            240,
-            150,
+            WS_OVERLAPPEDWINDOW,
+            dlg_x,
+            dlg_y,
+            DLG_WIDTH,
+            DLG_HEIGHT,
             None,
             None,
             Some(hinstance.into()),
