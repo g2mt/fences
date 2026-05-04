@@ -253,7 +253,27 @@ impl Icon {
 
     /// Shows the context menu at absolute mouse position x, y
     pub fn show_context_menu(&self, x: i32, y: i32) {
-        todo!()
+        let hwnd = self.base.hwnd();
+        let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
+
+        unsafe {
+            let _ = AppendMenuW(h_menu, MF_STRING, IDM_RUN_ICON, w!("&Run"));
+            let _ = AppendMenuW(h_menu, MF_STRING, IDM_RENAME_ICON, w!("Re&name"));
+            let _ = AppendMenuW(h_menu, MF_STRING, IDM_SET_ICON_PATH, w!("Set &path"));
+            let _ = AppendMenuW(h_menu, MF_STRING, IDM_DELETE_ICON, w!("&Delete"));
+
+            let _ = SetForegroundWindow(hwnd);
+            let _ = TrackPopupMenu(
+                h_menu,
+                TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+                x,
+                y,
+                0,
+                hwnd,
+                None,
+            );
+            let _ = DestroyMenu(h_menu);
+        }
     }
 }
 

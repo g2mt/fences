@@ -110,34 +110,66 @@ impl HitManager {
 
     /// Updates the Hit value based on relative mouse position, returning the copied Hit value
     fn update_hit(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> Option<Hit> {
-        todo!()
+        let hit = Hit::from_pos_in_fence(fence, rel_x, rel_y);
+        *self.m.lock() = hit;
+        hit
     }
 
     /// Handles changing the Hit value from left mouse button down
     fn on_lbutton_down(&self, fence: &Fence, rel_x: i32, rel_y: i32) {
-        todo!()
+        let hit = self.update_hit(fence, rel_x, rel_y);
+        fence.clear_selection();
+        if let Some(Hit::Icon(idx)) = hit {
+            fence.select_icon(idx);
+        }
     }
 
     /// Unsets the Hit value from left mouse button up
-    fn on_lbutton_up(&self, fence: &Fence, rel_x: i32, rel_y: i32) {
-        todo!()
+    fn on_lbutton_up(&self, _fence: &Fence, _rel_x: i32, _rel_y: i32) {
+        *self.m.lock() = None;
     }
 
     /// Runs the currently selected icon on double click
     fn on_lbutton_dblclk(&self, fence: &Fence, rel_x: i32, rel_y: i32) {
-        todo!()
+        if let Some(Hit::Icon(idx)) = Hit::from_pos_in_fence(fence, rel_x, rel_y) {
+            if let Some(icon) = fence.scroll_area.icons().get(idx) {
+                icon.run();
+            }
+        }
     }
 
     /// Activates context menu for either Fence or Icon based on the current Hit value
     /// THis also unsets the current Hit value
     fn on_rbutton_up(&self, fence: &Fence, rel_x: i32, rel_y: i32) {
-        todo!()
+        let hit = self.update_hit(fence, rel_x, rel_y);
+        let mut pt = POINT { x: rel_x, y: rel_y };
+        unsafe {
+            let _ = ClientToScreen(fence.base().hwnd(), &mut pt);
+        }
+
+        if let Some(Hit::Icon(idx)) = hit {
+            if let Some(icon) = fence.scroll_area.icons().get(idx) {
+                icon.show_context_menu(pt.x, pt.y);
+            }
+        } else {
+            fence.show_context_menu(pt.x, pt.y);
+        }
+        *self.m.lock() = None;
     }
 
     /// Returns the cursor at that specific location for
     /// the current Hit value, or IDC_ARROW if out of bounds
     fn on_set_cursor(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> HCURSOR {
-        todo!()
+        let hit = Hit::from_pos_in_fence(fence, rel_x, rel_y);
+        let cursor_id = match hit {
+            Some(Hit::TitleBar) => IDC_SIZEALL,
+            Some(Hit::Left) | Some(Hit::Right) => IDC_SIZEWE,
+            Some(Hit::Top) | Some(Hit::Bottom) => IDC_SIZENS,
+            Some(Hit::TopLeft) | Some(Hit::BottomRight) => IDC_SIZENWSE,
+            Some(Hit::TopRight) | Some(Hit::BottomLeft) => IDC_SIZENESW,
+            _ => IDC_ARROW,
+        };
+        unsafe { LoadCursorW(None, cursor_id).unwrap_or_default() }
     }
 }
 
@@ -283,12 +315,12 @@ impl Fence {
 
     pub fn add_icon_with_path(&self, title: &str, path: Option<&str>) {
         self.scroll_area.add_icon(title, path);
-        self.reflow_icons();
+        self.scroll_area.reflow_icons();
     }
 
     pub fn remove_icon(&self, index: usize) {
         self.scroll_area.remove_icon(index);
-        self.reflow_icons();
+        self.scroll_area.reflow_icons();
     }
 
     pub fn clear_selection(&self) {
@@ -471,7 +503,7 @@ impl Fence {
             let _ = EndDeferWindowPos(hdwp);
         }
 
-        self.reflow_icons();
+        self.scroll_area.reflow_icons();
     }
 
     #[cfg(feature = "use-UpdateLayeredWindow")]
@@ -544,263 +576,98 @@ impl Fence {
         }
     }
 
-    fn on_paint(&self) -> LRESULT {
-        let hwnd = self.base().hwnd();
-        unsafe {
-            let mut ps: PAINTSTRUCT = std::mem::zeroed();
-            let hdc = BeginPaint(hwnd, &mut ps);
-
-            let mut rect: RECT = std::mem::zeroed();
-            let _ = GetClientRect(hwnd, &mut rect);
-
-            let config = App::config();
-            config.fence.fence_bg_color.paint_background(hdc, &rect);
-
-            let _ = EndPaint(hwnd, &ps);
-        }
-        LRESULT(0)
+    pub fn hit_test(&self, rel_x: i32, rel_y: i32) -> Option<Hit> {
+        Hit::from_pos_in_fence(self, rel_x, rel_y)
     }
 
-    fn on_lbutton_down(&self, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().hwnd();
-        let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
-        let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
-        let mut pt = POINT { x: 0, y: 0 };
-        unsafe {
-            let _ = GetCursorPos(&mut pt);
-        };
-
-        if let Some(hit) = self.hit_test(rel_x, rel_y) {
-            let old = std::mem::replace(&mut *self.drag_hit.lock(), Some(hit));
-            if let Some(Hit::Icon(old_idx)) = old {
-                let inner = self.inner.lock();
-                if let Some(icon) = inner.icons.get(old_idx) {
-                    icon.set_selected(false);
-                }
-            }
-            match hit {
-                Hit::Client => (), // skip
-                Hit::Icon(idx) => {
-                    self.select_icon(idx);
-                }
-                _ => {
-                    let mut last = self.last_mouse_pos.lock();
-                    *last = pt;
-                    drop(last);
-                    unsafe {
-                        let _ = SetCapture(hwnd);
-                    };
-                }
-            }
-        } else {
-            if let Some(Hit::Icon(old_idx)) = (*self.drag_hit.lock()).take() {
-                if let Some(icon) = self.scroll_area.icons().get(old_idx) {
-                    icon.set_selected(false);
-                }
-            }
-        }
-        unsafe {
-            let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
-        }
-        LRESULT(0)
-    }
-
-    fn on_lbutton_up(&self) -> LRESULT {
-        *self.drag_hit.lock() = None;
-        unsafe {
-            let _ = ReleaseCapture();
-        };
-        LRESULT(0)
-    }
-
-    fn on_mouse_move(&self, _lparam: LPARAM) -> LRESULT {
-        let mut pt = POINT { x: 0, y: 0 };
-        unsafe {
-            let _ = GetCursorPos(&mut pt);
-        };
-
-        let drag_lock = self.drag_hit.lock();
-        if let Some(hit_type) = *drag_lock {
-            let mut last = self.last_mouse_pos.lock();
-            let dx = pt.x - last.x;
-            let dy = pt.y - last.y;
-
-            match hit_type {
-                Hit::TitleBar => {
-                    self.base().move_by(dx, dy);
-                }
-                Hit::Left => self.add_area(dx, 0, -dx, 0),
-                Hit::Right => self.add_area(0, 0, dx, 0),
-                Hit::Top => self.add_area(0, dy, 0, -dy),
-                Hit::Bottom => self.add_area(0, 0, 0, dy),
-                Hit::TopLeft => self.add_area(dx, dy, -dx, -dy),
-                Hit::TopRight => self.add_area(0, dy, dx, -dy),
-                Hit::BottomLeft => self.add_area(dx, 0, -dx, dy),
-                Hit::BottomRight => self.add_area(0, 0, dx, dy),
-                Hit::Client | Hit::Icon(_) => (),
-            }
-
-            self.base().redraw();
-            App::get().save_thread.get().unwrap().set_unsaved();
-            *last = pt;
-        }
-        LRESULT(0)
-    }
-
-    fn on_set_cursor(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().hwnd();
-        let mut pt = POINT { x: 0, y: 0 };
-        unsafe {
-            let _ = GetCursorPos(&mut pt);
-            let _ = ScreenToClient(hwnd, &mut pt);
-        };
-        debug!("pt={:?}", pt);
-
-        if let Some(hit) = self.hit_test(pt.x, pt.y) {
-            debug!("hit={:?}", hit);
-            let cursor_id = match hit {
-                Hit::TitleBar => IDC_SIZEALL,
-                Hit::Client | Hit::Icon(_) => IDC_ARROW,
-                Hit::Left | Hit::Right => IDC_SIZEWE,
-                Hit::Top | Hit::Bottom => IDC_SIZENS,
-                Hit::TopLeft | Hit::BottomRight => IDC_SIZENWSE,
-                Hit::TopRight | Hit::BottomLeft => IDC_SIZENESW,
-            };
-            unsafe {
-                let cursor = LoadCursorW(None, cursor_id).unwrap_or_default();
-                SetCursor(Some(cursor));
-            }
-            return LRESULT(TRUE.0 as isize);
-        }
-        unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
-    }
-
-    fn on_lbutton_dblclk(&self, lparam: LPARAM) -> LRESULT {
-        let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
-        let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
-
-        if let Some(hit @ Hit::Icon(_)) = self.hit_test(rel_x, rel_y) {
-            let cover = App::get().cover.get().unwrap();
-            Weak::upgrade(&self.self_weak)
-                .unwrap()
-                .on_command(cover, IDM_RUN_ICON, hit);
-        }
-        LRESULT(0)
-    }
-
-    fn on_rbutton_up(&self, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().hwnd();
-        let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
-        let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
-
-        if let Some(hit) = self.hit_test(rel_x, rel_y) {
-            *self.drag_hit.lock() = Some(hit);
-            let mut pt = POINT { x: rel_x, y: rel_y };
-            unsafe {
-                let _ = ClientToScreen(hwnd, &mut pt);
-            };
-            let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
-
-            unsafe {
-                if let Hit::Icon(_) = hit {
-                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_RUN_ICON, w!("&Run"));
-                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_RENAME_ICON, w!("Re&name"));
-                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_SET_ICON_PATH, w!("Set &path"));
-                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_DELETE_ICON, w!("&Delete"));
-                } else {
-                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_IMPORT, w!("&Import"));
-                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_IMPORT_FROM, w!("Import &from..."));
-                    let open_explorer_flags = if self.imported_from().is_some() {
-                        MF_STRING
-                    } else {
-                        MF_STRING | MF_GRAYED
-                    };
-                    let _ = AppendMenuW(
-                        h_menu,
-                        open_explorer_flags,
-                        IDM_OPEN_EXPLORER,
-                        w!("Open in Explorer"),
-                    );
-                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
-                    let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR::null());
-
-                    let h_sticky_menu = CreatePopupMenu().unwrap_or_default();
-                    let checky_sticky = |pos: Option<FenceStickyPosition>| {
-                        if self.sticky() == pos {
-                            MF_CHECKED
-                        } else {
-                            MF_UNCHECKED
-                        }
-                    };
-
-                    let _ = AppendMenuW(
-                        h_sticky_menu,
-                        MF_STRING | checky_sticky(None),
-                        IDM_STICKY_NONE,
-                        w!("None"),
-                    );
-                    let _ = AppendMenuW(
-                        h_sticky_menu,
-                        MF_STRING | checky_sticky(Some(FenceStickyPosition::TopLeft)),
-                        IDM_STICKY_TOPLEFT,
-                        w!("Top Left"),
-                    );
-                    let _ = AppendMenuW(
-                        h_sticky_menu,
-                        MF_STRING | checky_sticky(Some(FenceStickyPosition::TopRight)),
-                        IDM_STICKY_TOPRIGHT,
-                        w!("Top Right"),
-                    );
-                    let _ = AppendMenuW(
-                        h_sticky_menu,
-                        MF_STRING | checky_sticky(Some(FenceStickyPosition::BottomLeft)),
-                        IDM_STICKY_BOTTOMLEFT,
-                        w!("Bottom Left"),
-                    );
-                    let _ = AppendMenuW(
-                        h_sticky_menu,
-                        MF_STRING | checky_sticky(Some(FenceStickyPosition::BottomRight)),
-                        IDM_STICKY_BOTTOMRIGHT,
-                        w!("Bottom Right"),
-                    );
-
-                    let _ = AppendMenuW(
-                        h_menu,
-                        MF_POPUP,
-                        h_sticky_menu.0 as usize,
-                        w!("Sticky position"),
-                    );
-
-                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_RENAME_FENCE, w!("Re&name fence"));
-                    let _ = AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
-                }
-                let _ = SetForegroundWindow(hwnd);
-                let _ = TrackPopupMenu(
-                    h_menu,
-                    TPM_LEFTALIGN | TPM_RIGHTBUTTON,
-                    pt.x,
-                    pt.y,
-                    Some(0),
-                    hwnd,
-                    None,
-                );
-                let _ = DestroyMenu(h_menu);
-            }
-        }
-        LRESULT(0)
-    }
-
-    fn on_move(&self, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().hwnd();
-        unsafe {
-            let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
-            DefWindowProcW(hwnd, WM_MOVE, wparam, lparam)
-        }
+    pub fn icon_by_index(&self, index: usize) -> Option<Arc<Icon>> {
+        self.scroll_area.icons().get(index).cloned()
     }
 
     /// Shows the context menu at absolute mouse position x, y
     pub fn show_context_menu(&self, x: i32, y: i32) {
-        todo!()
+        let hwnd = self.base().hwnd();
+        let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
+
+        unsafe {
+            let _ = AppendMenuW(h_menu, MF_STRING, IDM_IMPORT, w!("&Import"));
+            let _ = AppendMenuW(h_menu, MF_STRING, IDM_IMPORT_FROM, w!("Import &from..."));
+            let open_explorer_flags = if self.imported_from().is_some() {
+                MF_STRING
+            } else {
+                MF_STRING | MF_GRAYED
+            };
+            let _ = AppendMenuW(
+                h_menu,
+                open_explorer_flags,
+                IDM_OPEN_EXPLORER,
+                w!("Open in Explorer"),
+            );
+            let _ = AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
+            let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR::null());
+
+            let h_sticky_menu = CreatePopupMenu().unwrap_or_default();
+            let checky_sticky = |pos: Option<FenceStickyPosition>| {
+                if self.sticky() == pos {
+                    MF_CHECKED
+                } else {
+                    MF_UNCHECKED
+                }
+            };
+
+            let _ = AppendMenuW(
+                h_sticky_menu,
+                MF_STRING | checky_sticky(None),
+                IDM_STICKY_NONE,
+                w!("None"),
+            );
+            let _ = AppendMenuW(
+                h_sticky_menu,
+                MF_STRING | checky_sticky(Some(FenceStickyPosition::TopLeft)),
+                IDM_STICKY_TOPLEFT,
+                w!("Top Left"),
+            );
+            let _ = AppendMenuW(
+                h_sticky_menu,
+                MF_STRING | checky_sticky(Some(FenceStickyPosition::TopRight)),
+                IDM_STICKY_TOPRIGHT,
+                w!("Top Right"),
+            );
+            let _ = AppendMenuW(
+                h_sticky_menu,
+                MF_STRING | checky_sticky(Some(FenceStickyPosition::BottomLeft)),
+                IDM_STICKY_BOTTOMLEFT,
+                w!("Bottom Left"),
+            );
+            let _ = AppendMenuW(
+                h_sticky_menu,
+                MF_STRING | checky_sticky(Some(FenceStickyPosition::BottomRight)),
+                IDM_STICKY_BOTTOMRIGHT,
+                w!("Bottom Right"),
+            );
+
+            let _ = AppendMenuW(
+                h_menu,
+                MF_POPUP,
+                h_sticky_menu.0 as usize,
+                w!("Sticky position"),
+            );
+
+            let _ = AppendMenuW(h_menu, MF_STRING, IDM_RENAME_FENCE, w!("Re&name fence"));
+            let _ = AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
+
+            let _ = SetForegroundWindow(hwnd);
+            let _ = TrackPopupMenu(
+                h_menu,
+                TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+                x,
+                y,
+                0,
+                hwnd,
+                None,
+            );
+            let _ = DestroyMenu(h_menu);
+        }
     }
 
     pub fn on_command(
@@ -951,16 +818,161 @@ impl Window for Fence {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().hwnd();
         match msg {
-            WM_MOVE => self.on_move(wparam, lparam),
-            WM_SETCURSOR => self.on_set_cursor(msg, wparam, lparam),
-            WM_LBUTTONDBLCLK => self.on_lbutton_dblclk(lparam),
-            WM_LBUTTONDOWN => self.on_lbutton_down(lparam),
-            WM_MOUSEMOVE => self.on_mouse_move(lparam),
-            WM_LBUTTONUP => self.on_lbutton_up(),
-            WM_RBUTTONUP => self.on_rbutton_up(lparam),
+            WM_MOVE => unsafe {
+                let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
+                DefWindowProcW(hwnd, WM_MOVE, wparam, lparam)
+            },
+            WM_SETCURSOR => {
+                let mut pt = POINT { x: 0, y: 0 };
+                unsafe {
+                    let _ = GetCursorPos(&mut pt);
+                    let _ = ScreenToClient(hwnd, &mut pt);
+                };
+
+                if let Some(hit) = self.hit_test(pt.x, pt.y) {
+                    let cursor_id = match hit {
+                        Hit::TitleBar => IDC_SIZEALL,
+                        Hit::Client | Hit::Icon(_) => IDC_ARROW,
+                        Hit::Left | Hit::Right => IDC_SIZEWE,
+                        Hit::Top | Hit::Bottom => IDC_SIZENS,
+                        Hit::TopLeft | Hit::BottomRight => IDC_SIZENWSE,
+                        Hit::TopRight | Hit::BottomLeft => IDC_SIZENESW,
+                    };
+                    unsafe {
+                        let cursor = LoadCursorW(None, cursor_id).unwrap_or_default();
+                        SetCursor(Some(cursor));
+                    }
+                    return LRESULT(TRUE.0 as isize);
+                }
+                unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+            }
+            WM_LBUTTONDBLCLK => {
+                let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
+                let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+
+                if let Some(hit @ Hit::Icon(_)) = self.hit_test(rel_x, rel_y) {
+                    let cover = App::get().cover.get().unwrap();
+                    Weak::upgrade(&self.self_weak)
+                        .unwrap()
+                        .on_command(cover, IDM_RUN_ICON, hit);
+                }
+                LRESULT(0)
+            }
+            WM_LBUTTONDOWN => {
+                let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
+                let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+                let mut pt = POINT { x: 0, y: 0 };
+                unsafe {
+                    let _ = GetCursorPos(&mut pt);
+                };
+
+                if let Some(hit) = self.hit_test(rel_x, rel_y) {
+                    let old = std::mem::replace(&mut *self.drag_hit.lock(), Some(hit));
+                    if let Some(Hit::Icon(old_idx)) = old {
+                        if let Some(icon) = self.scroll_area.icons().get(old_idx) {
+                            icon.set_selected(false);
+                        }
+                    }
+                    match hit {
+                        Hit::Client => (),
+                        Hit::Icon(idx) => {
+                            self.select_icon(idx);
+                        }
+                        _ => {
+                            let mut last = self.last_mouse_pos.lock();
+                            *last = pt;
+                            drop(last);
+                            unsafe {
+                                let _ = SetCapture(hwnd);
+                            };
+                        }
+                    }
+                } else {
+                    if let Some(Hit::Icon(old_idx)) = (*self.drag_hit.lock()).take() {
+                        if let Some(icon) = self.scroll_area.icons().get(old_idx) {
+                            icon.set_selected(false);
+                        }
+                    }
+                }
+                unsafe {
+                    let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
+                }
+                LRESULT(0)
+            }
+            WM_MOUSEMOVE => {
+                let mut pt = POINT { x: 0, y: 0 };
+                unsafe {
+                    let _ = GetCursorPos(&mut pt);
+                };
+
+                let drag_lock = self.drag_hit.lock();
+                if let Some(hit_type) = *drag_lock {
+                    let mut last = self.last_mouse_pos.lock();
+                    let dx = pt.x - last.x;
+                    let dy = pt.y - last.y;
+
+                    match hit_type {
+                        Hit::TitleBar => {
+                            self.base().move_by(dx, dy);
+                        }
+                        Hit::Left => self.add_area(dx, 0, -dx, 0),
+                        Hit::Right => self.add_area(0, 0, dx, 0),
+                        Hit::Top => self.add_area(0, dy, 0, -dy),
+                        Hit::Bottom => self.add_area(0, 0, 0, dy),
+                        Hit::TopLeft => self.add_area(dx, dy, -dx, -dy),
+                        Hit::TopRight => self.add_area(0, dy, dx, -dy),
+                        Hit::BottomLeft => self.add_area(dx, 0, -dx, dy),
+                        Hit::BottomRight => self.add_area(0, 0, dx, dy),
+                        Hit::Client | Hit::Icon(_) => (),
+                    }
+
+                    self.base().redraw();
+                    App::get().save_thread.get().unwrap().set_unsaved();
+                    *last = pt;
+                }
+                LRESULT(0)
+            }
+            WM_LBUTTONUP => {
+                *self.drag_hit.lock() = None;
+                unsafe {
+                    let _ = ReleaseCapture();
+                };
+                LRESULT(0)
+            }
+            WM_RBUTTONUP => {
+                let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
+                let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+
+                if let Some(hit) = self.hit_test(rel_x, rel_y) {
+                    *self.drag_hit.lock() = Some(hit);
+                    let mut pt = POINT { x: rel_x, y: rel_y };
+                    unsafe {
+                        let _ = ClientToScreen(hwnd, &mut pt);
+                    };
+
+                    if let Hit::Icon(idx) = hit {
+                        if let Some(icon) = self.scroll_area.icons().get(idx) {
+                            icon.show_context_menu(pt.x, pt.y);
+                        }
+                    } else {
+                        self.show_context_menu(pt.x, pt.y);
+                    }
+                }
+                LRESULT(0)
+            }
             #[cfg(not(feature = "use-UpdateLayeredWindow"))]
-            WM_PAINT => self.on_paint(),
+            WM_PAINT => unsafe {
+                let mut ps: PAINTSTRUCT = std::mem::zeroed();
+                let hdc = BeginPaint(hwnd, &mut ps);
+                let mut rect: RECT = std::mem::zeroed();
+                let _ = GetClientRect(hwnd, &mut rect);
+                let config = App::config();
+                config.fence.fence_bg_color.paint_background(hdc, &rect);
+                let _ = EndPaint(hwnd, &ps);
+                LRESULT(0)
+            },
             #[cfg(feature = "use-UpdateLayeredWindow")]
             WM_USER_PAINT_WITH_ALPHA => {
                 self.paint_with_alpha();
@@ -976,7 +988,7 @@ impl Window for Fence {
                 }
                 LRESULT(0)
             }
-            _ => unsafe { DefWindowProcW(self.base().hwnd(), msg, wparam, lparam) },
+            _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }
     }
 }
