@@ -1,6 +1,5 @@
 use std::path::PathBuf;
-use std::sync::atomic::AtomicI32;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, LazyLock, OnceLock};
 
 use anyhow::{anyhow, Result};
@@ -14,11 +13,12 @@ use crate::config::save_thread::SaveThread;
 use crate::config::state::{AppState, FenceStickyPosition};
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
-use crate::fence::{Fence, HitType};
 use crate::fence::import_dialog::ImportDialog;
+use crate::fence::{Fence, HitType};
 use crate::geo::Bounds;
 use crate::paths::{app_file, STATE_PATH};
 use crate::utils::HWNDWrapper;
+use crate::window::Window;
 
 #[derive(Default)]
 pub struct App {

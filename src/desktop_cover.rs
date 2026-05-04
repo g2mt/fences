@@ -142,20 +142,11 @@ impl DesktopCover {
             let mut app_fences = App::get().fences.lock();
             app_fences.items = fences;
         }
-        App::get().fences.lock().rearrange_fences(state.screen_width, state.screen_height);
+        App::get()
+            .fences
+            .lock()
+            .rearrange_fences(state.screen_width, state.screen_height);
         Ok(())
-    }
-
-    pub fn add_fence(&self, fence: Arc<Fence>) {
-        App::get().fences.lock().add_fence(fence);
-    }
-
-    pub fn remove_fence(&self, fence: &Arc<Fence>) {
-        App::get().fences.lock().remove_fence(fence);
-    }
-
-    pub fn rearrange_fences(&self, old_screen_width: i32, old_screen_height: i32) {
-        App::get().fences.lock().rearrange_fences(old_screen_width, old_screen_height);
     }
 
     fn on_display_change(&self) -> LRESULT {
@@ -167,7 +158,10 @@ impl DesktopCover {
         let bounds = App::get().screen_bounds();
         let old_width = bounds.width.swap(width, Ordering::Relaxed);
         let old_height = bounds.height.swap(height, Ordering::Relaxed);
-        App::get().fences.lock().rearrange_fences(old_width, old_height);
+        App::get()
+            .fences
+            .lock()
+            .rearrange_fences(old_width, old_height);
 
         unsafe {
             let _ = SetWindowPos(

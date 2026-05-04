@@ -941,7 +941,7 @@ impl Fence {
                     .await;
                     if result == IDYES {
                         let app = App::get();
-                        app.cover.get().unwrap().remove_fence(&fence);
+                        app.fences.lock().remove_fence(&fence);
                         app.save_thread.get().unwrap().set_unsaved();
                     }
                 });
