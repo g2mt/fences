@@ -188,9 +188,7 @@ impl HitManager {
     pub fn on_mouse_move(&self, fence: &Fence, dx: i32, dy: i32) {
         if let Some(hit_type) = *self.m.lock() {
             match hit_type {
-                Hit::TitleBar => {
-                    fence.base().move_by(dx, dy);
-                }
+                Hit::TitleBar => fence.base().move_by(dx, dy),
                 Hit::Left => fence.add_area(dx, 0, -dx, 0),
                 Hit::Right => fence.add_area(0, 0, dx, 0),
                 Hit::Top => fence.add_area(0, dy, 0, -dy),
@@ -215,6 +213,7 @@ pub struct Fence {
     scroll_area: Arc<ScrollArea>,
     imported_from: Mutex<Option<Arc<str>>>,
     sticky_pos: Mutex<Option<FenceStickyPosition>>,
+    #[cfg(feature = "use-UpdateLayeredWindow")]
     last_mouse_pos: Mutex<POINT>,
     hitman: HitManager,
 }
@@ -278,6 +277,7 @@ impl Fence {
                     scroll_area,
                     imported_from: Mutex::new(state.imported_from.clone()),
                     sticky_pos: Mutex::new(state.sticky_pos),
+                    #[cfg(feature = "use-UpdateLayeredWindow")]
                     last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
                     hitman: HitManager::new(),
                 });
@@ -864,18 +864,22 @@ impl Window for Fence {
                 let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
                 if self.hitman.on_lbutton_down(self, rel_x, rel_y) {
-                    let mut last = self.last_mouse_pos.lock();
-                    let mut pt = POINT { x: 0, y: 0 };
-                    unsafe {
-                        let _ = GetCursorPos(&mut pt);
-                    };
-                    *last = pt;
                     #[cfg(feature = "use-UpdateLayeredWindow")]
                     unsafe {
+                        let mut last = self.last_mouse_pos.lock();
+                        let mut pt = POINT { x: 0, y: 0 };
+                        unsafe {
+                            let _ = GetCursorPos(&mut pt);
+                        };
+                        *last = pt;
                         let _ = SetCapture(hwnd);
                     };
                     #[cfg(not(feature = "use-UpdateLayeredWindow"))]
                     {
+                        let mut pt = POINT { x: 0, y: 0 };
+                        unsafe {
+                            let _ = GetCursorPos(&mut pt);
+                        };
                         let cover = App::get().cover.get().unwrap();
                         cover.capture_mouse(Weak::upgrade(&self.self_weak).unwrap(), pt);
                     }
