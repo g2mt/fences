@@ -9,14 +9,13 @@ use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::app::App;
 use crate::commands::*;
-use crate::config::state::{AppState, FenceStickyPosition};
-use crate::fence::{Fence, HitType};
+use crate::config::state::AppState;
+use crate::fence::Fence;
 use crate::fut::AsyncExecutor;
 use crate::utils::HWNDWrapper;
 use crate::window::{register_classname, Base, BaseRef, Window};
@@ -237,15 +236,6 @@ impl DesktopCover {
         LRESULT(0)
     }
 
-    fn trigger_fence_command(&self, command: usize, hit_type: HitType) -> bool {
-        let fences = App::get().fences.lock();
-        if let Some(fence) = fences.items().last() {
-            fence.on_command(self, command, hit_type)
-        } else {
-            false
-        }
-    }
-
     fn on_command(&self, wparam: WPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         let command = (wparam.0 & 0xFFFF) as u16 as usize;
@@ -281,27 +271,6 @@ impl DesktopCover {
                         _ => (),
                     }
                 });
-            }
-            IDM_ADD_ICON
-            | IDM_RENAME_FENCE
-            | IDM_DELETE_FENCE
-            | IDM_RUN_ICON
-            | IDM_RENAME_ICON
-            | IDM_SET_ICON_PATH
-            | IDM_DELETE_ICON
-            | IDM_IMPORT
-            | IDM_IMPORT_FROM
-            | IDM_STICKY_NONE
-            | IDM_STICKY_TOPLEFT
-            | IDM_STICKY_TOPRIGHT
-            | IDM_STICKY_BOTTOMLEFT
-            | IDM_STICKY_BOTTOMRIGHT
-            | IDM_OPEN_EXPLORER => {
-                if let Some(hit_type) = App::get().fences.lock().release_hit_type() {
-                    should_save = self.trigger_fence_command(command, hit_type);
-                } else {
-                    error!("command {} expects hit type", command);
-                }
             }
             IDM_RELOAD => {
                 // Spawn a new instance of the same executable

@@ -22,7 +22,6 @@ use crate::desktop_cover::DesktopCover;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
 use crate::prompt;
-use crate::utils::HWNDWrapper;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 mod icon;
@@ -940,14 +939,14 @@ impl Fence {
         LRESULT(0)
     }
 
-    fn on_mouse_move(&self, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().hwnd();
+    fn on_mouse_move(&self, _lparam: LPARAM) -> LRESULT {
+        let _hwnd = self.base().hwnd();
         let mut pt = POINT { x: 0, y: 0 };
         unsafe {
             let _ = GetCursorPos(&mut pt);
         };
 
-        let mut drag_lock = self.drag_hit.lock();
+        let drag_lock = self.drag_hit.lock();
         if let Some(hit_type) = *drag_lock {
             let mut last = self.last_mouse_pos.lock();
             let dx = pt.x - last.x;

@@ -14,7 +14,7 @@ use crate::config::state::{AppState, FenceState, FenceStickyPosition};
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
 use crate::fence::import_dialog::ImportDialog;
-use crate::fence::{Fence, HitType};
+use crate::fence::Fence;
 use crate::geo::Bounds;
 use crate::paths::{app_file, STATE_PATH};
 use crate::utils::HWNDWrapper;
@@ -156,61 +156,11 @@ impl App {
 pub struct AppFences {
     /// List of fences currently managed by the desktop cover.
     items: Vec<Arc<Fence>>,
-    /// The type of hit test result from the last interaction, used for dragging or context menus.
-    hit_type: Option<HitType>,
 }
 
 impl AppFences {
     pub fn items(&self) -> &[Arc<Fence>] {
         &self.items
-    }
-
-    pub fn hit_type(&self) -> Option<HitType> {
-        self.hit_type
-    }
-
-    pub fn select(&mut self, x: i32, y: i32) -> Option<(&Arc<Fence>, HitType)> {
-        // Clear existing selections on all fences
-        for fence in &self.items {
-            fence.clear_selection();
-        }
-
-        // Find fence in reverse order
-        let mut hit_idx: Option<(usize, HitType)> = None;
-        for (i, fence) in self.items.iter().enumerate().rev() {
-            let area = fence.base().area();
-            let ax = area.x.load(Ordering::Relaxed);
-            let ay = area.y.load(Ordering::Relaxed);
-            if let Some(hit) = fence.hit_test(x - ax, y - ay) {
-                hit_idx = Some((i, hit));
-                break;
-            }
-        }
-
-        if let Some((idx, hit)) = hit_idx {
-            // Remove the fence at this index
-            let fence = self.items.remove(idx);
-
-            // Select the icon inside the fence if applicable
-            if let HitType::Icon(icon_idx) = hit {
-                fence.select_icon(icon_idx);
-            }
-
-            // Bring the window to front and push to end of items list
-            fence.base().bring_to_front();
-            self.items.push(fence);
-
-            self.hit_type = Some(hit);
-            Some((self.items.last().unwrap(), hit))
-        } else {
-            self.hit_type = None;
-            None
-        }
-    }
-
-    #[must_use]
-    pub fn release_hit_type(&mut self) -> Option<HitType> {
-        self.hit_type.take()
     }
 
     pub fn set_state(&mut self, cover: &DesktopCover, fence_states: &[FenceState]) -> Result<()> {
@@ -224,14 +174,12 @@ impl AppFences {
 
     pub fn add(&mut self, fence: Arc<Fence>) {
         self.items.push(fence);
-        self.hit_type = None;
     }
 
     pub fn remove(&mut self, fence: &Arc<Fence>) {
         if let Some(pos) = self.items.iter().position(|f| Arc::ptr_eq(f, fence)) {
             self.items.remove(pos);
         }
-        self.hit_type = None;
     }
 
     pub fn rearrange(&mut self, old_screen_width: i32, old_screen_height: i32) {
