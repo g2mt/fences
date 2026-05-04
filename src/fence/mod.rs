@@ -1048,7 +1048,6 @@ impl Window for Fence {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().hwnd();
         match msg {
             WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
             WM_MOVE => self.on_move(wparam, lparam),
@@ -1059,7 +1058,7 @@ impl Window for Fence {
                 self.paint_with_alpha();
                 LRESULT(0)
             }
-            _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+            _ => unsafe { DefWindowProcW(self.base().hwnd(), msg, wparam, lparam) },
         }
     }
 }
