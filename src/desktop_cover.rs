@@ -251,9 +251,8 @@ impl DesktopCover {
         let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
         let mut fences = App::get().fences.lock();
-        for fence in fences.items().iter().rev() {
-            if let Some(hit @ HitType::Icon(_)) = fence.hit_test(x, y) {
-                fences.hit_type = Some(hit);
+        if let Some(hit) = fences.select(x, y) {
+            if matches!(hit, HitType::Icon(_)) {
                 drop(fences);
                 self.on_command(WPARAM(IDM_RUN_ICON));
                 return LRESULT(0);
@@ -268,34 +267,13 @@ impl DesktopCover {
         let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
         let mut fences = App::get().fences.lock();
-        let mut hit_idx = None;
-        for (i, fence) in fences.items().iter().enumerate().rev() {
-            if let Some(hit) = fence.hit_test(x, y) {
-                hit_idx = Some((i, hit));
-                break;
-            }
-        }
-
-        for fence in &fences.items() {
-            fence.clear_selection();
-        }
-
-        if let Some((idx, hit)) = hit_idx {
-            let fence = fences.items.remove(idx);
-
-            if let HitType::Icon(icon_idx) = hit {
-                fence.select_icon(icon_idx);
-            }
-
-            fence.base().bring_to_front();
-            fences.items.push(fence);
-
+        let hit_type = fences.select(x, y);
+        if let Some(hit) = hit_type {
             match hit {
                 HitType::Client | HitType::Icon(_) => {
-                    fences.hit_type = Some(hit);
+                    // nothing extra needed
                 }
                 _ => {
-                    fences.hit_type = Some(hit);
                     let mut last = self.last_mouse_pos.lock();
                     *last = POINT { x, y };
                     drop(last);
@@ -356,30 +334,10 @@ impl DesktopCover {
         let x = (lparam.0 & 0xFFFF) as i16 as i32;
         let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
-        let mut hit_idx = None;
-        {
-            let fences = App::get().fences.lock();
-            for (i, fence) in fences.items().iter().enumerate().rev() {
-                if let Some(hit) = fence.hit_test(x, y) {
-                    hit_idx = Some((i, hit));
-                    break;
-                }
-            }
-        }
-
-        if let Some((idx, hit)) = hit_idx {
-            let mut fences = App::get().fences.lock();
-            let fence = fences.items.remove(idx);
-
-            fence.clear_selection();
-            if let HitType::Icon(icon_idx) = hit {
-                fence.select_icon(icon_idx);
-            }
-
-            fence.base().bring_to_front();
-            fences.items.push(fence.clone());
-
-            fences.hit_type = Some(hit);
+        let mut fences = App::get().fences.lock();
+        let hit = fences.select(x, y);
+        if let Some(hit) = hit {
+            let fence = fences.items().last().unwrap().clone();
             drop(fences);
 
             let mut pt = POINT { x, y };

@@ -170,7 +170,39 @@ impl AppFences {
     }
 
     pub fn select(&mut self, x: i32, y: i32) -> Option<HitType> {
-        todo!()
+        // Clear existing selections on all fences
+        for fence in &self.items {
+            fence.clear_selection();
+        }
+
+        // Find fence in reverse order
+        let mut hit_idx: Option<(usize, HitType)> = None;
+        for (i, fence) in self.items.iter().enumerate().rev() {
+            if let Some(hit) = fence.hit_test(x, y) {
+                hit_idx = Some((i, hit));
+                break;
+            }
+        }
+
+        if let Some((idx, hit)) = hit_idx {
+            // Remove the fence at this index
+            let fence = self.items.remove(idx);
+
+            // Select the icon inside the fence if applicable
+            if let HitType::Icon(icon_idx) = hit {
+                fence.select_icon(icon_idx);
+            }
+
+            // Bring the window to front and push to end of items list
+            fence.base().bring_to_front();
+            self.items.push(fence);
+
+            self.hit_type = Some(hit);
+            Some(hit)
+        } else {
+            self.hit_type = None;
+            None
+        }
     }
 
     #[must_use]
