@@ -34,23 +34,8 @@ pub struct FenceConfig {
     pub padding: i32,
     pub spacing: i32,
     pub title_text_color: Color,
-
-    #[cfg(not(feature = "use-UpdateLayeredWindow"))]
-    pub title_bar_bg_color: Color,
-    #[cfg(feature = "use-UpdateLayeredWindow")]
     pub title_bar_bg_color: Color<true>,
-
     pub scroll_area_bg_color: Color<true>,
-
-    /// Alpha is not enabled, because there is a limitation where LWA_COLORKEY doesn't work with full rendering
-    ///
-    /// See:
-    /// - https://stackoverflow.com/questions/12252864/winapi-setlayeredwindowattributes-with-lwa-colorkey-only-sets-pixels-to-either
-    /// - https://www.magpcss.org/ceforum/viewtopic.php?f=6&t=13382
-    #[cfg(not(feature = "use-UpdateLayeredWindow"))]
-    pub fence_bg_color: Color,
-    /// Alpha enabled when transparency is supported
-    #[cfg(feature = "use-UpdateLayeredWindow")]
     pub fence_bg_color: Color<true>,
 }
 

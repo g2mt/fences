@@ -149,7 +149,7 @@ impl Icon {
                 )
             };
             unsafe {
-                config.fence_bg_color.paint_background(hdc, &rect);
+                config.fence.fence_bg_color.paint_background(hdc, &rect);
             }
         }
         unsafe {

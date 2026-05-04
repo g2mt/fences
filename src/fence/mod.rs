@@ -991,7 +991,6 @@ impl Fence {
         }
     }
 
-    #[cfg(feature = "use-UpdateLayeredWindow")]
     fn on_set_cursor(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         let mut pt = POINT { x: 0, y: 0 };
@@ -1020,7 +1019,6 @@ impl Fence {
         unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
     }
 
-    #[cfg(feature = "use-UpdateLayeredWindow")]
     fn on_lbutton_dblclk(&self, lparam: LPARAM) -> LRESULT {
         let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
         let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
@@ -1034,13 +1032,13 @@ impl Fence {
         LRESULT(0)
     }
 
-    #[cfg(feature = "use-UpdateLayeredWindow")]
     fn on_rbutton_up(&self, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
         let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
         if let Some(hit) = self.hit_test(rel_x, rel_y) {
+            *self.drag_hit.lock() = Some(hit);
             let mut pt = POINT { x: rel_x, y: rel_y };
             unsafe {
                 let _ = ClientToScreen(hwnd, &mut pt);
@@ -1142,6 +1140,7 @@ impl Fence {
         command: usize,
         hit_type: HitType,
     ) -> bool {
+        debug!("command={}", command);
         let mut should_save = false;
 
         match command {
@@ -1283,28 +1282,29 @@ impl Window for Fence {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        debug!("msg: {}", msg);
-        #[cfg(feature = "use-UpdateLayeredWindow")]
-        {
-            let ret = match msg {
-                WM_SETCURSOR => return self.on_set_cursor(msg, wparam, lparam),
-                WM_LBUTTONDBLCLK => return self.on_lbutton_dblclk(lparam),
-                WM_LBUTTONDOWN => return self.on_lbutton_down(lparam),
-                WM_MOUSEMOVE => return self.on_mouse_move(lparam),
-                WM_LBUTTONUP => return self.on_lbutton_up(),
-                WM_RBUTTONUP => return self.on_rbutton_up(lparam),
-                _ => (),
-            };
-        }
         match msg {
-            #[cfg(not(feature = "use-UpdateLayeredWindow"))]
-            WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
             WM_MOVE => self.on_move(wparam, lparam),
+            WM_SETCURSOR => self.on_set_cursor(msg, wparam, lparam),
+            WM_LBUTTONDBLCLK => self.on_lbutton_dblclk(lparam),
+            WM_LBUTTONDOWN => self.on_lbutton_down(lparam),
+            WM_MOUSEMOVE => self.on_mouse_move(lparam),
+            WM_LBUTTONUP => self.on_lbutton_up(),
+            WM_RBUTTONUP => self.on_rbutton_up(lparam),
             #[cfg(not(feature = "use-UpdateLayeredWindow"))]
             WM_PAINT => self.on_paint(),
             #[cfg(feature = "use-UpdateLayeredWindow")]
             WM_USER_PAINT_WITH_ALPHA => {
                 self.paint_with_alpha();
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let command = (wparam.0 & 0xFFFF) as u16 as usize;
+                if let Some(hit) = self.drag_hit.lock().take() {
+                    let cover = App::get().cover.get().unwrap();
+                    Weak::upgrade(&self.self_weak)
+                        .unwrap()
+                        .on_command(cover, command, hit);
+                }
                 LRESULT(0)
             }
             _ => unsafe { DefWindowProcW(self.base().hwnd(), msg, wparam, lparam) },
