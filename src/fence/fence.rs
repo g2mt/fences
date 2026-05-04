@@ -9,7 +9,6 @@ use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
@@ -17,7 +16,6 @@ use crate::app::App;
 use crate::commands::*;
 use crate::config::state::{FenceState, FenceStickyPosition, IconState};
 use crate::desktop_cover::DesktopCover;
-use crate::fence::icon::Icon;
 use crate::fence::import_dialog::{self, ImportDialog, ImportItem};
 use crate::fence::scroll_area::ScrollArea;
 use crate::fence::title_bar::TitleBar;
@@ -30,7 +28,7 @@ use crate::window::{register_classname, Base, BaseRef, Window};
 pub const WM_USER_PAINT_WITH_ALPHA: u32 = WM_USER + 1;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-enum Hit {
+pub enum Hit {
     TitleBar,
     Client,
     Icon(usize),

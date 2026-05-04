@@ -327,8 +327,8 @@ impl Window for DesktopCover {
                 }
 
                 let mut state = self.captured_mouse_state.lock();
-                if let Some(mut state) = state.as_mut() {
-                    let mut last = &mut state.last_mouse_pos;
+                if let Some(state) = state.as_mut() {
+                    let last = &mut state.last_mouse_pos;
                     let dx = pt.x - last.x;
                     let dy = pt.y - last.y;
                     *last = pt;
@@ -340,7 +340,7 @@ impl Window for DesktopCover {
             WM_LBUTTONUP => {
                 if let Some(CapturedMouseState {
                     fence,
-                    last_mouse_pos,
+                    last_mouse_pos: _,
                 }) = self.captured_mouse_state.lock().take()
                 {
                     let mut pt = POINT { x: 0, y: 0 };
