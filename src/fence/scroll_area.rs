@@ -75,6 +75,30 @@ impl ScrollArea {
         self.icons.lock().clear();
     }
 
+    pub fn reflow_icons(&self) {
+        let config = App::config();
+        let icon_size = config.icon.size;
+        let fence_padding = config.fence.padding;
+        let fence_spacing = config.fence.spacing;
+
+        let width = self.base().area().width.load(Ordering::Relaxed);
+
+        let available_width = width - (fence_padding * 2);
+        let cols = (available_width / (icon_size + fence_spacing)).max(1);
+
+        let icons = self.icons();
+        for (i, icon) in icons.iter().enumerate() {
+            let col = i as i32 % cols;
+            let row = i as i32 / cols;
+
+            let x = fence_padding + col * (icon_size + fence_spacing);
+            let y = fence_padding + row * (icon_size + fence_spacing);
+
+            icon.base().resize_to(x, y, icon_size, icon_size);
+        }
+        self.update_scroll_info();
+    }
+
     pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
         let config = App::config();
         let border = config.fence.border_thickness;
@@ -121,30 +145,6 @@ impl ScrollArea {
                 .scroll_area_bg_color
                 .paint_background(hdc, &rect);
         }
-    }
-
-    pub fn reflow_icons(&self) {
-        let config = App::config();
-        let icon_size = config.icon.size;
-        let fence_padding = config.fence.padding;
-        let fence_spacing = config.fence.spacing;
-
-        let width = self.base().area().width.load(Ordering::Relaxed);
-
-        let available_width = width - (fence_padding * 2);
-        let cols = (available_width / (icon_size + fence_spacing)).max(1);
-
-        let icons = self.icons();
-        for (i, icon) in icons.iter().enumerate() {
-            let col = i as i32 % cols;
-            let row = i as i32 / cols;
-
-            let x = fence_padding + col * (icon_size + fence_spacing);
-            let y = fence_padding + row * (icon_size + fence_spacing);
-
-            icon.base().resize_to(x, y, icon_size, icon_size);
-        }
-        self.update_scroll_info();
     }
 
     pub fn update_scroll_info(&self) {
