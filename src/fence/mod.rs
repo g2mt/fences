@@ -346,6 +346,8 @@ pub struct Fence {
     inner: Mutex<FenceInner>,
     pub title_bar: Arc<TitleBar>,
     pub scroll_area: Arc<ScrollArea>,
+    last_mouse_pos: Mutex<POINT>,
+    drag_hit: Mutex<Option<HitType>>,
 }
 
 struct FenceInner {
@@ -418,6 +420,8 @@ impl Fence {
                     }),
                     title_bar,
                     scroll_area,
+                    last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
+                    drag_hit: Mutex::new(None),
                 });
                 for icon_state in state.icons {
                     fence.add_icon_with_path(&icon_state.title, icon_state.path.as_deref());
@@ -887,6 +891,68 @@ impl Fence {
 
             let _ = EndPaint(hwnd, &ps);
         }
+        LRESULT(0)
+    }
+
+    fn on_lbutton_down(&self, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().hwnd();
+        let x = (lparam.0 & 0xFFFF) as i16 as i32;
+        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+
+        if let Some(hit) = self.hit_test(x, y) {
+            *self.drag_hit.lock() = Some(hit);
+            if let HitType::Client | HitType::Icon(_) = hit {
+                // nothing extra needed
+            } else {
+                let mut last = self.last_mouse_pos.lock();
+                *last = POINT { x, y };
+                drop(last);
+                unsafe {
+                    let _ = SetCapture(hwnd);
+                };
+            }
+        }
+        LRESULT(0)
+    }
+
+    fn on_mouse_move(&self, lparam: LPARAM) -> LRESULT {
+        let hwnd = self.base().hwnd();
+        let x = (lparam.0 & 0xFFFF) as i16 as i32;
+        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+
+        let mut drag_lock = self.drag_hit.lock();
+        if let Some(hit_type) = *drag_lock {
+            let mut last = self.last_mouse_pos.lock();
+            let dx = x - last.x;
+            let dy = y - last.y;
+
+            match hit_type {
+                HitType::TitleBar => {
+                    self.base().move_by(dx, dy);
+                }
+                HitType::Left => self.add_area(dx, 0, -dx, 0),
+                HitType::Right => self.add_area(0, 0, dx, 0),
+                HitType::Top => self.add_area(0, dy, 0, -dy),
+                HitType::Bottom => self.add_area(0, 0, 0, dy),
+                HitType::TopLeft => self.add_area(dx, dy, -dx, -dy),
+                HitType::TopRight => self.add_area(0, dy, dx, -dy),
+                HitType::BottomLeft => self.add_area(dx, 0, -dx, dy),
+                HitType::BottomRight => self.add_area(0, 0, dx, dy),
+                HitType::Client | HitType::Icon(_) => (),
+            }
+
+            self.base().redraw();
+            App::get().save_thread.get().unwrap().set_unsaved();
+            *last = POINT { x, y };
+        }
+        LRESULT(0)
+    }
+
+    fn on_lbutton_up(&self) -> LRESULT {
+        *self.drag_hit.lock() = None;
+        unsafe {
+            let _ = ReleaseCapture();
+        };
         LRESULT(0)
     }
 
