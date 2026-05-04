@@ -3,7 +3,6 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use anyhow::Result;
-use parking_lot::Mutex;
 use tracing::{debug, error, info};
 use windows::core::*;
 use windows::Win32::Foundation::*;
@@ -26,7 +25,6 @@ pub const WM_USER_WAKE_FUTURE: u32 = WM_USER + 2;
 
 pub struct DesktopCover {
     base: BaseRef,
-    last_mouse_pos: Mutex<POINT>,
     executor: AsyncExecutor,
 }
 
@@ -104,7 +102,6 @@ impl DesktopCover {
 
                 let cover = Arc::new(Self {
                     base,
-                    last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
                     executor: AsyncExecutor::new(HWNDWrapper(hwnd)),
                 });
                 Ok(cover)
