@@ -1,6 +1,6 @@
 use std::path::Path;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, OnceLock, Weak};
 
 use anyhow::Result;
 use parking_lot::Mutex;
@@ -48,18 +48,12 @@ pub enum HitType {
 pub struct Fence {
     self_weak: Weak<Fence>,
     base: BaseRef,
-    inner: Mutex<FenceInner>,
     title_bar: Arc<TitleBar>,
     scroll_area: Arc<ScrollArea>,
+    imported_from: OnceLock<Option<Arc<str>>>,
+    sticky_pos: OnceLock<Option<FenceStickyPosition>>,
     last_mouse_pos: Mutex<POINT>,
     drag_hit: Mutex<Option<HitType>>,
-}
-
-struct FenceInner {
-    title: Arc<str>,
-    icons: Vec<Arc<Icon>>,
-    imported_from: Option<Arc<str>>,
-    sticky_pos: Option<FenceStickyPosition>,
 }
 
 impl Fence {
@@ -117,14 +111,10 @@ impl Fence {
                 let fence = Arc::new_cyclic(|self_weak| Self {
                     self_weak: self_weak.clone(),
                     base,
-                    inner: Mutex::new(FenceInner {
-                        title: state.title.clone(),
-                        icons: Vec::new(),
-                        imported_from: state.imported_from.clone(),
-                        sticky_pos: state.sticky_pos,
-                    }),
                     title_bar,
                     scroll_area,
+                    imported_from: OnceLock::from(state.imported_from.clone()),
+                    sticky_pos: OnceLock::from(state.sticky_pos),
                     last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
                     drag_hit: Mutex::new(None),
                 });
@@ -152,26 +142,26 @@ impl Fence {
     }
 
     pub fn get_state(&self) -> FenceState {
-        let inner = self.inner.lock();
         let area = self.base.area();
         FenceState {
-            title: inner.title.clone(),
+            title: self.title_bar.title(),
             area: Area::new(
                 area.x.load(Ordering::Relaxed),
                 area.y.load(Ordering::Relaxed),
                 area.width.load(Ordering::Relaxed),
                 area.height.load(Ordering::Relaxed),
             ),
-            icons: inner
-                .icons
+            icons: self
+                .scroll_area
+                .icons()
                 .iter()
                 .map(|i| IconState {
                     title: i.title(),
                     path: i.path(),
                 })
                 .collect(),
-            imported_from: inner.imported_from.clone(),
-            sticky_pos: inner.sticky_pos,
+            imported_from: self.imported_from().clone(),
+            sticky_pos: self.sticky(),
         }
     }
 
@@ -278,8 +268,8 @@ impl Fence {
 
                     let scroll_y = rel_y - title_h + si.nPos;
                     let mut icon_hit = None;
-                    let inner = self.inner.lock();
-                    for (i, icon) in inner.icons.iter().enumerate() {
+                    let icons = self.scroll_area.icons();
+                    for (i, icon) in icons.iter().enumerate() {
                         if icon.hit_test(rel_x, scroll_y) {
                             icon_hit = Some(HitType::Icon(i));
                             break;
@@ -293,21 +283,19 @@ impl Fence {
     }
 
     pub fn title(&self) -> Arc<str> {
-        self.inner.lock().title.clone()
+        self.title_bar.title()
     }
 
     pub fn set_title(&self, title: Arc<str>) {
-        let mut inner = self.inner.lock();
-        self.title_bar.set_title(title.clone());
-        inner.title = title;
+        self.title_bar.set_title(title);
     }
 
     pub fn sticky(&self) -> Option<crate::config::state::FenceStickyPosition> {
-        self.inner.lock().sticky_pos
+        *self.sticky_pos.get().unwrap_or(&None)
     }
 
     pub fn set_sticky(&self, sticky: Option<crate::config::state::FenceStickyPosition>) {
-        self.inner.lock().sticky_pos = sticky;
+        let _ = self.sticky_pos.set(sticky);
     }
 
     pub fn add_icon(&self, title: &str) {
@@ -315,39 +303,29 @@ impl Fence {
     }
 
     pub fn add_icon_with_path(&self, title: &str, path: Option<&str>) {
-        let mut inner = self.inner.lock();
-        inner
-            .icons
-            .push(Icon::new(self.scroll_area.base().hwnd(), title, path, 0, 0));
-        drop(inner);
+        self.scroll_area.add_icon(title, path);
         self.reflow_icons();
     }
 
     pub fn remove_icon(&self, index: usize) {
-        let mut inner = self.inner.lock();
-        if index < inner.icons.len() {
-            inner.icons.remove(index);
-        }
-        drop(inner);
+        self.scroll_area.remove_icon(index);
         self.reflow_icons();
     }
 
     pub fn clear_selection(&self) {
-        let inner = self.inner.lock();
-        for icon in &inner.icons {
+        for icon in self.scroll_area.icons() {
             icon.set_selected(false);
         }
     }
 
     pub fn select_icon(&self, index: usize) {
-        let inner = self.inner.lock();
-        if let Some(icon) = inner.icons.get(index) {
+        if let Some(icon) = self.scroll_area.icons().get(index) {
             icon.set_selected(true);
         }
     }
 
     pub fn icon_by_index(&self, index: usize) -> Option<Arc<Icon>> {
-        self.inner.lock().icons.get(index).cloned()
+        self.scroll_area.icons().get(index).cloned()
     }
 
     pub fn reflow_icons(&self) {
@@ -362,8 +340,8 @@ impl Fence {
         let available_width = width - (fence_padding * 2);
         let cols = (available_width / (icon_size + fence_spacing)).max(1);
 
-        let inner = self.inner.lock();
-        for (i, icon) in inner.icons.iter().enumerate() {
+        let icons = self.scroll_area.icons();
+        for (i, icon) in icons.iter().enumerate() {
             let col = i as i32 % cols;
             let row = i as i32 / cols;
 
@@ -372,16 +350,15 @@ impl Fence {
 
             icon.base().resize_to(x, y, icon_size, icon_size);
         }
-        drop(inner);
         self.update_scroll_info();
     }
 
     pub fn imported_from(&self) -> Option<Arc<str>> {
-        self.inner.lock().imported_from.clone()
+        self.imported_from.get().cloned().flatten()
     }
 
     pub fn set_imported_from(&self, imported_from: Option<Arc<str>>) {
-        self.inner.lock().imported_from = imported_from;
+        let _ = self.imported_from.set(imported_from);
     }
 
     pub fn show_import_existing_dialog(self: &Arc<Self>) {
@@ -417,8 +394,8 @@ impl Fence {
         let mut import_items: Vec<ImportItem> = Vec::new();
 
         {
-            let inner = self.inner.lock();
-            for icon in &inner.icons {
+            let icons = self.scroll_area.icons();
+            for icon in &icons {
                 let icon_path = icon.path().map(|p| p.to_string()).unwrap_or_default();
                 let still_present = dir_items.iter().any(|(_, dp)| *dp == icon_path);
                 import_items.push(ImportItem {
@@ -435,10 +412,9 @@ impl Fence {
 
         // Add new items from directory not already in the fence
         {
-            let inner = self.inner.lock();
+            let icons = self.scroll_area.icons();
             for (name, path_str) in &dir_items {
-                let already_present = inner
-                    .icons
+                let already_present = icons
                     .iter()
                     .any(|i| i.path().map(|p| p.to_string()).unwrap_or_default() == *path_str);
                 if !already_present {
@@ -454,9 +430,7 @@ impl Fence {
         let fence = self.clone();
         let import_dialog = match ImportDialog::create_window(import_items, move |kept_items| {
             // Remove all existing icons
-            let mut inner = fence.inner.lock();
-            inner.icons.clear();
-            drop(inner);
+            fence.scroll_area.clear_icons();
             // Add kept items
             for item in kept_items {
                 fence.add_icon_with_path(&item.title, Some(&item.path));
@@ -557,9 +531,9 @@ impl Fence {
         };
         let view_height = rect.bottom - rect.top;
 
-        let inner = self.inner.lock();
+        let icons = self.scroll_area.icons();
         let mut max_y = 0;
-        for icon in &inner.icons {
+        for icon in &icons {
             let irect = icon.base().rect();
             if irect.bottom > max_y {
                 max_y = irect.bottom;
@@ -574,7 +548,6 @@ impl Fence {
         si.nMax = content_height;
         si.nPage = view_height as u32;
         unsafe { SetScrollInfo(self.scroll_area.base().hwnd(), SB_VERT, &si, true) };
-        drop(inner);
     }
 
     fn on_paint(&self) -> LRESULT {
@@ -627,8 +600,7 @@ impl Fence {
             }
         } else {
             if let Some(HitType::Icon(old_idx)) = (*self.drag_hit.lock()).take() {
-                let inner = self.inner.lock();
-                if let Some(icon) = inner.icons.get(old_idx) {
+                if let Some(icon) = self.scroll_area.icons().get(old_idx) {
                     icon.set_selected(false);
                 }
             }
@@ -844,7 +816,7 @@ impl Fence {
 
         match command {
             IDM_ADD_ICON => {
-                let title = format!("Icon #{}", self.inner.lock().icons.len());
+                let title = format!("Icon #{}", self.scroll_area.icons().len());
                 self.add_icon(&title);
                 should_save = true;
             }

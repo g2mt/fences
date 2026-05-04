@@ -54,6 +54,10 @@ impl TitleBar {
         Area::new(0, 0, fence_area.width, title_bar_height)
     }
 
+    pub fn title(&self) -> Arc<str> {
+        self.title.lock().clone()
+    }
+
     pub fn set_title(&self, title: Arc<str>) {
         *self.title.lock() = title;
         self.base.redraw();

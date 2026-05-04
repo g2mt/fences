@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use parking_lot::{Mutex, MutexGuard};
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
@@ -8,11 +9,13 @@ use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::app::App;
+use crate::fence::icon::Icon;
 use crate::geo::Area;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub struct ScrollArea {
     base: BaseRef,
+    icons: Mutex<Vec<Arc<Icon>>>,
 }
 
 impl ScrollArea {
@@ -41,8 +44,34 @@ impl ScrollArea {
             parent_hwnd,
             None,
             hinstance,
-            |base| Ok(Arc::new(Self { base })),
+            |base| {
+                Ok(Arc::new(Self {
+                    base,
+                    icons: Mutex::new(Vec::new()),
+                }))
+            },
         )
+    }
+
+    pub fn icons(&self) -> MutexGuard<Vec<Arc<Icon>>> {
+        self.icons.lock()
+    }
+
+    pub fn add_icon(&self, title: &str, path: Option<&str>) {
+        self.icons
+            .lock()
+            .push(Icon::new(self.base.hwnd(), title, path, 0, 0));
+    }
+
+    pub fn remove_icon(&self, index: usize) {
+        let mut icons = self.icons.lock();
+        if index < icons.len() {
+            icons.remove(index);
+        }
+    }
+
+    pub fn clear_icons(&self) {
+        self.icons.lock().clear();
     }
 
     pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
