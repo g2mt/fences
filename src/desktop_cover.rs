@@ -27,17 +27,8 @@ pub const WM_USER_WAKE_FUTURE: u32 = WM_USER + 2;
 
 pub struct DesktopCover {
     base: BaseRef,
-    inner: Mutex<DesktopCoverInner>,
+    last_mouse_pos: Mutex<POINT>,
     executor: AsyncExecutor,
-}
-
-struct DesktopCoverInner {
-    /// List of fences currently managed by the desktop cover.
-    fences: Vec<Arc<Fence>>,
-    /// The type of hit test result from the last interaction, used for dragging or context menus.
-    hit_type: Option<HitType>,
-    /// The last recorded mouse position in client coordinates.
-    last_mouse_pos: POINT,
 }
 
 impl DesktopCover {
@@ -114,11 +105,7 @@ impl DesktopCover {
 
                 let cover = Arc::new(Self {
                     base,
-                    inner: Mutex::new(DesktopCoverInner {
-                        fences: Vec::new(),
-                        hit_type: None,
-                        last_mouse_pos: POINT { x: 0, y: 0 },
-                    }),
+                    last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
                     executor: AsyncExecutor::new(HWNDWrapper(hwnd)),
                 });
                 /*
@@ -136,10 +123,10 @@ impl DesktopCover {
     }
 
     pub fn state(&self) -> AppState {
-        let inner = self.inner.lock();
+        let fences = App::get().fences.lock();
         let bounds = App::get().screen_bounds();
         AppState {
-            fences: inner.fences.iter().map(|f| f.get_state()).collect(),
+            fences: fences.items.iter().map(|f| f.get_state()).collect(),
             screen_width: bounds.width.load(Ordering::Relaxed),
             screen_height: bounds.height.load(Ordering::Relaxed),
         }
@@ -151,67 +138,24 @@ impl DesktopCover {
             let fence = Fence::from_state(self, f_state.clone())?;
             fences.push(fence);
         }
-        let mut inner = self.inner.lock();
-        inner.fences = fences;
-        drop(inner);
-
-        self.rearrange_fences(state.screen_width, state.screen_height);
+        {
+            let mut app_fences = App::get().fences.lock();
+            app_fences.items = fences;
+        }
+        App::get().fences.lock().rearrange_fences(state.screen_width, state.screen_height);
         Ok(())
     }
 
     pub fn add_fence(&self, fence: Arc<Fence>) {
-        let mut inner = self.inner.lock();
-        inner.fences.push(fence);
+        App::get().fences.lock().add_fence(fence);
     }
 
     pub fn remove_fence(&self, fence: &Arc<Fence>) {
-        let mut inner = self.inner.lock();
-        if let Some(pos) = inner.fences.iter().position(|f| Arc::ptr_eq(f, fence)) {
-            inner.fences.remove(pos);
-        }
+        App::get().fences.lock().remove_fence(fence);
     }
 
     pub fn rearrange_fences(&self, old_screen_width: i32, old_screen_height: i32) {
-        let inner = self.inner.lock();
-        let bounds = App::get().screen_bounds();
-        let new_width = bounds.width.load(Ordering::Relaxed);
-        let new_height = bounds.height.load(Ordering::Relaxed);
-
-        if old_screen_width == new_width && old_screen_height == new_height {
-            return;
-        }
-
-        info!(
-            "rearranging from {}x{} to {}x{}",
-            old_screen_width, old_screen_height, new_width, new_height
-        );
-        for fence in &inner.fences {
-            if let Some(sticky) = fence.sticky() {
-                let area = fence.get_state().area;
-                let (new_x, new_y) = match sticky {
-                    FenceStickyPosition::TopLeft => (area.x, area.y),
-                    FenceStickyPosition::TopRight => {
-                        let offset_from_right = old_screen_width - (area.x + area.width);
-                        (new_width - area.width - offset_from_right, area.y)
-                    }
-                    FenceStickyPosition::BottomLeft => {
-                        let offset_from_bottom = old_screen_height - (area.y + area.height);
-                        (area.x, new_height - area.height - offset_from_bottom)
-                    }
-                    FenceStickyPosition::BottomRight => {
-                        let offset_from_right = old_screen_width - (area.x + area.width);
-                        let offset_from_bottom = old_screen_height - (area.y + area.height);
-                        (
-                            new_width - area.width - offset_from_right,
-                            new_height - area.height - offset_from_bottom,
-                        )
-                    }
-                };
-                fence.base().move_to(new_x, new_y);
-            }
-        }
-
-        App::get().save_thread.get().unwrap().set_unsaved();
+        App::get().fences.lock().rearrange_fences(old_screen_width, old_screen_height);
     }
 
     fn on_display_change(&self) -> LRESULT {
@@ -223,7 +167,7 @@ impl DesktopCover {
         let bounds = App::get().screen_bounds();
         let old_width = bounds.width.swap(width, Ordering::Relaxed);
         let old_height = bounds.height.swap(height, Ordering::Relaxed);
-        self.rearrange_fences(old_width, old_height);
+        App::get().fences.lock().rearrange_fences(old_width, old_height);
 
         unsafe {
             let _ = SetWindowPos(
@@ -299,8 +243,8 @@ impl DesktopCover {
             let _ = ScreenToClient(hwnd, &mut pt);
         };
 
-        let inner = self.inner.lock();
-        for fence in inner.fences.iter().rev() {
+        let fences = App::get().fences.lock();
+        for fence in fences.items.iter().rev() {
             if let Some(hit) = fence.hit_test(pt.x, pt.y) {
                 let cursor_id = match hit {
                     HitType::TitleBar => IDC_SIZEALL,
@@ -324,11 +268,11 @@ impl DesktopCover {
         let x = (lparam.0 & 0xFFFF) as i16 as i32;
         let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
-        let mut inner = self.inner.lock();
-        for fence in inner.fences.iter().rev() {
+        let mut fences = App::get().fences.lock();
+        for fence in fences.items.iter().rev() {
             if let Some(hit @ HitType::Icon(_)) = fence.hit_test(x, y) {
-                inner.hit_type = Some(hit);
-                drop(inner);
+                fences.hit_type = Some(hit);
+                drop(fences);
                 self.on_command(WPARAM(IDM_RUN_ICON));
                 return LRESULT(0);
             }
@@ -341,36 +285,38 @@ impl DesktopCover {
         let x = (lparam.0 & 0xFFFF) as i16 as i32;
         let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
-        let mut inner = self.inner.lock();
+        let mut fences = App::get().fences.lock();
         let mut hit_idx = None;
-        for (i, fence) in inner.fences.iter().enumerate().rev() {
+        for (i, fence) in fences.items.iter().enumerate().rev() {
             if let Some(hit) = fence.hit_test(x, y) {
                 hit_idx = Some((i, hit));
                 break;
             }
         }
 
-        for fence in &inner.fences {
+        for fence in &fences.items {
             fence.clear_selection();
         }
 
         if let Some((idx, hit)) = hit_idx {
-            let fence = inner.fences.remove(idx);
+            let fence = fences.items.remove(idx);
 
             if let HitType::Icon(icon_idx) = hit {
                 fence.select_icon(icon_idx);
             }
 
             fence.base().bring_to_front();
-            inner.fences.push(fence);
+            fences.items.push(fence);
 
             match hit {
                 HitType::Client | HitType::Icon(_) => {
-                    inner.hit_type = Some(hit);
+                    fences.hit_type = Some(hit);
                 }
                 _ => {
-                    inner.hit_type = Some(hit);
-                    inner.last_mouse_pos = POINT { x, y };
+                    fences.hit_type = Some(hit);
+                    let mut last = self.last_mouse_pos.lock();
+                    *last = POINT { x, y };
+                    drop(last);
                     unsafe {
                         SetCapture(hwnd);
                     };
@@ -381,15 +327,16 @@ impl DesktopCover {
     }
 
     fn on_mouse_move(&self, lparam: LPARAM) -> LRESULT {
-        let mut inner = self.inner.lock();
-        if let Some(hit_type) = inner.hit_type {
+        let mut fences = App::get().fences.lock();
+        if let Some(hit_type) = fences.hit_type {
             let x = (lparam.0 & 0xFFFF) as i16 as i32;
             let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
-            let dx = x - inner.last_mouse_pos.x;
-            let dy = y - inner.last_mouse_pos.y;
+            let mut last = self.last_mouse_pos.lock();
+            let dx = x - last.x;
+            let dy = y - last.y;
 
-            if let Some(fence) = inner.fences.last() {
+            if let Some(fence) = fences.items.last() {
                 match hit_type {
                     HitType::TitleBar => fence.base().move_by(dx, dy),
                     HitType::Left => fence.add_area(dx, 0, -dx, 0),
@@ -407,15 +354,15 @@ impl DesktopCover {
 
             self.base.redraw();
             App::get().save_thread.get().unwrap().set_unsaved();
-            inner.last_mouse_pos = POINT { x, y };
+            *last = POINT { x, y };
         }
         LRESULT(0)
     }
 
     fn on_lbutton_up(&self) -> LRESULT {
-        let mut inner = self.inner.lock();
-        if inner.hit_type.is_some() {
-            inner.hit_type = None;
+        let mut fences = App::get().fences.lock();
+        if fences.hit_type.is_some() {
+            fences.hit_type = None;
             unsafe {
                 let _ = ReleaseCapture();
             };
@@ -430,8 +377,8 @@ impl DesktopCover {
 
         let mut hit_idx = None;
         {
-            let inner = self.inner.lock();
-            for (i, fence) in inner.fences.iter().enumerate().rev() {
+            let fences = App::get().fences.lock();
+            for (i, fence) in fences.items.iter().enumerate().rev() {
                 if let Some(hit) = fence.hit_test(x, y) {
                     hit_idx = Some((i, hit));
                     break;
@@ -440,20 +387,19 @@ impl DesktopCover {
         }
 
         if let Some((idx, hit)) = hit_idx {
-            {
-                let mut inner = self.inner.lock();
-                let fence = inner.fences.remove(idx);
+            let mut fences = App::get().fences.lock();
+            let fence = fences.items.remove(idx);
 
-                fence.clear_selection();
-                if let HitType::Icon(icon_idx) = hit {
-                    fence.select_icon(icon_idx);
-                }
-
-                fence.base().bring_to_front();
-                inner.fences.push(fence);
-
-                inner.hit_type = Some(hit);
+            fence.clear_selection();
+            if let HitType::Icon(icon_idx) = hit {
+                fence.select_icon(icon_idx);
             }
+
+            fence.base().bring_to_front();
+            fences.items.push(fence);
+
+            fences.hit_type = Some(hit);
+            drop(fences);
 
             let mut pt = POINT { x, y };
             unsafe {
@@ -471,9 +417,9 @@ impl DesktopCover {
                     let _ = AppendMenuW(h_menu, MF_STRING, IDM_IMPORT, w!("&Import"));
                     let _ = AppendMenuW(h_menu, MF_STRING, IDM_IMPORT_FROM, w!("Import &from..."));
                     let has_import_path = {
-                        let inner = self.inner.lock();
-                        inner
-                            .fences
+                        let fences = App::get().fences.lock();
+                        fences
+                            .items
                             .last()
                             .map_or(false, |f| f.imported_from().is_some())
                     };
@@ -492,7 +438,10 @@ impl DesktopCover {
                     let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR::null());
 
                     let h_sticky_menu = CreatePopupMenu().unwrap_or_default();
-                    let current_sticky = self.inner.lock().fences.last().and_then(|f| f.sticky());
+                    let current_sticky = {
+                        let fences = App::get().fences.lock();
+                        fences.items.last().and_then(|f| f.sticky())
+                    };
 
                     let checky_sticky = |pos: Option<FenceStickyPosition>| {
                         if current_sticky == pos {
@@ -594,8 +543,8 @@ impl DesktopCover {
     }
 
     fn trigger_fence_command(&self, command: usize, hit_type: HitType) -> bool {
-        let inner = self.inner.lock();
-        if let Some(fence) = inner.fences.last() {
+        let fences = App::get().fences.lock();
+        if let Some(fence) = fences.items.last() {
             fence.on_command(self, command, hit_type)
         } else {
             false
@@ -616,7 +565,7 @@ impl DesktopCover {
                 let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
                 let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
                 match Fence::new(self, width / 2 - 150, height / 2 - 75, "Untitled") {
-                    Ok(fence) => self.add_fence(fence),
+                    Ok(fence) => App::get().fences.lock().add_fence(fence),
                     Err(err) => error!("spawning fence: {:?}", err),
                 }
                 should_save = true;
@@ -627,8 +576,8 @@ impl DesktopCover {
                     let cover = App::get().cover.get().unwrap();
                     match Fence::from_folder_selector(&cover).await {
                         Ok(Some(fence)) => {
-                            let mut inner = cover.inner.lock();
-                            inner.fences.push(fence);
+                            let mut fences = App::get().fences.lock();
+                            fences.items.push(fence);
                             App::get().save_thread.get().unwrap().set_unsaved();
                         }
                         Err(e) => {
@@ -653,10 +602,11 @@ impl DesktopCover {
             | IDM_STICKY_BOTTOMLEFT
             | IDM_STICKY_BOTTOMRIGHT
             | IDM_OPEN_EXPLORER => {
-                if let Some(hit_type) = {
-                    let mut inner = self.inner.lock();
-                    inner.hit_type.take()
-                } {
+                let hit_type = {
+                    let mut fences = App::get().fences.lock();
+                    fences.hit_type.take()
+                };
+                if let Some(hit_type) = hit_type {
                     should_save = self.trigger_fence_command(command, hit_type);
                 }
             }

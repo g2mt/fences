@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::sync::atomic::AtomicI32;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, LazyLock, OnceLock};
 
 use anyhow::{anyhow, Result};
@@ -10,9 +11,10 @@ use windows::Win32::Graphics::Gdi::*;
 
 use crate::config::config::Config;
 use crate::config::save_thread::SaveThread;
-use crate::config::state::AppState;
+use crate::config::state::{AppState, FenceStickyPosition};
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
+use crate::fence::{Fence, HitType};
 use crate::fence::import_dialog::ImportDialog;
 use crate::geo::Bounds;
 use crate::paths::{app_file, STATE_PATH};
@@ -28,6 +30,7 @@ pub struct App {
     pub config: OnceLock<Arc<Config>>,
     pub import_dialog: Mutex<Option<Arc<ImportDialog>>>,
     pub id_path: OnceLock<PathBuf>,
+    pub fences: Mutex<AppFences>,
 }
 
 /// Assume that the singleton is always initialized and the [App::get()] api to access.
@@ -155,4 +158,58 @@ pub struct AppFences {
     pub items: Vec<Arc<Fence>>,
     /// The type of hit test result from the last interaction, used for dragging or context menus.
     pub hit_type: Option<HitType>,
+}
+
+impl AppFences {
+    pub fn add_fence(&mut self, fence: Arc<Fence>) {
+        self.items.push(fence);
+    }
+
+    pub fn remove_fence(&mut self, fence: &Arc<Fence>) {
+        if let Some(pos) = self.items.iter().position(|f| Arc::ptr_eq(f, fence)) {
+            self.items.remove(pos);
+        }
+    }
+
+    pub fn rearrange_fences(&mut self, old_screen_width: i32, old_screen_height: i32) {
+        let bounds = App::get().screen_bounds();
+        let new_width = bounds.width.load(Ordering::Relaxed);
+        let new_height = bounds.height.load(Ordering::Relaxed);
+
+        if old_screen_width == new_width && old_screen_height == new_height {
+            return;
+        }
+
+        info!(
+            "rearranging from {}x{} to {}x{}",
+            old_screen_width, old_screen_height, new_width, new_height
+        );
+        for fence in &self.items {
+            if let Some(sticky) = fence.sticky() {
+                let area = fence.get_state().area;
+                let (new_x, new_y) = match sticky {
+                    FenceStickyPosition::TopLeft => (area.x, area.y),
+                    FenceStickyPosition::TopRight => {
+                        let offset_from_right = old_screen_width - (area.x + area.width);
+                        (new_width - area.width - offset_from_right, area.y)
+                    }
+                    FenceStickyPosition::BottomLeft => {
+                        let offset_from_bottom = old_screen_height - (area.y + area.height);
+                        (area.x, new_height - area.height - offset_from_bottom)
+                    }
+                    FenceStickyPosition::BottomRight => {
+                        let offset_from_right = old_screen_width - (area.x + area.width);
+                        let offset_from_bottom = old_screen_height - (area.y + area.height);
+                        (
+                            new_width - area.width - offset_from_right,
+                            new_height - area.height - offset_from_bottom,
+                        )
+                    }
+                };
+                fence.base().move_to(new_x, new_y);
+            }
+        }
+
+        App::get().save_thread.get().unwrap().set_unsaved();
+    }
 }
