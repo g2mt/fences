@@ -25,7 +25,6 @@ use crate::prompt;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Custom events
-#[cfg(feature = "use-UpdateLayeredWindow")]
 pub const WM_USER_PAINT_WITH_ALPHA: u32 = WM_USER + 1;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -527,7 +526,6 @@ impl Fence {
         self.scroll_area.reflow_icons();
     }
 
-    #[cfg(feature = "use-UpdateLayeredWindow")]
     pub fn paint_with_alpha(&self) {
         debug!("paint_with_alpha");
         // https://stackoverflow.com/a/18613002
@@ -884,9 +882,7 @@ impl Window for Fence {
                 }
                 LRESULT(0)
             }
-            // DesktopCover handles mouse move when not(feature = "use-UpdateLayeredWindow")
-            #[cfg(feature = "use-UpdateLayeredWindow")]
-            WM_MOUSEMOVE => {
+            WM_MOUSEMOVE if App::config().use_layered_window => {
                 let mut pt = POINT { x: 0, y: 0 };
                 unsafe {
                     let _ = GetCursorPos(&mut pt);

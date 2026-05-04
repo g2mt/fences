@@ -8,6 +8,7 @@ pub struct Config {
     pub font: FontConfig,
     pub fence: FenceConfig,
     pub icon: IconConfig,
+    pub use_layered_window: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
