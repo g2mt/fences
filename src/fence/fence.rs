@@ -166,9 +166,10 @@ impl HitManager {
 
     /// Returns the cursor at that specific location for
     /// the current Hit value, or IDC_ARROW if out of bounds
-    fn on_set_cursor(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> HCURSOR {
+    fn on_set_cursor(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> Option<HCURSOR> {
         let hit = Hit::from_pos_in_fence(fence, rel_x, rel_y);
         let cursor_id = match hit {
+            None => return None,
             Some(Hit::TitleBar) => IDC_SIZEALL,
             Some(Hit::Left) | Some(Hit::Right) => IDC_SIZEWE,
             Some(Hit::Top) | Some(Hit::Bottom) => IDC_SIZENS,
@@ -176,7 +177,7 @@ impl HitManager {
             Some(Hit::TopRight) | Some(Hit::BottomLeft) => IDC_SIZENESW,
             _ => IDC_ARROW,
         };
-        unsafe { LoadCursorW(None, cursor_id).unwrap_or_default() }
+        Some(unsafe { LoadCursorW(None, cursor_id).unwrap_or_default() })
     }
 
     /// Reacts based on the dragging movement of the mouse
@@ -835,11 +836,14 @@ impl Window for Fence {
                     let _ = ScreenToClient(hwnd, &mut pt);
                 };
 
-                let cursor = self.hitman.on_set_cursor(self, pt.x, pt.y);
-                unsafe {
-                    SetCursor(Some(cursor));
+                if let Some(cursor) = self.hitman.on_set_cursor(self, pt.x, pt.y) {
+                    unsafe {
+                        SetCursor(Some(cursor));
+                        LRESULT(TRUE.0 as isize)
+                    }
+                } else {
+                    unsafe { DefWindowProcW(hwnd, WM_MOVE, wparam, lparam) }
                 }
-                LRESULT(TRUE.0 as isize)
             }
             WM_LBUTTONDBLCLK => {
                 let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
