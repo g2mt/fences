@@ -214,7 +214,6 @@ pub struct Fence {
     scroll_area: Arc<ScrollArea>,
     imported_from: Mutex<Option<Arc<str>>>,
     sticky_pos: Mutex<Option<FenceStickyPosition>>,
-    #[cfg(feature = "use-UpdateLayeredWindow")]
     last_mouse_pos: Mutex<POINT>,
     hitman: HitManager,
 }
@@ -235,27 +234,18 @@ impl Fence {
 
     pub fn from_state(cover: &DesktopCover, state: FenceState) -> Result<Arc<Self>> {
         let hinstance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
-        let parent_hwnd = {
-            #[cfg(feature = "use-UpdateLayeredWindow")]
-            {
-                App::get().hwnd_shell.get().unwrap().0
-            }
-            #[cfg(not(feature = "use-UpdateLayeredWindow"))]
-            {
-                cover.base().hwnd()
-            }
+        let use_layered = App::config().use_layered_window;
+        let parent_hwnd = if use_layered {
+            App::get().hwnd_shell.get().unwrap().0
+        } else {
+            cover.base().hwnd()
         };
         debug!("parent_hwnd={:?}", parent_hwnd);
         Base::create_window(
-            {
-                #[cfg(feature = "use-UpdateLayeredWindow")]
-                {
-                    WS_EX_LAYERED
-                }
-                #[cfg(not(feature = "use-UpdateLayeredWindow"))]
-                {
-                    WINDOW_EX_STYLE(0)
-                }
+            if use_layered {
+                WS_EX_LAYERED
+            } else {
+                WINDOW_EX_STYLE(0)
             },
             register_classname("Fence"),
             PCWSTR::null(),
@@ -278,15 +268,13 @@ impl Fence {
                     scroll_area,
                     imported_from: Mutex::new(state.imported_from.clone()),
                     sticky_pos: Mutex::new(state.sticky_pos),
-                    #[cfg(feature = "use-UpdateLayeredWindow")]
                     last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
                     hitman: HitManager::new(),
                 });
                 for icon_state in state.icons {
                     fence.add_icon_with_path(&icon_state.title, icon_state.path.as_deref());
                 }
-                #[cfg(feature = "use-UpdateLayeredWindow")]
-                {
+                if use_layered {
                     fence.paint_with_alpha();
                     unsafe {
                         let _ = SetWindowPos(
@@ -860,22 +848,18 @@ impl Window for Fence {
                 let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
                 if self.hitman.on_lbutton_down(self, rel_x, rel_y) {
-                    #[cfg(feature = "use-UpdateLayeredWindow")]
+                    let mut pt = POINT { x: 0, y: 0 };
                     unsafe {
-                        let mut last = self.last_mouse_pos.lock();
-                        let mut pt = POINT { x: 0, y: 0 };
-                        unsafe {
-                            let _ = GetCursorPos(&mut pt);
-                        };
-                        *last = pt;
-                        let _ = SetCapture(hwnd);
+                        let _ = GetCursorPos(&mut pt);
                     };
-                    #[cfg(not(feature = "use-UpdateLayeredWindow"))]
-                    {
-                        let mut pt = POINT { x: 0, y: 0 };
+
+                    if App::config().use_layered_window {
+                        let mut last = self.last_mouse_pos.lock();
+                        *last = pt;
                         unsafe {
-                            let _ = GetCursorPos(&mut pt);
-                        };
+                            let _ = SetCapture(hwnd);
+                        }
+                    } else {
                         let cover = App::get().cover.get().unwrap();
                         cover.capture_mouse(Weak::upgrade(&self.self_weak).unwrap(), pt);
                     }
@@ -897,9 +881,7 @@ impl Window for Fence {
                 self.hitman.on_mouse_move(self, dx, dy);
                 LRESULT(0)
             }
-            // DesktopCover handles mouse move when not(feature = "use-UpdateLayeredWindow")
-            #[cfg(feature = "use-UpdateLayeredWindow")]
-            WM_LBUTTONUP => {
+            WM_LBUTTONUP if App::config().use_layered_window => {
                 let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
                 let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
                 self.hitman.on_lbutton_up(self, rel_x, rel_y);
@@ -914,8 +896,7 @@ impl Window for Fence {
                 self.hitman.on_rbutton_up(self, rel_x, rel_y);
                 LRESULT(0)
             }
-            #[cfg(not(feature = "use-UpdateLayeredWindow"))]
-            WM_PAINT => unsafe {
+            WM_PAINT if !App::config().use_layered_window => unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
                 let mut rect: RECT = std::mem::zeroed();
@@ -927,8 +908,7 @@ impl Window for Fence {
                 let _ = EndPaint(hwnd, &ps);
                 LRESULT(0)
             },
-            #[cfg(feature = "use-UpdateLayeredWindow")]
-            WM_USER_PAINT_WITH_ALPHA => {
+            WM_USER_PAINT_WITH_ALPHA if App::config().use_layered_window => {
                 self.paint_with_alpha();
                 LRESULT(0)
             }

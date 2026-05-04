@@ -131,8 +131,7 @@ impl Icon {
         } else {
             config.icon.unselected_bg_color
         };
-        #[cfg(not(feature = "use-UpdateLayeredWindow"))]
-        if bg_color.a() < 255 {
+        if !config.use_layered_window && bg_color.a() < 255 {
             let mirror = App::get().mirror.lock();
             let screen_left = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
             let screen_top = unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) };

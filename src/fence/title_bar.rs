@@ -102,8 +102,7 @@ impl Window for TitleBar {
                 self.paint(hdc);
                 let _ = EndPaint(hwnd, &ps);
 
-                #[cfg(feature = "use-UpdateLayeredWindow")]
-                {
+                if App::config().use_layered_window {
                     let _ = PostMessageW(
                         GetParent(hwnd).ok(),
                         crate::fence::fence::WM_USER_PAINT_WITH_ALPHA,

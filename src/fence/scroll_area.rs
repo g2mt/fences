@@ -126,8 +126,7 @@ impl ScrollArea {
         let _ = unsafe { ClientToScreen(hwnd, &mut pt) };
 
         let config = App::config();
-        #[cfg(not(feature = "use-UpdateLayeredWindow"))]
-        if config.fence.scroll_area_bg_color.a() < 255 {
+        if !config.use_layered_window && config.fence.scroll_area_bg_color.a() < 255 {
             let mirror = App::get().mirror.lock();
             let screen_left = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
             let screen_top = unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) };
@@ -263,8 +262,7 @@ impl Window for ScrollArea {
                 self.paint(hdc);
                 let _ = EndPaint(hwnd, &ps);
 
-                #[cfg(feature = "use-UpdateLayeredWindow")]
-                {
+                if App::config().use_layered_window {
                     let _ = PostMessageW(
                         GetParent(hwnd).ok(),
                         crate::fence::fence::WM_USER_PAINT_WITH_ALPHA,

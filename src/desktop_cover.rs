@@ -318,8 +318,7 @@ impl Window for DesktopCover {
             WM_WINDOWPOSCHANGING => self.on_window_pos_changing(msg, wparam, lparam),
             WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),
             WM_PAINT => self.on_paint(),
-            #[cfg(not(feature = "use-UpdateLayeredWindow"))]
-            WM_MOUSEMOVE => {
+            WM_MOUSEMOVE if !App::config().use_layered_window => {
                 let mut pt = POINT { x: 0, y: 0 };
                 unsafe {
                     // for consistency with Fence, the absolute point is used
@@ -336,8 +335,7 @@ impl Window for DesktopCover {
                 }
                 LRESULT(0)
             }
-            #[cfg(not(feature = "use-UpdateLayeredWindow"))]
-            WM_LBUTTONUP => {
+            WM_LBUTTONUP if !App::config().use_layered_window => {
                 if let Some(CapturedMouseState {
                     fence,
                     last_mouse_pos: _,
