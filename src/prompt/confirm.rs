@@ -1,7 +1,9 @@
 use std::sync::Arc;
+
 use parking_lot::Mutex;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::*;
+
 use crate::fut::{PromptFuture, PromptState};
 
 pub fn confirm(

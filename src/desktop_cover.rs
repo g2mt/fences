@@ -1,15 +1,15 @@
 use std::process::Command;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use anyhow::Result;
 use tracing::{debug, error, info};
-use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
 
 use crate::app::App;
 use crate::commands::*;
@@ -17,7 +17,7 @@ use crate::config::state::AppState;
 use crate::fence::Fence;
 use crate::fut::AsyncExecutor;
 use crate::utils::HWNDWrapper;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
@@ -117,10 +117,10 @@ impl DesktopCover {
         let fences = App::get().fences.lock();
         let bounds = App::get().screen_bounds();
         AppState {
-            fences: fences.items().iter().map(|f| f.get_state()).collect(),
+            fences: fences.items().iter().map(|f| f.state()).collect(),
             screen_width: bounds.width.load(Ordering::Relaxed),
             screen_height: bounds.height.load(Ordering::Relaxed),
-        }state
+        }
     }
 
     pub fn set_state(&self, state: &AppState) -> Result<()> {

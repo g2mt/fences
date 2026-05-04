@@ -1,20 +1,21 @@
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use parking_lot::Mutex;
 use tracing::{error, info};
-use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
 use windows::Win32::UI::Controls::Dialogs::*;
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
 
 use crate::app::App;
+use crate::commands::*;
 use crate::config::state::IconState;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 pub struct Icon {
     base: BaseRef,
@@ -66,7 +67,7 @@ impl Icon {
         }
     }
 
-    pub fn hit_test(&self, rel_x: i32, rel_y: i32) -> bool {
+    pub fn contains_point(&self, rel_x: i32, rel_y: i32) -> bool {
         let rect = self.base.rect();
         rel_x >= rect.left && rel_x < rect.right && rel_y >= rect.top && rel_y < rect.bottom
     }
@@ -268,7 +269,7 @@ impl Icon {
                 TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                 x,
                 y,
-                0,
+                Some(0),
                 hwnd,
                 None,
             );

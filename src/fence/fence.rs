@@ -1,18 +1,17 @@
 use std::path::Path;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, OnceLock, Weak};
+use std::sync::{Arc, Weak};
 
 use anyhow::Result;
 use parking_lot::Mutex;
 use tracing::{debug, error};
-use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
 
 use crate::app::App;
 use crate::commands::*;
@@ -24,7 +23,7 @@ use crate::fence::scroll_area::ScrollArea;
 use crate::fence::title_bar::TitleBar;
 use crate::geo::Area;
 use crate::prompt;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 // Custom events
 #[cfg(feature = "use-UpdateLayeredWindow")]
@@ -114,7 +113,7 @@ impl HitManager {
         let old_hit = std::mem::replace(&mut *self.m.lock(), hit);
 
         if old_hit != hit {
-            for icon in fence.scroll_area.icons() {
+            for icon in fence.scroll_area.icons().iter() {
                 icon.set_selected(false);
             }
             if let Some(Hit::Icon(idx)) = hit {
@@ -355,7 +354,6 @@ impl Fence {
         self.scroll_area.reflow_icons();
     }
 
-
     pub fn imported_from(&self) -> Option<Arc<str>> {
         self.imported_from.lock().clone()
     }
@@ -396,21 +394,18 @@ impl Fence {
         // they still exist in the directory; new items from directory get Keep.
         let mut import_items: Vec<ImportItem> = Vec::new();
 
-        {
-            let icons = self.scroll_area.icons();
-            for icon in &icons {
-                let icon_path = icon.path().map(|p| p.to_string()).unwrap_or_default();
-                let still_present = dir_items.iter().any(|(_, dp)| *dp == icon_path);
-                import_items.push(ImportItem {
-                    title: icon.title(),
-                    path: Arc::from(icon_path.as_str()),
-                    action: if still_present {
-                        import_dialog::ACTION_KEEP
-                    } else {
-                        import_dialog::ACTION_REMOVE
-                    },
-                });
-            }
+        for icon in self.scroll_area.icons().iter() {
+            let icon_path = icon.path().map(|p| p.to_string()).unwrap_or_default();
+            let still_present = dir_items.iter().any(|(_, dp)| *dp == icon_path);
+            import_items.push(ImportItem {
+                title: icon.title(),
+                path: Arc::from(icon_path.as_str()),
+                action: if still_present {
+                    import_dialog::ACTION_KEEP
+                } else {
+                    import_dialog::ACTION_REMOVE
+                },
+            });
         }
 
         // Add new items from directory not already in the fence
@@ -674,7 +669,15 @@ impl Fence {
             let _ = AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
 
             let _ = SetForegroundWindow(hwnd);
-            let _ = TrackPopupMenu(h_menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, x, y, 0, hwnd, None);
+            let _ = TrackPopupMenu(
+                h_menu,
+                TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+                x,
+                y,
+                Some(0),
+                hwnd,
+                None,
+            );
             let _ = DestroyMenu(h_menu);
         }
     }

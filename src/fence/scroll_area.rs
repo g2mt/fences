@@ -1,17 +1,18 @@
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use anyhow::Result;
 use parking_lot::{Mutex, MutexGuard};
-use windows::core::PCWSTR;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::PCWSTR;
 
 use crate::app::App;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 pub struct ScrollArea {
     base: BaseRef,
@@ -53,7 +54,7 @@ impl ScrollArea {
         )
     }
 
-    pub fn icons(&self) -> MutexGuard<Vec<Arc<Icon>>> {
+    pub fn icons(&self) -> MutexGuard<'_, Vec<Arc<Icon>>> {
         self.icons.lock()
     }
 
@@ -128,7 +129,7 @@ impl ScrollArea {
         let fence_padding = config.fence.padding;
         let fence_spacing = config.fence.spacing;
 
-        let width = self.base().area().width().load(Ordering::Relaxed);
+        let width = self.base().area().width.load(Ordering::Relaxed);
 
         let available_width = width - (fence_padding * 2);
         let cols = (available_width / (icon_size + fence_spacing)).max(1);
@@ -153,9 +154,8 @@ impl ScrollArea {
         };
         let view_height = rect.bottom - rect.top;
 
-        let icons = self.icons();
         let mut max_y = 0;
-        for icon in &icons {
+        for icon in self.icons.lock().iter() {
             let irect = icon.base().rect();
             if irect.bottom > max_y {
                 max_y = irect.bottom;

@@ -1,9 +1,9 @@
 use std::cell::LazyCell;
 
-use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::{CreateFontIndirectW, HFONT};
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
 
 #[derive(Copy, Clone)]
 pub(crate) struct HWNDWrapper(pub HWND);
