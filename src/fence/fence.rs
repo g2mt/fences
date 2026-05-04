@@ -27,6 +27,7 @@ use crate::prompt;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Custom events
+#[cfg(feature = "use-UpdateLayeredWindow")]
 pub const WM_USER_PAINT_WITH_ALPHA: u32 = WM_USER + 1;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -45,20 +46,20 @@ pub enum HitType {
 }
 
 pub struct Fence {
-    pub(crate) self_weak: Weak<Fence>,
-    pub(crate) base: BaseRef,
-    pub(crate) inner: Mutex<FenceInner>,
-    pub title_bar: Arc<TitleBar>,
-    pub scroll_area: Arc<ScrollArea>,
-    pub(crate) last_mouse_pos: Mutex<POINT>,
-    pub(crate) drag_hit: Mutex<Option<HitType>>,
+    self_weak: Weak<Fence>,
+    base: BaseRef,
+    inner: Mutex<FenceInner>,
+    title_bar: Arc<TitleBar>,
+    scroll_area: Arc<ScrollArea>,
+    last_mouse_pos: Mutex<POINT>,
+    drag_hit: Mutex<Option<HitType>>,
 }
 
-pub(crate) struct FenceInner {
-    pub(crate) title: Arc<str>,
-    pub(crate) icons: Vec<Arc<Icon>>,
-    pub(crate) imported_from: Option<Arc<str>>,
-    pub(crate) sticky_pos: Option<FenceStickyPosition>,
+struct FenceInner {
+    title: Arc<str>,
+    icons: Vec<Arc<Icon>>,
+    imported_from: Option<Arc<str>>,
+    sticky_pos: Option<FenceStickyPosition>,
 }
 
 impl Fence {
@@ -331,10 +332,6 @@ impl Fence {
         self.reflow_icons();
     }
 
-    pub fn icon_count(&self) -> usize {
-        self.inner.lock().icons.len()
-    }
-
     pub fn clear_selection(&self) {
         let inner = self.inner.lock();
         for icon in &inner.icons {
@@ -457,10 +454,9 @@ impl Fence {
         let fence = self.clone();
         let import_dialog = match ImportDialog::create_window(import_items, move |kept_items| {
             // Remove all existing icons
-            let count = fence.icon_count();
-            for _ in 0..count {
-                fence.remove_icon(0);
-            }
+            let mut inner = fence.inner.lock();
+            inner.icons.clear();
+            drop(inner);
             // Add kept items
             for item in kept_items {
                 fence.add_icon_with_path(&item.title, Some(&item.path));
@@ -848,7 +844,7 @@ impl Fence {
 
         match command {
             IDM_ADD_ICON => {
-                let title = format!("Icon #{}", self.icon_count());
+                let title = format!("Icon #{}", self.inner.lock().icons.len());
                 self.add_icon(&title);
                 should_save = true;
             }

@@ -12,7 +12,6 @@ use crate::app::App;
 use crate::geo::Area;
 use crate::window::{register_classname, Base, BaseRef, Window};
 
-use crate::fence::fence::WM_USER_PAINT_WITH_ALPHA;
 
 pub struct TitleBar {
     base: BaseRef,

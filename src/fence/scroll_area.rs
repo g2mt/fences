@@ -1,17 +1,15 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use windows::core::PCWSTR;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Controls::*;
-use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::app::App;
 use crate::geo::Area;
 use crate::window::{register_classname, Base, BaseRef, Window};
-
-use crate::fence::fence::WM_USER_PAINT_WITH_ALPHA;
 
 pub struct ScrollArea {
     base: BaseRef,
