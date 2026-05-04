@@ -171,6 +171,11 @@ impl HitManager {
         };
         unsafe { LoadCursorW(None, cursor_id).unwrap_or_default() }
     }
+
+    /// Reacts based on the dragging movement of the mouse
+    fn on_mouse_move(&self, fence: &Fence, dx: i32, dy: i32) {
+        todo!()
+    }
 }
 
 pub struct Fence {
@@ -657,15 +662,7 @@ impl Fence {
             let _ = AppendMenuW(h_menu, MF_STRING, IDM_DELETE_FENCE, w!("&Delete fence"));
 
             let _ = SetForegroundWindow(hwnd);
-            let _ = TrackPopupMenu(
-                h_menu,
-                TPM_LEFTALIGN | TPM_RIGHTBUTTON,
-                x,
-                y,
-                0,
-                hwnd,
-                None,
-            );
+            let _ = TrackPopupMenu(h_menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, x, y, 0, hwnd, None);
             let _ = DestroyMenu(h_menu);
         }
     }
