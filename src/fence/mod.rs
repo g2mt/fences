@@ -1,6 +1,6 @@
 use std::path::Path;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use anyhow::Result;
 use import_dialog::{ImportDialog, ImportItem};
@@ -341,6 +341,7 @@ pub enum HitType {
 }
 
 pub struct Fence {
+    self_weak: Weak<Fence>,
     base: BaseRef,
     inner: Mutex<FenceInner>,
     pub title_bar: Arc<TitleBar>,
@@ -406,7 +407,8 @@ impl Fence {
                 let title_bar = TitleBar::new(base.hwnd(), state.title.clone(), &state.area)?;
                 let scroll_area = ScrollArea::new(base.hwnd(), &state.area)?;
 
-                let fence = Arc::new(Self {
+                let fence = Arc::new_cyclic(|self_weak| Self {
+                    self_weak: self_weak.clone(),
                     base,
                     inner: Mutex::new(FenceInner {
                         title: state.title.clone(),
@@ -933,34 +935,11 @@ impl Fence {
         let x = (lparam.0 & 0xFFFF) as i16 as i32;
         let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
-        if let Some(HitType::Icon(_)) = self.hit_test(x, y) {
+        if let Some(hit @ HitType::Icon(_)) = self.hit_test(x, y) {
             let cover = App::get().cover.get().unwrap();
-            self.on_command(cover, IDM_RUN_ICON, HitType::Icon(0)); // index doesn't matter for run
-        }
-        LRESULT(0)
-    }
-
-    #[cfg(feature = "use-UpdateLayeredWindow")]
-    fn on_lbutton_down(&self, lparam: LPARAM) -> LRESULT {
-        let hwnd = self.base().hwnd();
-        let x = (lparam.0 & 0xFFFF) as i16 as i32;
-        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
-
-        if let Some(hit) = self.hit_test(x, y) {
-            match hit {
-                HitType::Client | HitType::Icon(_) => {
-                    // nothing extra needed
-                }
-                _ => {
-                    let mut fences = App::get().fences.lock();
-                    // We need to track which fence is being dragged globally
-                    // but for this specific window, we just set the hit type
-                    fences.select(x + self.base.rect().left, y + self.base.rect().top);
-                    unsafe {
-                        SetCapture(hwnd);
-                    };
-                }
-            }
+            Weak::upgrade(&self.self_weak)
+                .unwrap()
+                .on_command(cover, IDM_RUN_ICON, hit);
         }
         LRESULT(0)
     }
@@ -1215,17 +1194,14 @@ impl Window for Fence {
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         #[cfg(feature = "use-UpdateLayeredWindow")]
-        {
+        'handle_fences: {
             let ret = match msg {
                 WM_SETCURSOR => self.on_set_cursor(msg, wparam, lparam),
                 WM_LBUTTONDBLCLK => self.on_lbutton_dblclk(lparam),
-                WM_LBUTTONDOWN => self.on_lbutton_down(lparam),
                 WM_RBUTTONUP => self.on_rbutton_up(lparam),
-                _ => LRESULT(-1),
+                _ => break 'handle_fences,
             };
-            if ret != LRESULT(-1) {
-                return ret;
-            }
+            return ret;
         }
         match msg {
             WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
