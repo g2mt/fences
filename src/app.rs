@@ -148,3 +148,11 @@ impl App {
         }
     }
 }
+
+#[derive(Default)]
+pub struct AppFences {
+    /// List of fences currently managed by the desktop cover.
+    pub items: Vec<Arc<Fence>>,
+    /// The type of hit test result from the last interaction, used for dragging or context menus.
+    pub hit_type: Option<HitType>,
+}
