@@ -267,7 +267,7 @@ impl Window for ScrollArea {
                 {
                     let _ = PostMessageW(
                         GetParent(hwnd).ok(),
-                        crate::fence::WM_USER_PAINT_WITH_ALPHA,
+                        crate::fence::fence::WM_USER_PAINT_WITH_ALPHA,
                         WPARAM(0),
                         LPARAM(0),
                     );

@@ -34,9 +34,9 @@ pub struct FenceConfig {
     pub padding: i32,
     pub spacing: i32,
     pub title_text_color: Color,
-    pub title_bar_bg_color: Color<true>,
-    pub scroll_area_bg_color: Color<true>,
-    pub fence_bg_color: Color<true>,
+    pub title_bar_bg_color: Color,
+    pub scroll_area_bg_color: Color,
+    pub fence_bg_color: Color,
 }
 
 impl Default for FenceConfig {
@@ -58,8 +58,8 @@ impl Default for FenceConfig {
 #[serde(default)]
 pub struct IconConfig {
     pub size: i32,
-    pub selected_bg_color: Color<true>,
-    pub unselected_bg_color: Color<true>,
+    pub selected_bg_color: Color,
+    pub unselected_bg_color: Color,
     pub text_color: Color,
     pub icon_size_draw: i32,
 }

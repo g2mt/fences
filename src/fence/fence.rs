@@ -9,6 +9,7 @@ use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
@@ -237,7 +238,7 @@ impl Fence {
         let hinstance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
         let parent_hwnd = {
             #[cfg(feature = "use-UpdateLayeredWindow")]
-            unsafe {
+            {
                 App::get().hwnd_shell.get().unwrap().0
             }
             #[cfg(not(feature = "use-UpdateLayeredWindow"))]
