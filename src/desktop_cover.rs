@@ -551,17 +551,16 @@ impl Window for DesktopCover {
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         #[cfg(not(feature = "use-UpdateLayeredWindow"))]
-        'handle_fences: {
+        {
             let ret = match msg {
-                WM_SETCURSOR => self.on_set_cursor(msg, wparam, lparam),
-                WM_LBUTTONDBLCLK => self.on_lbutton_dblclk(lparam),
-                WM_LBUTTONDOWN => self.on_lbutton_down(lparam),
-                WM_MOUSEMOVE => self.on_mouse_move(lparam),
-                WM_LBUTTONUP => self.on_lbutton_up(),
-                WM_RBUTTONUP => self.on_rbutton_up(lparam),
-                _ => break 'handle_fences,
+                WM_SETCURSOR => return self.on_set_cursor(msg, wparam, lparam),
+                WM_LBUTTONDBLCLK => return self.on_lbutton_dblclk(lparam),
+                WM_LBUTTONDOWN => return self.on_lbutton_down(lparam),
+                WM_MOUSEMOVE => return self.on_mouse_move(lparam),
+                WM_LBUTTONUP => return self.on_lbutton_up(),
+                WM_RBUTTONUP => return self.on_rbutton_up(lparam),
+                _ => (),
             };
-            return ret;
         }
         match msg {
             WM_CLOSE => LRESULT(0),

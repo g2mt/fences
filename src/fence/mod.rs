@@ -386,7 +386,7 @@ impl Fence {
             {
                 #[cfg(feature = "use-UpdateLayeredWindow")]
                 {
-                    WS_EX_NOACTIVATE | WS_EX_LAYERED
+                    WS_EX_LAYERED
                 }
                 #[cfg(not(feature = "use-UpdateLayeredWindow"))]
                 {
@@ -1193,15 +1193,15 @@ impl Window for Fence {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        debug!("msg: {}", msg);
         #[cfg(feature = "use-UpdateLayeredWindow")]
-        'handle_fences: {
+        {
             let ret = match msg {
-                WM_SETCURSOR => self.on_set_cursor(msg, wparam, lparam),
-                WM_LBUTTONDBLCLK => self.on_lbutton_dblclk(lparam),
-                WM_RBUTTONUP => self.on_rbutton_up(lparam),
-                _ => break 'handle_fences,
+                WM_SETCURSOR => return self.on_set_cursor(msg, wparam, lparam),
+                WM_LBUTTONDBLCLK => return self.on_lbutton_dblclk(lparam),
+                WM_RBUTTONUP => return self.on_rbutton_up(lparam),
+                _ => (),
             };
-            return ret;
         }
         match msg {
             WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
