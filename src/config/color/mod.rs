@@ -7,15 +7,14 @@ mod tests;
 
 /// Represents a color value stored as **AARRGGBB** (alpha, red, green, blue).
 ///
-/// The generic const `ACCEPTS_ALPHA` indicates whether the color variant
-/// permits an explicit alpha component. When `true`, the color can be
-/// serialized/deserialized from `#AARRGGBB` strings; otherwise only `#RRGGBB`
-/// strings are accepted.
+/// When a six-digit hex string like `#RRGGBB` is deserialized, the alpha channel
+/// is set to `0xFF` (fully opaque). Eight-digit strings `#AARRGGBB` are accepted
+/// as well, preserving the given alpha.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Color<const ACCEPTS_ALPHA: bool = false>(u32);
+pub struct Color(u32);
 
 #[allow(dead_code)]
-impl<const ACCEPTS_ALPHA: bool> Color<ACCEPTS_ALPHA> {
+impl Color {
     pub fn from_argb(n: u32) -> Self {
         Self(n)
     }
@@ -49,39 +48,31 @@ impl<const ACCEPTS_ALPHA: bool> Color<ACCEPTS_ALPHA> {
     }
 }
 
-impl<const ACCEPTS_ALPHA: bool> Serialize for Color<ACCEPTS_ALPHA> {
+impl Serialize for Color {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let s = if ACCEPTS_ALPHA {
-            format!("#{:08X}", self.0)
-        } else {
-            format!("#{:06X}", self.0 & 0x00FFFFFF)
-        };
+        let s = format!("#{:08X}", self.0);
         serializer.serialize_str(&s)
     }
 }
 
-impl<'de, const ACCEPTS_ALPHA: bool> Deserialize<'de> for Color<ACCEPTS_ALPHA> {
+impl<'de> Deserialize<'de> for Color {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct ColorVisitor<const ACCEPTS_ALPHA: bool>;
+        struct ColorVisitor;
 
-        impl<'de, const ACCEPTS_ALPHA: bool> serde::de::Visitor<'de> for ColorVisitor<ACCEPTS_ALPHA> {
-            type Value = Color<ACCEPTS_ALPHA>;
+        impl<'de> serde::de::Visitor<'de> for ColorVisitor {
+            type Value = Color;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                if ACCEPTS_ALPHA {
-                    formatter.write_str("a hex color string like \"#RRGGBB\" or \"#AARRGGBB\"")
-                } else {
-                    formatter.write_str("a hex color string like \"#RRGGBB\"")
-                }
+                formatter.write_str("a hex color string like \"#RRGGBB\" or \"#AARRGGBB\"")
             }
 
-            fn visit_str<E>(self, v: &str) -> Result<Color<ACCEPTS_ALPHA>, E>
+            fn visit_str<E>(self, v: &str) -> Result<Color, E>
             where
                 E: serde::de::Error,
             {
@@ -95,11 +86,6 @@ impl<'de, const ACCEPTS_ALPHA: bool> Deserialize<'de> for Color<ACCEPTS_ALPHA> {
                         Ok(Color((0xFF << 24) | rgb))
                     }
                     8 => {
-                        if !ACCEPTS_ALPHA {
-                            return Err(E::custom(
-                                "alpha channel not accepted, use #RRGGBB format",
-                            ));
-                        }
                         let aarrggbb = u32::from_str_radix(hex, 16)
                             .map_err(|_| E::custom("invalid hex digits"))?;
                         Ok(Color(aarrggbb))
@@ -110,11 +96,11 @@ impl<'de, const ACCEPTS_ALPHA: bool> Deserialize<'de> for Color<ACCEPTS_ALPHA> {
             }
         }
 
-        deserializer.deserialize_str(ColorVisitor::<ACCEPTS_ALPHA>)
+        deserializer.deserialize_str(ColorVisitor)
     }
 }
 
-impl Color<true> {
+impl Color {
     pub unsafe fn paint_background(&self, hdc: HDC, rect: &RECT) {
         unsafe {
             let alpha = self.a();
