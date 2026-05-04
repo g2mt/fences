@@ -93,10 +93,10 @@ impl App {
                 .map_err(|_| anyhow!("Config already set"))?;
         } else {
             let cfg = Config::default();
-            self.config
-                .set(Arc::new(cfg.clone()))
-                .map_err(|_| anyhow!("Config already set"))?;
             let json = serde_json::to_string_pretty(&cfg)?;
+            self.config
+                .set(Arc::new(cfg))
+                .map_err(|_| anyhow!("Config already set"))?;
             std::fs::write(&path, json)?;
             info!("Config file created at {:?}", path);
         }
