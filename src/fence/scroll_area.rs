@@ -90,8 +90,7 @@ impl ScrollArea {
         let available_width = width - (fence_padding * 2);
         let cols = (available_width / (icon_size + fence_spacing)).max(1);
 
-        let icons = self.icons();
-        for (i, icon) in icons.iter().enumerate() {
+        for (i, icon) in self.icons.lock().iter().enumerate() {
             let col = i as i32 % cols;
             let row = i as i32 / cols;
 
