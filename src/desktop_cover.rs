@@ -3,11 +3,13 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use anyhow::Result;
+use parking_lot::Mutex;
 use tracing::{debug, error, info};
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
@@ -23,9 +25,15 @@ use crate::window::{register_classname, Base, BaseRef, Window};
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
 pub const WM_USER_WAKE_FUTURE: u32 = WM_USER + 2;
 
+pub struct CapturedMouseState {
+    pub fence: Arc<Fence>,
+    pub last_mouse_pos: POINT,
+}
+
 pub struct DesktopCover {
     base: BaseRef,
     executor: AsyncExecutor,
+    captured_mouse_state: Mutex<Option<CapturedMouseState>>,
 }
 
 impl DesktopCover {
@@ -103,6 +111,7 @@ impl DesktopCover {
                 let cover = Arc::new(Self {
                     base,
                     executor: AsyncExecutor::new(HWNDWrapper(hwnd)),
+                    captured_mouse_state: Mutex::new(None),
                 });
                 Ok(cover)
             },
@@ -111,6 +120,17 @@ impl DesktopCover {
 
     pub fn executor(&self) -> &AsyncExecutor {
         &self.executor
+    }
+
+    pub fn capture_mouse(&self, fence: Arc<Fence>, last_mouse_pos: POINT) {
+        debug!("captured");
+        *self.captured_mouse_state.lock() = Some(CapturedMouseState {
+            fence,
+            last_mouse_pos,
+        });
+        unsafe {
+            SetCapture(self.base().hwnd());
+        }
     }
 
     pub fn state(&self) -> AppState {
@@ -185,7 +205,6 @@ impl DesktopCover {
     }
 
     fn on_paint(&self) -> LRESULT {
-        debug!("on_paint");
         unsafe {
             let hwnd = self.base().hwnd();
             let mut ps: PAINTSTRUCT = std::mem::zeroed();
@@ -294,6 +313,7 @@ impl Window for DesktopCover {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        debug!("{:x}", msg);
         match msg {
             WM_CLOSE => LRESULT(0),
             WM_DISPLAYCHANGE => self.on_display_change(),
@@ -301,6 +321,47 @@ impl Window for DesktopCover {
             WM_WINDOWPOSCHANGING => self.on_window_pos_changing(msg, wparam, lparam),
             WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),
             WM_PAINT => self.on_paint(),
+            #[cfg(not(feature = "use-UpdateLayeredWindow"))]
+            WM_MOUSEMOVE => {
+                debug!("move");
+                let mut pt = POINT { x: 0, y: 0 };
+                unsafe {
+                    // for consistency with Fence, the absolute point is used
+                    let _ = GetCursorPos(&mut pt);
+                }
+
+                let mut state = self.captured_mouse_state.lock();
+                if let Some(mut state) = state.as_mut() {
+                    let mut last = &mut state.last_mouse_pos;
+                    let dx = pt.x - last.x;
+                    let dy = pt.y - last.y;
+                    *last = pt;
+                    state.fence.hitman().on_mouse_move(&*state.fence, dx, dy);
+                }
+                LRESULT(0)
+            }
+            #[cfg(not(feature = "use-UpdateLayeredWindow"))]
+            WM_LBUTTONUP => {
+                debug!("release");
+                if let Some(CapturedMouseState {
+                    fence,
+                    last_mouse_pos,
+                }) = self.captured_mouse_state.lock().take()
+                {
+                    let mut pt = POINT { x: 0, y: 0 };
+                    unsafe {
+                        let _ = GetCursorPos(&mut pt);
+                    }
+                    let area = fence.base().area();
+                    let x = area.x.load(Ordering::Relaxed);
+                    let y = area.y.load(Ordering::Relaxed);
+                    fence.hitman().on_lbutton_up(&fence, pt.x - x, pt.y - y);
+                }
+                unsafe {
+                    let _ = ReleaseCapture();
+                };
+                LRESULT(0)
+            }
             WM_USER_SHELLICON => self.on_shell_icon(lparam),
             WM_USER_WAKE_FUTURE => {
                 self.executor.poll_all();

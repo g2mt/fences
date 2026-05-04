@@ -52,9 +52,9 @@ impl Hit {
 
         let area = fence.base().area();
         let on_left = rel_x < border;
-        let on_right = rel_x >= area.width.load(Ordering::Relaxed) + border;
+        let on_right = rel_x >= area.width.load(Ordering::Relaxed) - border;
         let on_top = rel_y < border;
-        let on_bottom = rel_y >= area.height.load(Ordering::Relaxed) + border;
+        let on_bottom = rel_y >= area.height.load(Ordering::Relaxed) - border;
 
         let hit = match (on_left, on_right, on_top, on_bottom) {
             (true, _, true, _) => Self::TopLeft,
@@ -93,7 +93,7 @@ impl Hit {
     }
 }
 
-struct HitManager {
+pub struct HitManager {
     m: Mutex<Option<Hit>>,
 }
 
@@ -108,7 +108,7 @@ impl HitManager {
     }
 
     /// Updates the Hit value based on relative mouse position, returning the copied Hit value
-    fn update_hit(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> Option<Hit> {
+    pub fn update_hit(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> Option<Hit> {
         let hit = Hit::from_pos_in_fence(fence, rel_x, rel_y);
         let old_hit = std::mem::replace(&mut *self.m.lock(), hit);
 
@@ -126,18 +126,22 @@ impl HitManager {
         hit
     }
 
-    /// Handles changing the Hit value from left mouse button down
-    fn on_lbutton_down(&self, fence: &Fence, rel_x: i32, rel_y: i32) {
-        self.update_hit(fence, rel_x, rel_y);
+    /// Handles changing the Hit value from left mouse button down. Returns true if mouse is
+    /// captured
+    pub fn on_lbutton_down(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> bool {
+        match self.update_hit(fence, rel_x, rel_y) {
+            None | Some(Hit::Icon(_)) | Some(Hit::Client) => false,
+            _ => true,
+        }
     }
 
     /// Unsets the Hit value from left mouse button up
-    fn on_lbutton_up(&self, _fence: &Fence, _rel_x: i32, _rel_y: i32) {
+    pub fn on_lbutton_up(&self, _fence: &Fence, _rel_x: i32, _rel_y: i32) {
         *self.m.lock() = None;
     }
 
     /// Runs the currently selected icon on double click
-    fn on_lbutton_dblclk(&self, fence: &Fence, rel_x: i32, rel_y: i32) {
+    pub fn on_lbutton_dblclk(&self, fence: &Fence, rel_x: i32, rel_y: i32) {
         if let Some(Hit::Icon(idx)) = Hit::from_pos_in_fence(fence, rel_x, rel_y) {
             if let Some(icon) = fence.scroll_area.icons().get(idx) {
                 icon.run();
@@ -147,7 +151,7 @@ impl HitManager {
 
     /// Activates context menu for either Fence or Icon based on the current Hit value
     /// THis also unsets the current Hit value
-    fn on_rbutton_up(&self, fence: &Fence, rel_x: i32, rel_y: i32) {
+    pub fn on_rbutton_up(&self, fence: &Fence, rel_x: i32, rel_y: i32) {
         let hit = self.update_hit(fence, rel_x, rel_y);
         let mut pt = POINT { x: rel_x, y: rel_y };
         unsafe {
@@ -166,7 +170,7 @@ impl HitManager {
 
     /// Returns the cursor at that specific location for
     /// the current Hit value, or IDC_ARROW if out of bounds
-    fn on_set_cursor(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> Option<HCURSOR> {
+    pub fn on_set_cursor(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> Option<HCURSOR> {
         let hit = Hit::from_pos_in_fence(fence, rel_x, rel_y);
         let cursor_id = match hit {
             None => return None,
@@ -181,9 +185,8 @@ impl HitManager {
     }
 
     /// Reacts based on the dragging movement of the mouse
-    fn on_mouse_move(&self, fence: &Fence, dx: i32, dy: i32) {
-        let hitman_lock = self.m.lock();
-        if let Some(hit_type) = *hitman_lock {
+    pub fn on_mouse_move(&self, fence: &Fence, dx: i32, dy: i32) {
+        if let Some(hit_type) = *self.m.lock() {
             match hit_type {
                 Hit::TitleBar => {
                     fence.base().move_by(dx, dy);
@@ -593,6 +596,10 @@ impl Fence {
         }
     }
 
+    pub fn hitman(&self) -> &HitManager {
+        &self.hitman
+    }
+
     /// Shows the context menu at absolute mouse position x, y
     pub fn show_context_menu(&self, x: i32, y: i32) {
         let hwnd = self.base().hwnd();
@@ -822,7 +829,7 @@ impl Window for Fence {
     }
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        debug!("msg={}", msg);
+        debug!("{:x}", msg);
         let hwnd = self.base().hwnd();
         match msg {
             WM_MOVE => unsafe {
@@ -852,32 +859,31 @@ impl Window for Fence {
                 LRESULT(0)
             }
             WM_LBUTTONDOWN => {
+                debug!("moues down");
                 let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
                 let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
-                let mut pt = POINT { x: 0, y: 0 };
-                unsafe {
-                    let _ = GetCursorPos(&mut pt);
-                };
 
-                self.hitman.on_lbutton_down(self, rel_x, rel_y);
-                if let Some(hit) = *self.hitman.m.lock() {
-                    match hit {
-                        Hit::Client | Hit::Icon(_) => (),
-                        _ => {
-                            let mut last = self.last_mouse_pos.lock();
-                            *last = pt;
-                            drop(last);
-                            unsafe {
-                                let _ = SetCapture(hwnd);
-                            };
-                        }
+                if self.hitman.on_lbutton_down(self, rel_x, rel_y) {
+                    let mut last = self.last_mouse_pos.lock();
+                    let mut pt = POINT { x: 0, y: 0 };
+                    unsafe {
+                        let _ = GetCursorPos(&mut pt);
+                    };
+                    *last = pt;
+                    #[cfg(feature = "use-UpdateLayeredWindow")]
+                    unsafe {
+                        let _ = SetCapture(hwnd);
+                    };
+                    #[cfg(not(feature = "use-UpdateLayeredWindow"))]
+                    {
+                        let cover = App::get().cover.get().unwrap();
+                        cover.capture_mouse(Weak::upgrade(&self.self_weak).unwrap(), pt);
                     }
-                }
-                unsafe {
-                    let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
                 }
                 LRESULT(0)
             }
+            // DesktopCover handles mouse move when not(feature = "use-UpdateLayeredWindow")
+            #[cfg(feature = "use-UpdateLayeredWindow")]
             WM_MOUSEMOVE => {
                 let mut pt = POINT { x: 0, y: 0 };
                 unsafe {
@@ -893,6 +899,8 @@ impl Window for Fence {
                 self.hitman.on_mouse_move(self, dx, dy);
                 LRESULT(0)
             }
+            // DesktopCover handles mouse move when not(feature = "use-UpdateLayeredWindow")
+            #[cfg(feature = "use-UpdateLayeredWindow")]
             WM_LBUTTONUP => {
                 let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
                 let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
@@ -910,7 +918,6 @@ impl Window for Fence {
             }
             #[cfg(not(feature = "use-UpdateLayeredWindow"))]
             WM_PAINT => unsafe {
-                debug!("on_paint");
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
                 let mut rect: RECT = std::mem::zeroed();
