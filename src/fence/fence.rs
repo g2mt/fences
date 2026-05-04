@@ -31,7 +31,7 @@ use crate::window::{register_classname, Base, BaseRef, Window};
 pub const WM_USER_PAINT_WITH_ALPHA: u32 = WM_USER + 1;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum HitType {
+enum HitType {
     TitleBar,
     Client,
     Icon(usize),
