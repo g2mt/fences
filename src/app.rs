@@ -18,6 +18,7 @@ use crate::fence::import_dialog::ImportDialog;
 use crate::geo::Bounds;
 use crate::paths::{app_file, STATE_PATH};
 use crate::utils::HWNDWrapper;
+use crate::window::Window;
 
 #[derive(Default)]
 pub struct App {
@@ -150,3 +151,4 @@ impl App {
         }
     }
 }
+state

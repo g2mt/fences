@@ -121,6 +121,56 @@ impl ScrollArea {
                 .paint_background(hdc, &rect);
         }
     }
+
+    pub fn reflow_icons(&self) {
+        let config = App::config();
+        let icon_size = config.icon.size;
+        let fence_padding = config.fence.padding;
+        let fence_spacing = config.fence.spacing;
+
+        let width = self.base().area().width().load(Ordering::Relaxed);
+
+        let available_width = width - (fence_padding * 2);
+        let cols = (available_width / (icon_size + fence_spacing)).max(1);
+
+        let icons = self.icons();
+        for (i, icon) in icons.iter().enumerate() {
+            let col = i as i32 % cols;
+            let row = i as i32 / cols;
+
+            let x = fence_padding + col * (icon_size + fence_spacing);
+            let y = fence_padding + row * (icon_size + fence_spacing);
+
+            icon.base().resize_to(x, y, icon_size, icon_size);
+        }
+        self.update_scroll_info();
+    }
+
+    pub fn update_scroll_info(&self) {
+        let mut rect: RECT = unsafe { std::mem::zeroed() };
+        unsafe {
+            let _ = GetClientRect(self.base().hwnd(), &mut rect);
+        };
+        let view_height = rect.bottom - rect.top;
+
+        let icons = self.icons();
+        let mut max_y = 0;
+        for icon in &icons {
+            let irect = icon.base().rect();
+            if irect.bottom > max_y {
+                max_y = irect.bottom;
+            }
+        }
+        let content_height = max_y + 10;
+
+        let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
+        si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
+        si.fMask = SIF_RANGE | SIF_PAGE | SIF_DISABLENOSCROLL;
+        si.nMin = 0;
+        si.nMax = content_height;
+        si.nPage = view_height as u32;
+        unsafe { SetScrollInfo(self.base().hwnd(), SB_VERT, &si, true) };
+    }
 }
 
 impl Window for ScrollArea {

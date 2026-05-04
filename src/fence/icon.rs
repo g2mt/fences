@@ -250,6 +250,11 @@ impl Icon {
             }
         }
     }
+
+    /// Shows the context menu at absolute mouse position x, y
+    pub fn show_context_menu(&self, x: i32, y: i32) {
+        todo!()
+    }
 }
 
 impl Window for Icon {

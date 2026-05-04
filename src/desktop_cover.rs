@@ -120,7 +120,7 @@ impl DesktopCover {
             fences: fences.items().iter().map(|f| f.get_state()).collect(),
             screen_width: bounds.width.load(Ordering::Relaxed),
             screen_height: bounds.height.load(Ordering::Relaxed),
-        }
+        }state
     }
 
     pub fn set_state(&self, state: &AppState) -> Result<()> {

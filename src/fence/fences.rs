@@ -55,7 +55,7 @@ impl Fences {
         );
         for fence in &self.items {
             if let Some(sticky) = fence.sticky() {
-                let area = fence.get_state().area;
+                let area = fence.state().area;
                 let (new_x, new_y) = match sticky {
                     FenceStickyPosition::TopLeft => (area.x, area.y),
                     FenceStickyPosition::TopRight => {
