@@ -133,9 +133,8 @@ impl DesktopCover {
     }
 
     pub fn set_state(&self, state: &AppState) -> Result<()> {
-        let mut fences = Vec::new();
-        App::get().fences.lock();
-        fences.set_state(self, &state.fences);
+        let mut fences = App::get().fences.lock();
+        fences.set_state(self, &state.fences)?;
         fences.rearrange(state.screen_width, state.screen_height);
         Ok(())
     }
@@ -250,13 +249,9 @@ impl DesktopCover {
         let x = (lparam.0 & 0xFFFF) as i16 as i32;
         let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
-        let mut fences = App::get().fences.lock();
-        if let Some(hit) = fences.select(x, y) {
-            if matches!(hit, HitType::Icon(_)) {
-                drop(fences);
-                self.on_command(WPARAM(IDM_RUN_ICON));
-                return LRESULT(0);
-            }
+        if let Some((_, HitType::Icon(_))) = App::get().fences.lock().select(x, y) {
+            self.on_command(WPARAM(IDM_RUN_ICON));
+            return LRESULT(0);
         }
         LRESULT(0)
     }
@@ -267,20 +262,17 @@ impl DesktopCover {
         let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
         let mut fences = App::get().fences.lock();
-        let hit_type = fences.select(x, y);
-        if let Some(hit) = hit_type {
-            match hit {
-                HitType::Client | HitType::Icon(_) => {
-                    // nothing extra needed
-                }
-                _ => {
-                    let mut last = self.last_mouse_pos.lock();
-                    *last = POINT { x, y };
-                    drop(last);
-                    unsafe {
-                        SetCapture(hwnd);
-                    };
-                }
+        match fences.select(x, y) {
+            Some((_, HitType::Client | HitType::Icon(_))) => {
+                // nothing extra needed
+            }
+            _ => {
+                let mut last = self.last_mouse_pos.lock();
+                *last = POINT { x, y };
+                drop(last);
+                unsafe {
+                    SetCapture(hwnd);
+                };
             }
         }
         LRESULT(0)
@@ -335,9 +327,8 @@ impl DesktopCover {
         let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
 
         let mut fences = App::get().fences.lock();
-        let hit = fences.select(x, y);
-        if let Some(hit) = hit {
-            let fence = fences.items().last().unwrap().clone();
+        if let Some((fence, hit)) = fences.select(x, y) {
+            let fence = fence.clone();
             drop(fences);
 
             let mut pt = POINT { x, y };

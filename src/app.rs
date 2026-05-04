@@ -165,11 +165,11 @@ impl AppFences {
         &self.items
     }
 
-    pub fn hit_type(&self) -> Option<&HitType> {
-        self.hit_type.as_ref()
+    pub fn hit_type(&self) -> Option<HitType> {
+        self.hit_type
     }
 
-    pub fn select(&mut self, x: i32, y: i32) -> Option<HitType> {
+    pub fn select(&mut self, x: i32, y: i32) -> Option<(&Arc<Fence>, HitType)> {
         // Clear existing selections on all fences
         for fence in &self.items {
             fence.clear_selection();
@@ -198,7 +198,7 @@ impl AppFences {
             self.items.push(fence);
 
             self.hit_type = Some(hit);
-            Some(hit)
+            Some((self.items.last().unwrap(), hit))
         } else {
             self.hit_type = None;
             None
@@ -210,12 +210,13 @@ impl AppFences {
         self.hit_type.take()
     }
 
-    pub fn set_state(&mut self, cover: &DesktopCover, fence_states: &[FenceState]) {
-        for f_state in &fence_states {
+    pub fn set_state(&mut self, cover: &DesktopCover, fence_states: &[FenceState]) -> Result<()> {
+        self.items.clear();
+        for f_state in fence_states {
             let fence = Fence::from_state(cover, f_state.clone())?;
-            self.push(fence);
+            self.items.push(fence);
         }
-        self.items = fences;
+        Ok(())
     }
 
     pub fn add(&mut self, fence: Arc<Fence>) {

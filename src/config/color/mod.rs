@@ -117,7 +117,7 @@ impl<'de, const ACCEPTS_ALPHA: bool> Deserialize<'de> for Color<ACCEPTS_ALPHA> {
 impl Color<true> {
     pub unsafe fn paint_background(&self, hdc: HDC, rect: &RECT) {
         unsafe {
-            let alpha = 0xff - self.a();
+            let alpha = self.a();
             let mem_dc = CreateCompatibleDC(Some(hdc));
             let width = rect.right - rect.left;
             let height = rect.bottom - rect.top;
