@@ -1,18 +1,18 @@
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::{Mutex, MutexGuard};
+use windows::core::PCWSTR;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::PCWSTR;
 
 use crate::app::App;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub struct ScrollArea {
     base: BaseRef,
@@ -261,7 +261,7 @@ impl Window for ScrollArea {
                 {
                     let _ = PostMessageW(
                         GetParent(hwnd).ok(),
-                        WM_USER_PAINT_WITH_ALPHA,
+                        crate::fence::WM_USER_PAINT_WITH_ALPHA,
                         WPARAM(0),
                         LPARAM(0),
                     );

@@ -5,13 +5,13 @@ use std::sync::{Arc, Weak};
 use anyhow::Result;
 use parking_lot::Mutex;
 use tracing::{debug, error};
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
 
 use crate::app::App;
 use crate::commands::*;
@@ -23,7 +23,7 @@ use crate::fence::scroll_area::ScrollArea;
 use crate::fence::title_bar::TitleBar;
 use crate::geo::Area;
 use crate::prompt;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Custom events
 #[cfg(feature = "use-UpdateLayeredWindow")]
@@ -682,12 +682,7 @@ impl Fence {
         }
     }
 
-    pub fn on_command(
-        self: &Arc<Self>,
-        cover: &DesktopCover,
-        command: usize,
-        hit_type: Hit,
-    ) -> bool {
+    fn on_command(self: &Arc<Self>, cover: &DesktopCover, command: usize, hit_type: Hit) -> bool {
         debug!("command={}", command);
         let mut should_save = false;
 
@@ -918,8 +913,10 @@ impl Window for Fence {
                 let hdc = BeginPaint(hwnd, &mut ps);
                 let mut rect: RECT = std::mem::zeroed();
                 let _ = GetClientRect(hwnd, &mut rect);
-                let config = App::config();
-                config.fence.fence_bg_color.paint_background(hdc, &rect);
+                App::config()
+                    .fence
+                    .fence_bg_color
+                    .paint_background(hdc, &rect);
                 let _ = EndPaint(hwnd, &ps);
                 LRESULT(0)
             },
