@@ -817,6 +817,10 @@ impl Window for Fence {
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         match msg {
+            WM_DISPLAYCHANGE => {
+                self.hitman.unfocus();
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
             WM_SETCURSOR => {
                 let mut pt = POINT { x: 0, y: 0 };
                 unsafe {
