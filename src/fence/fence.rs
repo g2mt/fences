@@ -819,7 +819,7 @@ impl Window for Fence {
         match msg {
             WM_DISPLAYCHANGE => {
                 self.hitman.unfocus();
-                DefWindowProcW(hwnd, msg, wparam, lparam)
+                unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
             WM_SETCURSOR => {
                 let mut pt = POINT { x: 0, y: 0 };
