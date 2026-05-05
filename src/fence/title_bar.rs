@@ -59,7 +59,7 @@ impl TitleBar {
 
     pub fn set_title(&self, title: Arc<str>) {
         *self.title.lock() = title;
-        self.base.redraw();
+        self.base.redraw(true);
     }
 
     fn paint(&self, hdc: HDC) {

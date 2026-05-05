@@ -180,10 +180,12 @@ impl Base {
         self.hwnd
     }
 
-    pub fn redraw(&self) {
+    pub fn redraw(&self, immediate: bool) {
         unsafe {
             let _ = InvalidateRect(Some(self.hwnd), None, true);
-            let _ = UpdateWindow(self.hwnd);
+            if immediate {
+                let _ = UpdateWindow(self.hwnd);
+            }
         }
     }
 

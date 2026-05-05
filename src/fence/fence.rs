@@ -115,14 +115,15 @@ impl HitManager {
         let old_hit = std::mem::replace(&mut *self.m.lock(), hit);
 
         if old_hit != hit {
-            for icon in fence.scroll_area.icons().iter() {
-                icon.set_selected(false);
+            let selected_idx = if let Some(Hit::Icon(idx)) = hit {
+                Some(idx)
+            } else {
+                None
+            };
+            for (idx, icon) in fence.scroll_area.icons().iter().enumerate() {
+                icon.set_selected(Some(idx) == selected_idx);
             }
-            if let Some(Hit::Icon(idx)) = hit {
-                if let Some(icon) = fence.scroll_area.icons().get(idx) {
-                    icon.set_selected(true);
-                }
-            }
+            fence.scroll_area.base().redraw(true);
         }
 
         hit
@@ -201,7 +202,7 @@ impl HitManager {
                 Hit::Client | Hit::Icon(_) => return,
             }
 
-            fence.base().redraw();
+            fence.base().redraw(true);
             App::get().save_thread.get().unwrap().set_unsaved();
         }
     }
@@ -515,7 +516,6 @@ impl Fence {
     }
 
     pub fn paint_with_alpha(&self) {
-        debug!("paint_with_alpha");
         // https://stackoverflow.com/a/18613002
         let hwnd = self.base().hwnd();
         unsafe {
@@ -817,10 +817,6 @@ impl Window for Fence {
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         match msg {
-            WM_MOVE => unsafe {
-                let _ = InvalidateRect(Some(self.scroll_area.base().hwnd()), None, true);
-                DefWindowProcW(hwnd, WM_MOVE, wparam, lparam)
-            },
             WM_SETCURSOR => {
                 let mut pt = POINT { x: 0, y: 0 };
                 unsafe {
@@ -834,7 +830,7 @@ impl Window for Fence {
                         LRESULT(TRUE.0 as isize)
                     }
                 } else {
-                    unsafe { DefWindowProcW(hwnd, WM_MOVE, wparam, lparam) }
+                    unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
                 }
             }
             WM_LBUTTONDBLCLK => {
@@ -866,6 +862,10 @@ impl Window for Fence {
                 }
                 LRESULT(0)
             }
+            WM_MOVE if App::config().use_layered_window => unsafe {
+                self.scroll_area.base().redraw(false);
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            },
             WM_MOUSEMOVE if App::config().use_layered_window => {
                 let mut pt = POINT { x: 0, y: 0 };
                 unsafe {

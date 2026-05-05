@@ -86,7 +86,7 @@ impl Icon {
         unsafe {
             let _ = SetWindowTextW(hwnd, PCWSTR(title_u16.as_ptr()));
         }
-        self.base.redraw();
+        self.base.redraw(true);
     }
 
     pub fn path(&self) -> Option<Arc<str>> {
@@ -95,7 +95,7 @@ impl Icon {
 
     pub fn set_path(&self, path: Option<Arc<str>>) {
         let _ = std::mem::replace(&mut self.state.lock().path, path);
-        self.base.redraw();
+        self.base.redraw(true);
     }
 
     #[cfg(windows)]

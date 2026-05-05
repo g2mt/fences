@@ -171,8 +171,6 @@ impl DesktopCover {
                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
             );
         }
-
-        App::get().save_thread.get().unwrap().set_unsaved();
         LRESULT(0)
     }
 
