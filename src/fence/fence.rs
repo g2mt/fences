@@ -5,13 +5,13 @@ use std::sync::{Arc, Weak};
 use anyhow::Result;
 use parking_lot::Mutex;
 use tracing::{debug, error};
-use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
 
 use crate::app::App;
 use crate::commands::*;
@@ -22,7 +22,7 @@ use crate::fence::scroll_area::ScrollArea;
 use crate::fence::title_bar::TitleBar;
 use crate::geo::Area;
 use crate::prompt;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 // Custom events
 pub const WM_USER_PAINT_WITH_ALPHA: u32 = WM_USER + 1;

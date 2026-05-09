@@ -15,6 +15,7 @@ mod desktop_mirror;
 mod fence;
 mod fut;
 mod geo;
+mod layout;
 mod paths;
 mod prompt;
 mod utils;

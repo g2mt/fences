@@ -11,6 +11,8 @@ use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::*;
 
+use crate::layout::{Item, Layout, Orientation};
+use crate::utils::HWNDWrapper;
 use crate::window::{Base, BaseRef, Window, register_classname_ex};
 
 const ID_LISTVIEW: u32 = 1001;
@@ -26,10 +28,8 @@ pub const ACTION_REMOVE: u32 = 1;
 
 const DLG_DEFAULT_WIDTH: i32 = 600;
 const DLG_DEFAULT_HEIGHT: i32 = 450;
-const MARGIN: i32 = 10;
 const BUTTON_WIDTH: i32 = 90;
 const BUTTON_HEIGHT: i32 = 30;
-const BOTTOM_PANEL_HEIGHT: i32 = 50;
 
 #[derive(Clone)]
 pub struct ImportItem {
@@ -41,6 +41,7 @@ pub struct ImportItem {
 struct ImportDialogInner {
     items: Vec<ImportItem>,
     himagelist: HIMAGELIST,
+    layout: Layout,
 }
 
 pub struct ImportDialog {
@@ -259,7 +260,7 @@ impl ImportDialog {
                 }
 
                 // Import button
-                crate::utils::create_button(
+                let import_btn = crate::utils::create_button(
                     "Import",
                     0,
                     0,
@@ -271,7 +272,7 @@ impl ImportDialog {
                 );
 
                 // Cancel button
-                crate::utils::create_button(
+                let cancel_btn = crate::utils::create_button(
                     "Cancel",
                     0,
                     0,
@@ -282,9 +283,47 @@ impl ImportDialog {
                     hinstance.into(),
                 );
 
+                let layout = Layout {
+                    orientation: Orientation::Vertical,
+                    margin: 10,
+                    gap: 10,
+                    items: vec![
+                        Item::Fill {
+                            hwnd: HWNDWrapper(lv_hwnd),
+                            min: 0,
+                        },
+                        Item::Nested {
+                            layout: Box::new(Layout {
+                                orientation: Orientation::Horizontal,
+                                margin: 10,
+                                gap: 10,
+                                items: vec![
+                                    Item::Fill {
+                                        hwnd: HWNDWrapper(HWND::default()),
+                                        min: 0,
+                                    },
+                                    Item::Fixed {
+                                        hwnd: HWNDWrapper(import_btn),
+                                        size: BUTTON_WIDTH,
+                                    },
+                                    Item::Fixed {
+                                        hwnd: HWNDWrapper(cancel_btn),
+                                        size: BUTTON_WIDTH,
+                                    },
+                                ],
+                            }),
+                            size: BUTTON_HEIGHT,
+                        },
+                    ],
+                };
+
                 let dialog = Arc::new(Self {
                     base,
-                    inner: Mutex::new(ImportDialogInner { items, himagelist }),
+                    inner: Mutex::new(ImportDialogInner {
+                        items,
+                        himagelist,
+                        layout,
+                    }),
                     on_import: Box::new(on_import),
                 });
 
@@ -296,14 +335,6 @@ impl ImportDialog {
     }
 
     fn get_listview_hwnd(&self) -> HWND {
-        unsafe { GetDlgItem(Some(self.base.hwnd()), ID_LISTVIEW as i32).unwrap_or_default() }
-    }
-
-    fn get_import_btn_hwnd(&self) -> HWND {
-        unsafe { GetDlgItem(Some(self.base.hwnd()), ID_IMPORT_BTN as i32).unwrap_or_default() }
-    }
-
-    fn get_cancel_btn_hwnd(&self) -> HWND {
         unsafe { GetDlgItem(Some(self.base.hwnd()), ID_CANCEL_BTN as i32).unwrap_or_default() }
     }
 
@@ -313,45 +344,8 @@ impl ImportDialog {
         unsafe {
             let _ = GetClientRect(hwnd, &mut rect);
         };
-
-        let width = rect.right - rect.left;
-        let height = rect.bottom - rect.top;
-
-        let lv_hwnd = self.get_listview_hwnd();
-        let import_btn_hwnd = self.get_import_btn_hwnd();
-        let cancel_btn_hwnd = self.get_cancel_btn_hwnd();
-
-        unsafe {
-            // ListView takes most of the space
-            let _ = MoveWindow(
-                lv_hwnd,
-                MARGIN,
-                MARGIN,
-                width - 2 * MARGIN,
-                height - BOTTOM_PANEL_HEIGHT - MARGIN,
-                true,
-            );
-
-            // Cancel button on the right
-            let _ = MoveWindow(
-                cancel_btn_hwnd,
-                width - MARGIN - BUTTON_WIDTH,
-                height - MARGIN - BUTTON_HEIGHT,
-                BUTTON_WIDTH,
-                BUTTON_HEIGHT,
-                true,
-            );
-
-            // Import button to the left of Cancel
-            let _ = MoveWindow(
-                import_btn_hwnd,
-                width - 2 * MARGIN - 2 * BUTTON_WIDTH,
-                height - MARGIN - BUTTON_HEIGHT,
-                BUTTON_WIDTH,
-                BUTTON_HEIGHT,
-                true,
-            );
-        }
+        let inner = self.inner.lock();
+        inner.layout.arrange(&rect);
     }
 
     /// Toggle the action of the selected row between Keep and Remove.

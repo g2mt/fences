@@ -9,28 +9,26 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::*;
 
 use crate::fut::{PromptFuture, PromptState};
+use crate::layout::{Item, Layout, Orientation};
+use crate::utils::HWNDWrapper;
 
 const ID_EDIT: u32 = 101;
 const ID_OK: u32 = 1;
 const ID_CANCEL: u32 = 2;
 
-const MARGIN: i32 = 10;
-const GAP: i32 = 6;
-const LABEL_HEIGHT: i32 = 20;
-const EDIT_HEIGHT: i32 = 22;
-const BTN_WIDTH: i32 = 70;
-const BTN_HEIGHT: i32 = 26;
-
 const DLG_WIDTH: i32 = 360;
 const DLG_HEIGHT: i32 = 170;
+
+const LABEL_HEIGHT: i32 = 20;
+const EDIT_MIN_HEIGHT: i32 = 22;
+const BTN_WIDTH: i32 = 70;
+const BTN_HEIGHT: i32 = 26;
 
 struct InputDialogData {
     message_utf16: Vec<u16>,
     default_text: String,
-    label_hwnd: HWND,
+    layout: Layout,
     edit_hwnd: HWND,
-    ok_hwnd: HWND,
-    cancel_hwnd: HWND,
     state: Arc<Mutex<crate::fut::PromptState<Option<String>>>>,
 }
 
@@ -39,49 +37,7 @@ fn layout_widgets(hwnd: HWND, data: &InputDialogData) {
     unsafe {
         let _ = GetClientRect(hwnd, &mut rect);
     };
-
-    let width = rect.right - rect.left;
-    let height = rect.bottom - rect.top;
-
-    unsafe {
-        let _ = MoveWindow(
-            data.label_hwnd,
-            MARGIN,
-            MARGIN,
-            width - 2 * MARGIN,
-            LABEL_HEIGHT,
-            true,
-        );
-
-        let edit_y = MARGIN + LABEL_HEIGHT + GAP;
-        let _ = MoveWindow(
-            data.edit_hwnd,
-            MARGIN,
-            edit_y,
-            width - 2 * MARGIN,
-            EDIT_HEIGHT,
-            true,
-        );
-
-        let btn_y = height - MARGIN - BTN_HEIGHT;
-        let _ = MoveWindow(
-            data.cancel_hwnd,
-            width - MARGIN - BTN_WIDTH,
-            btn_y,
-            BTN_WIDTH,
-            BTN_HEIGHT,
-            true,
-        );
-
-        let _ = MoveWindow(
-            data.ok_hwnd,
-            width - 2 * MARGIN - 2 * BTN_WIDTH,
-            btn_y,
-            BTN_WIDTH,
-            BTN_HEIGHT,
-            true,
-        );
-    }
+    data.layout.arrange(&rect);
 }
 
 unsafe extern "system" fn input_wndproc(
@@ -114,7 +70,6 @@ unsafe extern "system" fn input_wndproc(
                 None,
             )
             .unwrap_or_default();
-            data.label_hwnd = label;
 
             // Create edit control
             let edit = CreateWindowExW(
@@ -145,7 +100,6 @@ unsafe extern "system" fn input_wndproc(
                 Some(HMENU(ID_OK as *mut core::ffi::c_void)),
                 hinstance.into(),
             );
-            data.ok_hwnd = ok_btn;
 
             // Create Cancel button
             let cancel_btn = crate::utils::create_button(
@@ -158,7 +112,44 @@ unsafe extern "system" fn input_wndproc(
                 Some(HMENU(ID_CANCEL as *mut core::ffi::c_void)),
                 hinstance.into(),
             );
-            data.cancel_hwnd = cancel_btn;
+
+            data.layout = Layout {
+                orientation: Orientation::Vertical,
+                margin: 10,
+                gap: 6,
+                items: vec![
+                    Item::Fixed {
+                        hwnd: HWNDWrapper(label),
+                        size: LABEL_HEIGHT,
+                    },
+                    Item::Fill {
+                        hwnd: HWNDWrapper(edit),
+                        min: EDIT_MIN_HEIGHT,
+                    },
+                    Item::Nested {
+                        layout: Box::new(Layout {
+                            orientation: Orientation::Horizontal,
+                            margin: 10,
+                            gap: 10,
+                            items: vec![
+                                Item::Fill {
+                                    hwnd: HWNDWrapper(HWND::default()),
+                                    min: 0,
+                                },
+                                Item::Fixed {
+                                    hwnd: HWNDWrapper(ok_btn),
+                                    size: BTN_WIDTH,
+                                },
+                                Item::Fixed {
+                                    hwnd: HWNDWrapper(cancel_btn),
+                                    size: BTN_WIDTH,
+                                },
+                            ],
+                        }),
+                        size: BTN_HEIGHT,
+                    },
+                ],
+            };
 
             // Set the edit's initial text
             let default_utf16: Vec<u16> = data
@@ -256,10 +247,13 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
         let data_ptr = Box::into_raw(Box::new(InputDialogData {
             message_utf16: message.encode_utf16().chain(std::iter::once(0)).collect(),
             default_text: default.to_string(),
-            label_hwnd: HWND::default(),
+            layout: Layout {
+                orientation: Orientation::Vertical,
+                margin: 0,
+                gap: 0,
+                items: vec![],
+            },
             edit_hwnd: HWND::default(),
-            ok_hwnd: HWND::default(),
-            cancel_hwnd: HWND::default(),
             state: state.clone(),
         }));
 

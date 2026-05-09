@@ -1,18 +1,18 @@
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use anyhow::Result;
 use parking_lot::{Mutex, MutexGuard};
-use windows::core::PCWSTR;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::PCWSTR;
 
 use crate::app::App;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 pub struct ScrollArea {
     base: BaseRef,
