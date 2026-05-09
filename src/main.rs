@@ -13,6 +13,7 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 mod app;
 mod commands;
 mod config;
+mod controls;
 mod desktop_cover;
 mod desktop_mirror;
 mod fence;

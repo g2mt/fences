@@ -90,7 +90,7 @@ unsafe extern "system" fn input_wndproc(
             data.edit_hwnd = edit;
 
             // Create OK button
-            let ok_btn = crate::utils::create_button(
+            let ok_btn = crate::controls::create_button(
                 "OK",
                 0,
                 0,
@@ -102,7 +102,7 @@ unsafe extern "system" fn input_wndproc(
             );
 
             // Create Cancel button
-            let cancel_btn = crate::utils::create_button(
+            let cancel_btn = crate::controls::create_button(
                 "Cancel",
                 0,
                 0,

@@ -260,7 +260,7 @@ impl ImportDialog {
                 }
 
                 // Import button
-                let import_btn = crate::utils::create_button(
+                let import_btn = crate::controls::create_button(
                     "Import",
                     0,
                     0,
@@ -272,7 +272,7 @@ impl ImportDialog {
                 );
 
                 // Cancel button
-                let cancel_btn = crate::utils::create_button(
+                let cancel_btn = crate::controls::create_button(
                     "Cancel",
                     0,
                     0,
