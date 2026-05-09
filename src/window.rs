@@ -146,7 +146,6 @@ impl Base {
             window: OnceLock::new(),
             area: Area::new(x, y, nwidth, nheight),
         }));
-        debug!("CreateWindowExW run");
         let hwnd = unsafe {
             CreateWindowExW(
                 dwexstyle,
@@ -163,7 +162,6 @@ impl Base {
                 Some(&*self_ref as *const Base as *const _),
             )
         };
-        debug!("CreateWindowExW done");
         if hwnd.is_err() {
             return Err(anyhow!(
                 "CreateWindowExW failed, GetLastError()={:?}",
