@@ -1,11 +1,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use tracing::{error, info};
 use tracing_subscriber::prelude::*;
-use windows::Win32::Foundation::*;
-use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::*;
+use windows::Win32::Foundation::*;
+use windows::Win32::UI::Controls::{
+    InitCommonControlsEx, ICC_LISTVIEW_CLASSES, INITCOMMONCONTROLSEX,
+};
+use windows::Win32::UI::WindowsAndMessaging::*;
 
 mod app;
 mod commands;
@@ -24,7 +27,7 @@ mod window;
 use crate::app::App;
 use crate::config::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
-use crate::paths::{ID_PATH, LOG_PATH, app_file, init_app_dir};
+use crate::paths::{app_file, init_app_dir, ID_PATH, LOG_PATH};
 
 fn ensure_single_instance() -> Result<()> {
     let id_path = App::get().id_path.get().unwrap();
@@ -68,6 +71,12 @@ fn ensure_single_instance() -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    unsafe {
+        let mut icc = INITCOMMONCONTROLSEX::default();
+        icc.dwSize = std::mem::size_of::<INITCOMMONCONTROLSEX>() as u32;
+        icc.dwICC = ICC_LISTVIEW_CLASSES;
+        let _ = InitCommonControlsEx(&icc);
+    }
     let _ = init_app_dir();
 
     let log_path = app_file(LOG_PATH)?;

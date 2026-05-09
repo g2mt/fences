@@ -3,14 +3,14 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, LazyLock, OnceLock, Weak};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use parking_lot::{Mutex, MutexGuard};
 use tracing::debug;
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
 use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
 
 use crate::geo::Area;
 
@@ -146,6 +146,7 @@ impl Base {
             window: OnceLock::new(),
             area: Area::new(x, y, nwidth, nheight),
         }));
+        debug!("CreateWindowExW run");
         let hwnd = unsafe {
             CreateWindowExW(
                 dwexstyle,
@@ -162,6 +163,7 @@ impl Base {
                 Some(&*self_ref as *const Base as *const _),
             )
         };
+        debug!("CreateWindowExW done");
         if hwnd.is_err() {
             return Err(anyhow!(
                 "CreateWindowExW failed, GetLastError()={:?}",

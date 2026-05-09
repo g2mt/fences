@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::Mutex;
+use tracing::debug;
+use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
@@ -9,11 +11,10 @@ use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
 
 use crate::layout::{Item, Layout, Orientation};
 use crate::utils::HWNDWrapper;
-use crate::window::{Base, BaseRef, Window, register_classname_ex};
+use crate::window::{register_classname_ex, Base, BaseRef, Window};
 
 const ID_LISTVIEW: u32 = 1001;
 const ID_IMPORT_BTN: u32 = 1002;
@@ -56,6 +57,7 @@ impl ImportDialog {
         on_import: impl Fn(Vec<ImportItem>) + Send + Sync + 'static,
     ) -> Result<Arc<Self>> {
         let hinstance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
+        debug!("create_window");
 
         // Center dialog on screen
         let bounds = crate::app::App::get().screen_bounds();
@@ -89,12 +91,14 @@ impl ImportDialog {
             None,
             hinstance.into(),
             |base| {
+                debug!("imagelist");
                 let hwnd = base.hwnd();
                 let himagelist = unsafe {
                     ImageList_Create(32, 32, ILC_COLOR32 | ILC_MASK, items.len() as i32, 0)
                 };
 
                 // Create ListView
+                debug!("ListView");
                 let lv_hwnd = unsafe {
                     CreateWindowExW(
                         WINDOW_EX_STYLE(0),
@@ -118,6 +122,7 @@ impl ImportDialog {
 
                 unsafe {
                     // Extended styles: full row select, subitem images
+                    debug!("ext style");
                     let _ = SendMessageW(
                         lv_hwnd,
                         LVM_SETEXTENDEDLISTVIEWSTYLE,
@@ -128,6 +133,7 @@ impl ImportDialog {
                     );
 
                     // Assign image list
+                    debug!("img list");
                     let _ = SendMessageW(
                         lv_hwnd,
                         LVM_SETIMAGELIST,
@@ -136,6 +142,7 @@ impl ImportDialog {
                     );
 
                     // Column 0: Icon
+                    debug!("icon");
                     let col0_text: Vec<u16> = "".encode_utf16().chain(std::iter::once(0)).collect();
                     let mut col0: LVCOLUMNW = std::mem::zeroed();
                     col0.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
@@ -150,6 +157,7 @@ impl ImportDialog {
                     );
 
                     // Column 1: Path
+                    debug!("path");
                     let col1_text: Vec<u16> =
                         "Path".encode_utf16().chain(std::iter::once(0)).collect();
                     let mut col1: LVCOLUMNW = std::mem::zeroed();
@@ -165,6 +173,7 @@ impl ImportDialog {
                     );
 
                     // Column 2: Action
+                    debug!("action");
                     let col2_text: Vec<u16> =
                         "Action".encode_utf16().chain(std::iter::once(0)).collect();
                     let mut col2: LVCOLUMNW = std::mem::zeroed();
@@ -181,7 +190,9 @@ impl ImportDialog {
                 }
 
                 // Populate rows
+                debug!("Populating listview rows");
                 for (i, item) in items.iter().enumerate() {
+                    debug!("Processing row {}", i);
                     // Load icon for this item
                     let icon_index = unsafe {
                         let path_u16: Vec<u16> =
@@ -205,6 +216,7 @@ impl ImportDialog {
                         }
                         idx
                     };
+                    debug!("Icon index for row {}: {}", i, icon_index);
 
                     unsafe {
                         // Insert row with icon in column 0
@@ -219,6 +231,7 @@ impl ImportDialog {
                             Some(WPARAM(0)),
                             Some(LPARAM(&lvi as *const _ as isize)),
                         );
+                        debug!("Inserted LVITEMW for row {}", i);
 
                         // Column 1: path text
                         let path_u16: Vec<u16> =
@@ -258,6 +271,7 @@ impl ImportDialog {
                         );
                     }
                 }
+                debug!("Populated listview rows finished");
 
                 // Import button
                 let import_btn = crate::utils::create_button(
@@ -335,17 +349,20 @@ impl ImportDialog {
     }
 
     fn get_listview_hwnd(&self) -> HWND {
-        unsafe { GetDlgItem(Some(self.base.hwnd()), ID_CANCEL_BTN as i32).unwrap_or_default() }
+        unsafe { GetDlgItem(Some(self.base.hwnd()), ID_LISTVIEW as i32).unwrap_or_default() }
     }
 
     fn layout_widgets(&self) {
         let hwnd = self.base.hwnd();
+        debug!("Laying out widgets for hwnd: {:?}", hwnd);
         let mut rect = RECT::default();
         unsafe {
             let _ = GetClientRect(hwnd, &mut rect);
         };
+        debug!("Client rect: {:?}", rect);
         let inner = self.inner.lock();
         inner.layout.arrange(&rect);
+        debug!("Layout arrangement finished");
     }
 
     /// Toggle the action of the selected row between Keep and Remove.
