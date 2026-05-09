@@ -25,7 +25,7 @@ const BTN_WIDTH: i32 = 70;
 const BTN_HEIGHT: i32 = 26;
 
 struct InputDialogData {
-    message_utf16: Vec<u16>,
+    message: String,
     default_text: String,
     layout: Layout,
     edit_hwnd: HWND,
@@ -55,38 +55,26 @@ unsafe extern "system" fn input_wndproc(
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, data as *mut InputDialogData as isize);
 
             // Create a static message label
-            let label = CreateWindowExW(
-                WINDOW_EX_STYLE(0),
-                w!("STATIC"),
-                PCWSTR(data.message_utf16.as_ptr()),
-                WS_VISIBLE | WS_CHILD,
+            let label = crate::controls::create_label(
+                &data.message,
                 0,
                 0,
                 0,
                 0,
-                Some(hwnd),
-                None,
-                Some(GetModuleHandleW(None).unwrap_or_default().into()),
-                None,
-            )
-            .unwrap_or_default();
+                hwnd,
+                hinstance.into(),
+            );
 
             // Create edit control
-            let edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                None,
-                WS_VISIBLE | WS_CHILD | WS_BORDER | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+            let edit = crate::controls::create_edit(
                 0,
                 0,
                 0,
                 0,
-                Some(hwnd),
+                hwnd,
                 Some(HMENU(ID_EDIT as *mut core::ffi::c_void)),
-                Some(GetModuleHandleW(None).unwrap_or_default().into()),
-                None,
-            )
-            .unwrap_or_default();
+                hinstance.into(),
+            );
             data.edit_hwnd = edit;
 
             // Create OK button
@@ -245,7 +233,7 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
         let dlg_y = (screen_h - DLG_HEIGHT) / 2;
 
         let data_ptr = Box::into_raw(Box::new(InputDialogData {
-            message_utf16: message.encode_utf16().chain(std::iter::once(0)).collect(),
+            message: message.to_string(),
             default_text: default.to_string(),
             layout: Layout {
                 orientation: Orientation::Vertical,
