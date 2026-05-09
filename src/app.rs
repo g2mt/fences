@@ -1,12 +1,15 @@
 use std::path::PathBuf;
 use std::sync::atomic::AtomicI32;
 use std::sync::{Arc, LazyLock, OnceLock};
+use std::time::SystemTime;
 
 use anyhow::{Result, anyhow};
 use parking_lot::Mutex;
 use tracing::{error, info, warn};
 use windows::Win32::Foundation::RECT;
 use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
 
 use crate::config::config::Config;
 use crate::config::save_thread::SaveThread;
@@ -26,6 +29,7 @@ pub struct App {
     pub hwnd_shell: OnceLock<HWNDWrapper>,
     pub save_thread: OnceLock<SaveThread>,
     pub config: OnceLock<Arc<Config>>,
+    pub config_modified: OnceLock<SystemTime>,
     pub import_dialog: Mutex<Option<Arc<ImportDialog>>>,
     pub id_path: OnceLock<PathBuf>,
     pub fences: Mutex<FenceList>,
@@ -88,15 +92,23 @@ impl App {
         if path.exists() {
             let json = std::fs::read_to_string(&path)?;
             let cfg: Config = serde_json::from_str(&json)?;
+            let modified = std::fs::metadata(&path)?.modified()?;
             self.config
                 .set(Arc::new(cfg))
                 .map_err(|_| anyhow!("Config already set"))?;
+            self.config_modified
+                .set(modified)
+                .map_err(|_| anyhow!("config_modified already set"))?;
         } else {
             let cfg = Config::default();
             let json = serde_json::to_string_pretty(&cfg)?;
+            let modified = std::time::SystemTime::now();
             self.config
                 .set(Arc::new(cfg))
                 .map_err(|_| anyhow!("Config already set"))?;
+            self.config_modified
+                .set(modified)
+                .map_err(|_| anyhow!("config_modified already set"))?;
             std::fs::write(&path, json)?;
             info!("Config file created at {:?}", path);
         }
@@ -106,6 +118,28 @@ impl App {
     pub fn save_config(&self) -> Result<()> {
         let path = app_file("config.json")?;
         let cfg = self.config.get().expect("Config not loaded");
+        let modified = self.config_modified.get().expect("config_modified not set");
+
+        // Check if file has been modified since we last read it
+        if let Ok(current_modified) = std::fs::metadata(&path).and_then(|m| m.modified()) {
+            if current_modified != *modified {
+                let text = w!("The config file has been modified by another program.\nDo you want to override it?");
+                let caption = w!("Config File Changed");
+                let result = unsafe {
+                    MessageBoxW(
+                        None,
+                        text,
+                        caption,
+                        MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
+                    )
+                };
+                if result != IDYES {
+                    info!("User chose not to override modified config file");
+                    return Ok(());
+                }
+            }
+        }
+
         let json = serde_json::to_string_pretty(&**cfg)?;
         std::fs::write(&path, json)?;
         info!("Config saved to {:?}", path);
