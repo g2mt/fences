@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::{Mutex, MutexGuard};
@@ -11,7 +11,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use crate::app::App;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub struct ScrollArea {
     base: BaseRef,
@@ -245,7 +245,7 @@ impl Window for ScrollArea {
                     let _ = SendMessageW(
                         hwnd,
                         WM_VSCROLL,
-                        (((new_pos as usize) << 16) | SB_THUMBTRACK as usize) as WPARAM,
+                        ((new_pos as WPARAM) << 16) | SB_THUMBTRACK as WPARAM,
                         0 as LPARAM,
                     );
                 }

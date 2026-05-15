@@ -2,17 +2,17 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::Mutex;
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 use crate::layout::{Item, Layout, Orientation};
 use crate::utils::HWNDWrapper;
-use crate::window::{Base, BaseRef, Window, register_classname_ex};
+use crate::window::{register_classname_ex, Base, BaseRef, Window};
 
 const ID_LISTVIEW: u32 = 1001;
 const ID_IMPORT_BTN: u32 = 1002;
@@ -117,15 +117,15 @@ impl ImportDialog {
                         lv_hwnd,
                         LVM_SETEXTENDEDLISTVIEWSTYLE,
                         0 as WPARAM,
-                        (LVS_EX_FULLROWSELECT | LVS_EX_SUBITEMIMAGES) as isize as LPARAM,
+                        (LVS_EX_FULLROWSELECT | LVS_EX_SUBITEMIMAGES) as LPARAM,
                     );
 
                     // Assign image list
                     let _ = SendMessageW(
                         lv_hwnd,
                         LVM_SETIMAGELIST,
-                        LVSIL_SMALL as usize as WPARAM,
-                        himagelist as isize as LPARAM,
+                        LVSIL_SMALL as WPARAM,
+                        himagelist as LPARAM,
                     );
 
                     // Column 0: Icon
@@ -138,8 +138,8 @@ impl ImportDialog {
                     let _ = SendMessageW(
                         lv_hwnd,
                         LVM_INSERTCOLUMNW,
-                        COL_ICON as usize as WPARAM,
-                        &col0 as *const _ as isize as LPARAM,
+                        COL_ICON as WPARAM,
+                        &col0 as *const _ as LPARAM,
                     );
 
                     // Column 1: Path
@@ -153,8 +153,8 @@ impl ImportDialog {
                     let _ = SendMessageW(
                         lv_hwnd,
                         LVM_INSERTCOLUMNW,
-                        COL_PATH as usize as WPARAM,
-                        &col1 as *const _ as isize as LPARAM,
+                        COL_PATH as WPARAM,
+                        &col1 as *const _ as LPARAM,
                     );
 
                     // Column 2: Action
@@ -168,8 +168,8 @@ impl ImportDialog {
                     let _ = SendMessageW(
                         lv_hwnd,
                         LVM_INSERTCOLUMNW,
-                        COL_ACTION as usize as WPARAM,
-                        &col2 as *const _ as isize as LPARAM,
+                        COL_ACTION as WPARAM,
+                        &col2 as *const _ as LPARAM,
                     );
                 }
 
@@ -210,7 +210,7 @@ impl ImportDialog {
                             lv_hwnd,
                             LVM_INSERTITEMW,
                             0 as WPARAM,
-                            &lvi as *const _ as isize as LPARAM,
+                            &lvi as *const _ as LPARAM,
                         );
 
                         // Column 1: path text
@@ -225,7 +225,7 @@ impl ImportDialog {
                             lv_hwnd,
                             LVM_SETITEMW,
                             0 as WPARAM,
-                            &lvi_path as *const _ as isize as LPARAM,
+                            &lvi_path as *const _ as LPARAM,
                         );
 
                         // Column 2: action text
@@ -247,7 +247,7 @@ impl ImportDialog {
                             lv_hwnd,
                             LVM_SETITEMW,
                             0 as WPARAM,
-                            &lvi_action as *const _ as isize as LPARAM,
+                            &lvi_action as *const _ as LPARAM,
                         );
                     }
                 }
@@ -349,7 +349,7 @@ impl ImportDialog {
                 lv,
                 LVM_GETNEXTITEM,
                 usize::MAX as WPARAM,
-                LVNI_SELECTED as isize as LPARAM,
+                LVNI_SELECTED as LPARAM,
             )
         };
         if sel < 0 {
@@ -381,12 +381,7 @@ impl ImportDialog {
             lvi.iItem = idx as i32;
             lvi.iSubItem = COL_ACTION;
             lvi.pszText = action_u16.as_ptr() as *mut _;
-            let _ = SendMessageW(
-                lv,
-                LVM_SETITEMW,
-                0 as WPARAM,
-                &lvi as *const _ as isize as LPARAM,
-            );
+            let _ = SendMessageW(lv, LVM_SETITEMW, 0 as WPARAM, &lvi as *const _ as LPARAM);
         }
     }
 
