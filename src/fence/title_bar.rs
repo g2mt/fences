@@ -19,18 +19,16 @@ pub struct TitleBar {
 
 impl TitleBar {
     pub fn new(parent_hwnd: HWND, title: Arc<str>, fence_area: &Area<i32>) -> Result<Arc<Self>> {
-        let hinstance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
+        let hinstance = unsafe { GetModuleHandleW(std::ptr::null()) };
         let area = Self::area_from_fence_area(fence_area);
         Base::create_window(
-            WINDOW_EX_STYLE(0),
+            0,
             register_classname("FenceTitleBar"),
-            PCWSTR(
-                title
-                    .encode_utf16()
-                    .chain(std::iter::once(0))
-                    .collect::<Vec<_>>()
-                    .as_ptr(),
-            ),
+            title
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect::<Vec<_>>()
+                .as_ptr(),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
             area.x,
             area.y,
@@ -75,8 +73,8 @@ impl TitleBar {
         let mut text_rect = rect;
         text_rect.left += 5;
         unsafe {
-            SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, COLORREF(config.fence.title_text_color.bgr()));
+            SetBkMode(hdc, TRANSPARENT as i32);
+            SetTextColor(hdc, config.fence.title_text_color.bgr());
         }
         App::get().draw_text(
             hdc,
@@ -95,7 +93,7 @@ impl Window for TitleBar {
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         match msg {
-            WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
+            WM_NCHITTEST => HTTRANSPARENT as isize,
             WM_PAINT => unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
@@ -104,18 +102,18 @@ impl Window for TitleBar {
 
                 if App::config().use_layered_window {
                     let _ = PostMessageW(
-                        GetParent(hwnd).ok(),
+                        GetParent(hwnd),
                         crate::fence::fence::WM_USER_PAINT_WITH_ALPHA,
-                        WPARAM(0),
-                        LPARAM(0),
+                        0 as WPARAM,
+                        0 as LPARAM,
                     );
                 }
 
-                LRESULT(0)
+                0
             },
             WM_PRINTCLIENT => {
-                self.paint(HDC(wparam.0 as _));
-                LRESULT(0)
+                self.paint(wparam as HDC);
+                0
             }
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }

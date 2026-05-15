@@ -38,7 +38,7 @@ pub struct DesktopCover {
 
 impl DesktopCover {
     pub fn new() -> Result<Arc<Self>> {
-        let hinstance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
+        let hinstance = unsafe { GetModuleHandleW(std::ptr::null()) };
 
         let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
@@ -49,15 +49,14 @@ impl DesktopCover {
             bounds.height.store(height, Ordering::Relaxed);
             app.hwnd_shell.get_or_init(|| unsafe {
                 // https://stackoverflow.com/a/32589338
-                let progman = FindWindowW(w!("Progman"), PCWSTR::null()).unwrap_or_default();
+                let progman = FindWindowW(w!("Progman"), std::ptr::null());
                 HWNDWrapper(
                     FindWindowExW(
-                        Some(progman),
-                        Some(HWND::default()),
+                        progman,
+                        HWND::default(),
                         w!("SHELLDLL_DefView"),
-                        PCWSTR::null(),
+                        std::ptr::null(),
                     )
-                    .unwrap_or_default(),
                 )
             });
         }
@@ -84,9 +83,14 @@ impl DesktopCover {
                     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
                     nid.uCallbackMessage = WM_USER_SHELLICON;
                     // winresource puts icon at ID 1
-                    nid.hIcon = LoadIconW(Some(hinstance.into()), PCWSTR(1usize as *const u16))
-                        .or_else(|_| LoadIconW(None, IDI_APPLICATION))
-                        .unwrap_or_default();
+                    nid.hIcon = {
+                        let icon = LoadIconW(hinstance, 1usize as *const u16);
+                        if icon == std::ptr::null_mut() {
+                            LoadIconW(std::ptr::null_mut(), IDI_APPLICATION)
+                        } else {
+                            icon
+                        }
+                    };
                     let tip: Vec<u16> = "Desktop Cover"
                         .encode_utf16()
                         .chain(std::iter::once(0))
@@ -95,11 +99,11 @@ impl DesktopCover {
                     nid.szTip[..len].copy_from_slice(&tip[..len]);
                     let _ = Shell_NotifyIconW(NIM_ADD, &nid);
 
-                    let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0x00000000), 0, LWA_COLORKEY);
+                    let _ = SetLayeredWindowAttributes(hwnd, 0x00000000, 0, LWA_COLORKEY);
 
                     let _ = SetWindowPos(
                         hwnd,
-                        Some(HWND_BOTTOM),
+                        HWND_BOTTOM,
                         0,
                         0,
                         0,
@@ -163,7 +167,7 @@ impl DesktopCover {
         unsafe {
             let _ = SetWindowPos(
                 self.base().hwnd(),
-                None,
+                std::ptr::null_mut(),
                 0,
                 0,
                 width,
@@ -171,7 +175,7 @@ impl DesktopCover {
                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
             );
         }
-        LRESULT(0)
+        0
     }
 
     fn on_destroy(&self) -> LRESULT {
@@ -184,16 +188,16 @@ impl DesktopCover {
             let _ = Shell_NotifyIconW(NIM_DELETE, &nid);
             PostQuitMessage(0);
         }
-        LRESULT(0)
+        0
     }
 
     fn on_window_pos_changing(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
-        let pos = lparam.0 as *mut WINDOWPOS;
+        let pos = lparam as *mut WINDOWPOS;
         unsafe {
             (*pos).hwndInsertAfter = HWND_BOTTOM;
 
-            if ((*pos).flags & SWP_NOSIZE) == SET_WINDOW_POS_FLAGS(0) {
+            if ((*pos).flags & SWP_NOSIZE) == 0 {
                 App::get().mirror.lock().update();
             }
 
@@ -207,23 +211,23 @@ impl DesktopCover {
             let mut ps: PAINTSTRUCT = std::mem::zeroed();
             let hdc = BeginPaint(hwnd, &mut ps);
 
-            let brush = CreateSolidBrush(COLORREF(0x00000000));
+            let brush = CreateSolidBrush(0x00000000);
             let _ = FillRect(hdc, &ps.rcPaint, brush);
             let _ = DeleteObject(brush.into());
 
             let _ = EndPaint(hwnd, &ps);
         }
-        LRESULT(0)
+        0
     }
 
     fn on_shell_icon(&self, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
-        if lparam.0 as u32 == WM_RBUTTONUP || lparam.0 as u32 == WM_LBUTTONUP {
+        if lparam as u32 == WM_RBUTTONUP || lparam as u32 == WM_LBUTTONUP {
             let mut pt = POINT { x: 0, y: 0 };
             unsafe {
                 let _ = GetCursorPos(&mut pt);
             };
-            let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
+            let h_menu = unsafe { CreatePopupMenu() };
             unsafe {
                 let _ = AppendMenuW(h_menu, MF_STRING, IDM_ADD_FENCE, w!("&Add fence"));
                 let _ = AppendMenuW(
@@ -240,19 +244,19 @@ impl DesktopCover {
                     TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                     pt.x,
                     pt.y,
-                    Some(0),
+                    0,
                     hwnd,
-                    None,
+                    std::ptr::null(),
                 );
                 let _ = DestroyMenu(h_menu);
             }
         }
-        LRESULT(0)
+        0
     }
 
     fn on_command(&self, wparam: WPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
-        let command = (wparam.0 & 0xFFFF) as u16 as usize;
+        let command = (wparam & 0xFFFF) as u16 as usize;
         debug!("command={}", command);
 
         let mut should_save = false;
@@ -299,7 +303,7 @@ impl DesktopCover {
         if should_save {
             App::get().save_thread.get().unwrap().set_unsaved();
         }
-        LRESULT(0)
+        0
     }
 }
 
@@ -310,11 +314,11 @@ impl Window for DesktopCover {
 
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         match msg {
-            WM_CLOSE => LRESULT(0),
+            WM_CLOSE => 0,
             WM_DISPLAYCHANGE => self.on_display_change(),
             WM_DESTROY => self.on_destroy(),
             WM_WINDOWPOSCHANGING => self.on_window_pos_changing(msg, wparam, lparam),
-            WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),
+            WM_MOUSEACTIVATE => MA_NOACTIVATE as isize,
             WM_PAINT => self.on_paint(),
             WM_MOUSEMOVE if !App::config().use_layered_window => {
                 let mut pt = POINT { x: 0, y: 0 };
@@ -331,7 +335,7 @@ impl Window for DesktopCover {
                     *last = pt;
                     state.fence.hitman().on_mouse_move(&*state.fence, dx, dy);
                 }
-                LRESULT(0)
+                0
             }
             WM_LBUTTONUP if !App::config().use_layered_window => {
                 if let Some(CapturedMouseState {
@@ -351,12 +355,12 @@ impl Window for DesktopCover {
                 unsafe {
                     let _ = ReleaseCapture();
                 };
-                LRESULT(0)
+                0
             }
             WM_USER_SHELLICON => self.on_shell_icon(lparam),
             WM_USER_WAKE_FUTURE => {
                 self.executor.poll_all();
-                LRESULT(0)
+                0
             }
             WM_COMMAND => self.on_command(wparam),
             _ => unsafe { DefWindowProcW(self.base().hwnd(), msg, wparam, lparam) },

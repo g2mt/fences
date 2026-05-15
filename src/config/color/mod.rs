@@ -105,18 +105,18 @@ impl Color {
         unsafe {
             let alpha = self.a();
             if alpha == 255 {
-                let brush = CreateSolidBrush(COLORREF(self.bgr()));
+                let brush = CreateSolidBrush(self.bgr());
                 FillRect(hdc, rect, brush);
                 let _ = DeleteObject(brush.into());
                 return;
             }
-            let mem_dc = CreateCompatibleDC(Some(hdc));
+            let mem_dc = CreateCompatibleDC(hdc);
             let width = rect.right - rect.left;
             let height = rect.bottom - rect.top;
             let bitmap = CreateCompatibleBitmap(hdc, width, height);
             SelectObject(mem_dc, bitmap.into());
 
-            let brush = CreateSolidBrush(COLORREF(self.bgr()));
+            let brush = CreateSolidBrush(self.bgr());
             let local_rect = RECT {
                 left: 0,
                 top: 0,

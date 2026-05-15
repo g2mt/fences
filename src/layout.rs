@@ -60,18 +60,18 @@ impl Layout {
             let is_last = i == item_count - 1;
             match item {
                 Item::Fixed { hwnd, size } => {
-                    if !hwnd.0.is_invalid() && content_w > 0 && *size > 0 {
+                    if hwnd.0 != std::ptr::null_mut() && content_w > 0 && *size > 0 {
                         unsafe {
-                            let _ = MoveWindow(hwnd.0, rect.left, y, content_w, *size, true);
+                            let _ = MoveWindow(hwnd.0, rect.left, y, content_w, *size, 1);
                         }
                     }
                     y += size;
                 }
                 Item::Fill { hwnd, min } => {
                     let item_h = fill_size.max(*min);
-                    if !hwnd.0.is_invalid() && content_w > 0 && item_h > 0 {
+                    if hwnd.0 != std::ptr::null_mut() && content_w > 0 && item_h > 0 {
                         unsafe {
-                            let _ = MoveWindow(hwnd.0, rect.left, y, content_w, item_h, true);
+                            let _ = MoveWindow(hwnd.0, rect.left, y, content_w, item_h, 1);
                         }
                     }
                     y += item_h;
@@ -126,18 +126,18 @@ impl Layout {
             let is_last = i == item_count - 1;
             match item {
                 Item::Fixed { hwnd, size } => {
-                    if !hwnd.0.is_invalid() && *size > 0 && content_h > 0 {
+                    if hwnd.0 != std::ptr::null_mut() && *size > 0 && content_h > 0 {
                         unsafe {
-                            let _ = MoveWindow(hwnd.0, x, rect.top, *size, content_h, true);
+                            let _ = MoveWindow(hwnd.0, x, rect.top, *size, content_h, 1);
                         }
                     }
                     x += size;
                 }
                 Item::Fill { hwnd, min } => {
                     let item_w = fill_size.max(*min);
-                    if !hwnd.0.is_invalid() && item_w > 0 && content_h > 0 {
+                    if hwnd.0 != std::ptr::null_mut() && item_w > 0 && content_h > 0 {
                         unsafe {
-                            let _ = MoveWindow(hwnd.0, x, rect.top, item_w, content_h, true);
+                            let _ = MoveWindow(hwnd.0, x, rect.top, item_w, content_h, 1);
                         }
                     }
                     x += item_w;

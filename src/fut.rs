@@ -42,10 +42,10 @@ impl std::task::Wake for WindowWaker {
     fn wake(self: Arc<Self>) {
         unsafe {
             let _ = PostMessageW(
-                Some(self.hwnd_w.0),
+                self.hwnd_w.0,
                 WM_USER_WAKE_FUTURE,
-                WPARAM(0),
-                LPARAM(0),
+                0 as WPARAM,
+                0 as LPARAM,
             );
         }
     }
@@ -68,10 +68,10 @@ impl AsyncExecutor {
         self.tasks.lock().push(Box::pin(fut));
         unsafe {
             let _ = PostMessageW(
-                Some(self.hwnd_w.0),
+                self.hwnd_w.0,
                 WM_USER_WAKE_FUTURE,
-                WPARAM(0),
-                LPARAM(0),
+                0,
+                0,
             );
         }
     }

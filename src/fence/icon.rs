@@ -6,7 +6,6 @@ use parking_lot::Mutex;
 use tracing::{error, info};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
-use windows_sys::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
 use windows_sys::Win32::UI::Controls::Dialogs::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
@@ -26,7 +25,7 @@ pub struct Icon {
 impl Icon {
     pub fn new(parent_hwnd: HWND, title: &str, path: Option<&str>, x: i32, y: i32) -> Arc<Self> {
         let hinstance = unsafe {
-            HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
+            GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE
         };
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
 
@@ -38,9 +37,9 @@ impl Icon {
         let icon_size = App::config().icon.size;
 
         Base::create_window(
-            WINDOW_EX_STYLE(0),
+            0,
             register_classname("FenceIcon"),
-            PCWSTR(title_u16.as_ptr()),
+            title_u16.as_ptr(),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
             x,
             y,
@@ -63,7 +62,7 @@ impl Icon {
     pub fn set_selected(&self, selected: bool) {
         self.selected.store(selected, Ordering::SeqCst);
         unsafe {
-            let _ = InvalidateRect(Some(self.base.hwnd()), None, true);
+            let _ = InvalidateRect(self.base.hwnd(), std::ptr::null(), 1);
         }
     }
 
@@ -84,7 +83,7 @@ impl Icon {
         let hwnd = self.base.hwnd();
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
         unsafe {
-            let _ = SetWindowTextW(hwnd, PCWSTR(title_u16.as_ptr()));
+            let _ = SetWindowTextW(hwnd, title_u16.as_ptr());
         }
         self.base.redraw(true);
     }
@@ -100,7 +99,7 @@ impl Icon {
 
     #[cfg(windows)]
     pub fn run(&self) {
-        use std::os::windows_sys::process::CommandExt;
+        use std::os::windows::process::CommandExt;
 
         use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
@@ -108,7 +107,7 @@ impl Icon {
             info!("Running {}", path);
             let mut command = Command::new("cmd");
             command.args(["/C", &path]);
-            command.creation_flags(CREATE_NO_WINDOW.0);
+            command.creation_flags(CREATE_NO_WINDOW);
             let _ = command.spawn();
         } else {
             error!("No path specified for {}", self.title());
@@ -142,7 +141,7 @@ impl Icon {
                     0,
                     rect.right - rect.left,
                     rect.bottom - rect.top,
-                    Some(mirror.hdc()),
+                    mirror.hdc(),
                     pt.x - screen_left,
                     pt.y - screen_top,
                     SRCCOPY,
@@ -168,9 +167,9 @@ impl Icon {
             let mut shfi: SHFILEINFOW = unsafe { std::mem::zeroed() };
             unsafe {
                 SHGetFileInfoW(
-                    PCWSTR(path_u16.as_ptr()),
-                    FILE_FLAGS_AND_ATTRIBUTES(0),
-                    Some(&mut shfi),
+                    path_u16.as_ptr(),
+                    0,
+                    &mut shfi,
                     std::mem::size_of::<SHFILEINFOW>() as u32,
                     SHGFI_ICON | SHGFI_LARGEICON,
                 );
@@ -178,8 +177,8 @@ impl Icon {
             hicon = shfi.hIcon;
         }
 
-        if hicon.is_invalid() {
-            hicon = unsafe { LoadIconW(None, IDI_APPLICATION).unwrap_or_default() };
+        if hicon == std::ptr::null_mut() {
+            hicon = unsafe { LoadIconW(std::ptr::null_mut(), IDI_APPLICATION) };
         }
 
         let _ = unsafe {
@@ -191,7 +190,7 @@ impl Icon {
                 icon_draw_size,
                 icon_draw_size,
                 0,
-                None,
+                std::ptr::null_mut(),
                 DI_NORMAL,
             )
         };
@@ -201,8 +200,8 @@ impl Icon {
         }
 
         unsafe {
-            SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, COLORREF(config.icon.text_color.bgr()));
+            SetBkMode(hdc, TRANSPARENT as i32);
+            SetTextColor(hdc, config.icon.text_color.bgr());
         }
 
         let mut text_rect = rect;
@@ -220,13 +219,13 @@ impl Icon {
         let mut ofn: OPENFILENAMEW = unsafe { std::mem::zeroed() };
         ofn.lStructSize = std::mem::size_of::<OPENFILENAMEW>() as u32;
         ofn.hwndOwner = self.base.hwnd();
-        ofn.lpstrFile = windows_sys::core::PWSTR(file_buf.as_mut_ptr());
+        ofn.lpstrFile = file_buf.as_mut_ptr();
         ofn.nMaxFile = MAX_PATH;
         ofn.lpstrFilter = w!("All Files\0*.*\0\0");
         ofn.nFilterIndex = 1;
         ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
-        if unsafe { GetOpenFileNameW(&mut ofn) }.as_bool() {
+        if unsafe { GetOpenFileNameW(&mut ofn) } != 0 {
             let path_str = String::from_utf16_lossy(
                 &file_buf[..file_buf.iter().position(|&c| c == 0).unwrap_or(0)],
             );
@@ -238,7 +237,7 @@ impl Icon {
             if let Some(name) = path_stem {
                 let result = unsafe {
                     MessageBoxW(
-                        Some(self.base.hwnd()),
+                        self.base.hwnd(),
                         w!("Do you want to update the icon name to match the file?"),
                         w!("Update Name"),
                         MB_YESNO | MB_ICONQUESTION,
@@ -254,7 +253,7 @@ impl Icon {
     /// Shows the context menu at absolute mouse position x, y
     pub fn show_context_menu(&self, x: i32, y: i32) {
         let hwnd = self.base.hwnd();
-        let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
+        let h_menu = unsafe { CreatePopupMenu() };
 
         unsafe {
             let _ = AppendMenuW(h_menu, MF_STRING, IDM_RUN_ICON, w!("&Run"));
@@ -268,9 +267,9 @@ impl Icon {
                 TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                 x,
                 y,
-                Some(0),
+                0,
                 hwnd,
-                None,
+                std::ptr::null(),
             );
             let _ = DestroyMenu(h_menu);
         }
@@ -285,17 +284,17 @@ impl Window for Icon {
     fn wndproc(&self, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         let hwnd = self.base().hwnd();
         match msg {
-            WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
+            WM_NCHITTEST => HTTRANSPARENT as isize,
             WM_PAINT => unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
                 self.paint(hdc);
                 let _ = EndPaint(hwnd, &ps);
-                LRESULT(0)
+                0
             },
             WM_PRINTCLIENT => {
-                self.paint(HDC(wparam.0 as _));
-                LRESULT(0)
+                self.paint(wparam as HDC);
+                0
             }
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }

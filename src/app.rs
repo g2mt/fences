@@ -127,7 +127,7 @@ impl App {
                 let caption = w!("Config File Changed");
                 let result = unsafe {
                     MessageBoxW(
-                        None,
+                        std::ptr::null_mut(),
                         text,
                         caption,
                         MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
@@ -161,22 +161,22 @@ impl App {
                 0,
                 0,
                 0,
-                FW_NORMAL.0 as i32,
+                FW_NORMAL as i32,
                 0,
                 0,
                 0,
-                DEFAULT_CHARSET,
-                OUT_DEFAULT_PRECIS,
-                CLIP_DEFAULT_PRECIS,
-                CLEARTYPE_QUALITY,
-                VARIABLE_PITCH.0 as u32,
-                windows_sys::core::PCWSTR(font_name_u16.as_ptr()),
+                DEFAULT_CHARSET as u32,
+                OUT_DEFAULT_PRECIS as u32,
+                CLIP_DEFAULT_PRECIS as u32,
+                CLEARTYPE_QUALITY as u32,
+                VARIABLE_PITCH as u32,
+                font_name_u16.as_ptr(),
             );
 
             let old_font = SelectObject(hdc, hfont.into());
 
             let mut text_u16: Vec<u16> = text.encode_utf16().collect();
-            DrawTextW(hdc, &mut text_u16, rect, format);
+            DrawTextW(hdc, text_u16.as_ptr(), text_u16.len() as i32, rect, format);
 
             SelectObject(hdc, old_font.into());
             let _ = DeleteObject(hfont.into());

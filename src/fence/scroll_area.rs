@@ -7,7 +7,6 @@ use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::PCWSTR;
 
 use crate::app::App;
 use crate::fence::icon::Icon;
@@ -22,7 +21,7 @@ pub struct ScrollArea {
 impl ScrollArea {
     pub fn new(parent_hwnd: HWND, fence_area: &Area<i32>) -> Result<Arc<Self>> {
         let hinstance = unsafe {
-            HINSTANCE(GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as *mut core::ffi::c_void)
+            GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE
         };
         let config = App::config();
         let border = config.fence.border_thickness;
@@ -34,9 +33,9 @@ impl ScrollArea {
             fence_area.height - title_h - border,
         );
         Base::create_window(
-            WINDOW_EX_STYLE(0),
+            0,
             register_classname("FenceScrollArea"),
-            PCWSTR::null(),
+            std::ptr::null(),
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_VSCROLL,
             area.x,
             area.y,
@@ -137,7 +136,7 @@ impl ScrollArea {
                     0,
                     rect.right - rect.left,
                     rect.bottom - rect.top,
-                    Some(mirror.hdc()),
+                    mirror.hdc(),
                     pt.x - screen_left,
                     pt.y - screen_top,
                     SRCCOPY,
@@ -174,7 +173,7 @@ impl ScrollArea {
         si.nMin = 0;
         si.nMax = content_height;
         si.nPage = view_height as u32;
-        unsafe { SetScrollInfo(self.base().hwnd(), SB_VERT, &si, true) };
+        unsafe { SetScrollInfo(self.base().hwnd(), SB_VERT, &si, 1) };
     }
 }
 
@@ -188,8 +187,8 @@ impl Window for ScrollArea {
         match msg {
             WM_NCHITTEST => unsafe {
                 let res = DefWindowProcW(hwnd, msg, wparam, lparam);
-                if res == LRESULT(HTCLIENT as isize) {
-                    LRESULT(HTTRANSPARENT as isize)
+                if res == HTCLIENT as isize {
+                    HTTRANSPARENT as isize
                 } else {
                     res
                 }
@@ -201,19 +200,19 @@ impl Window for ScrollArea {
                 let _ = GetScrollInfo(hwnd, SB_VERT, &mut si);
 
                 let cur_pos = si.nPos;
-                match SCROLLBAR_COMMAND((wparam.0 & 0xFFFF) as i32) {
+                match (wparam & 0xFFFF) as i32 {
                     SB_TOP => si.nPos = si.nMin,
                     SB_BOTTOM => si.nPos = si.nMax,
                     SB_LINEUP => si.nPos -= 10,
                     SB_LINEDOWN => si.nPos += 10,
                     SB_PAGEUP => si.nPos -= si.nPage as i32,
                     SB_PAGEDOWN => si.nPos += si.nPage as i32,
-                    SB_THUMBTRACK => si.nPos = (wparam.0 >> 16) as i16 as i32,
+                    SB_THUMBTRACK => si.nPos = (wparam >> 16) as i16 as i32,
                     _ => {}
                 }
 
                 si.fMask = SIF_POS;
-                let _ = SetScrollInfo(hwnd, SB_VERT, &si, true);
+                let _ = SetScrollInfo(hwnd, SB_VERT, &si, 1);
                 let _ = GetScrollInfo(hwnd, SB_VERT, &mut si);
 
                 if si.nPos != cur_pos {
@@ -221,21 +220,21 @@ impl Window for ScrollArea {
                         hwnd,
                         0,
                         cur_pos - si.nPos,
-                        None,
-                        None,
-                        None,
-                        None,
+                        std::ptr::null(),
+                        std::ptr::null(),
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
                         SW_ERASE | SW_INVALIDATE | SW_SCROLLCHILDREN,
                     );
                     let parent = GetParent(hwnd);
-                    if let Ok(parent) = parent {
-                        let _ = InvalidateRect(Some(parent), None, true);
+                    if parent != std::ptr::null_mut() {
+                        let _ = InvalidateRect(parent, std::ptr::null(), 1);
                     }
                 }
-                LRESULT(0)
+                0
             },
             WM_MOUSEWHEEL => unsafe {
-                let delta = (wparam.0 >> 16) as i16 as i32;
+                let delta = (wparam >> 16) as i16 as i32;
                 let mut si: SCROLLINFO = std::mem::zeroed();
                 si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
                 si.fMask = SIF_ALL;
@@ -248,13 +247,11 @@ impl Window for ScrollArea {
                     let _ = SendMessageW(
                         hwnd,
                         WM_VSCROLL,
-                        Some(WPARAM(
-                            ((new_pos as usize) << 16) | SB_THUMBTRACK.0 as usize,
-                        )),
-                        Some(LPARAM(0)),
+                        (((new_pos as usize) << 16) | SB_THUMBTRACK as usize) as WPARAM,
+                        0 as LPARAM,
                     );
                 }
-                LRESULT(0)
+                0
             },
             WM_PAINT => unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
@@ -264,18 +261,18 @@ impl Window for ScrollArea {
 
                 if App::config().use_layered_window {
                     let _ = PostMessageW(
-                        GetParent(hwnd).ok(),
+                        GetParent(hwnd),
                         crate::fence::fence::WM_USER_PAINT_WITH_ALPHA,
-                        WPARAM(0),
-                        LPARAM(0),
+                        0 as WPARAM,
+                        0 as LPARAM,
                     );
                 }
 
-                LRESULT(0)
+                0
             },
             WM_PRINTCLIENT => {
-                self.paint(HDC(wparam.0 as _));
-                LRESULT(0)
+                self.paint(wparam as HDC);
+                0
             }
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }

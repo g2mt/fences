@@ -12,9 +12,9 @@ thread_local! {
         SystemParametersInfoW(
             SPI_GETNONCLIENTMETRICS,
             std::mem::size_of::<NONCLIENTMETRICSW>() as u32,
-            Some(&mut ncm as *mut NONCLIENTMETRICSW as *mut _),
+            &mut ncm as *mut NONCLIENTMETRICSW as *mut _,
             Default::default(),
-        ).unwrap();
+        );
         CreateFontIndirectW(&ncm.lfMessageFont)
     });
 }
@@ -32,28 +32,27 @@ pub fn create_button(
     let text_u16: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
     let hwnd = unsafe {
         CreateWindowExW(
-            WINDOW_EX_STYLE(0),
+            0,
             w!("BUTTON"),
-            PCWSTR(text_u16.as_ptr()),
-            WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
+            text_u16.as_ptr(),
+            WS_CHILD | WS_VISIBLE | (BS_PUSHBUTTON as u32),
             x,
             y,
             width,
             height,
-            Some(hwndparent),
-            hmenu,
-            Some(hinstance.into()),
-            None,
+            hwndparent,
+            hmenu.unwrap_or(std::ptr::null_mut()),
+            hinstance,
+            std::ptr::null(),
         )
-        .unwrap()
     };
     unsafe {
         CONTROL_FONT.with(|font| {
             SendMessageW(
                 hwnd,
                 WM_SETFONT,
-                Some(WPARAM((*font).0 as _)),
-                Some(LPARAM(1)),
+                (**font) as WPARAM,
+                1 as LPARAM,
             );
         });
     }
@@ -72,28 +71,27 @@ pub fn create_label(
     let text_u16: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
     let hwnd = unsafe {
         CreateWindowExW(
-            WINDOW_EX_STYLE(0),
+            0,
             w!("STATIC"),
-            PCWSTR(text_u16.as_ptr()),
+            text_u16.as_ptr(),
             WS_VISIBLE | WS_CHILD,
             x,
             y,
             width,
             height,
-            Some(hwndparent),
-            None,
-            Some(hinstance.into()),
-            None,
+            hwndparent,
+            std::ptr::null_mut(),
+            hinstance,
+            std::ptr::null(),
         )
-        .unwrap()
     };
     unsafe {
         CONTROL_FONT.with(|font| {
             SendMessageW(
                 hwnd,
                 WM_SETFONT,
-                Some(WPARAM((*font).0 as _)),
-                Some(LPARAM(1)),
+                (**font) as WPARAM,
+                1 as LPARAM,
             );
         });
     }
@@ -113,26 +111,25 @@ pub fn create_edit(
         CreateWindowExW(
             WS_EX_CLIENTEDGE,
             w!("EDIT"),
-            None,
-            WS_VISIBLE | WS_CHILD | WS_BORDER | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+            std::ptr::null(),
+            WS_VISIBLE | WS_CHILD | WS_BORDER | (ES_AUTOHSCROLL as u32),
             x,
             y,
             width,
             height,
-            Some(hwndparent),
-            hmenu,
-            Some(hinstance.into()),
-            None,
+            hwndparent,
+            hmenu.unwrap_or(std::ptr::null_mut()),
+            hinstance,
+            std::ptr::null(),
         )
-        .unwrap()
     };
     unsafe {
         CONTROL_FONT.with(|font| {
             SendMessageW(
                 hwnd,
                 WM_SETFONT,
-                Some(WPARAM((*font).0 as _)),
-                Some(LPARAM(1)),
+                (**font) as WPARAM,
+                1 as LPARAM,
             );
         });
     }

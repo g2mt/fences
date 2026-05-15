@@ -33,13 +33,13 @@ pub fn browse_for_folder() -> PromptFuture<Option<String>> {
 
 fn browse_for_folder_sync() -> Option<String> {
     let mut browse_info = BROWSEINFOW {
-        hwndOwner: HWND(std::ptr::null_mut()),
+        hwndOwner: std::ptr::null_mut(),
         pidlRoot: std::ptr::null_mut(),
-        pszDisplayName: windows_sys::core::PWSTR(std::ptr::null_mut()),
+        pszDisplayName: std::ptr::null_mut(),
         lpszTitle: w!("Select a folder"),
         ulFlags: BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE,
         lpfn: None,
-        lParam: LPARAM(0),
+        lParam: 0,
         iImage: 0,
     };
 
@@ -51,13 +51,13 @@ fn browse_for_folder_sync() -> Option<String> {
     }
 
     let mut path = [0u16; MAX_PATH as usize];
-    let success = unsafe { SHGetPathFromIDListW(pidl, &mut path) };
+    let success = unsafe { SHGetPathFromIDListW(pidl, path.as_mut_ptr()) };
 
     unsafe {
-        CoTaskMemFree(Some(pidl as *mut _));
+        CoTaskMemFree(pidl as *const core::ffi::c_void);
     }
 
-    if success.as_bool() {
+    if success != 0 {
         let path_str = String::from_utf16_lossy(
             &path[..path.iter().position(|&c| c == 0).unwrap_or(path.len())],
         );

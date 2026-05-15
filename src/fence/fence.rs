@@ -183,7 +183,7 @@ impl HitManager {
             Some(Hit::TopRight) | Some(Hit::BottomLeft) => IDC_SIZENESW,
             _ => IDC_ARROW,
         };
-        Some(unsafe { LoadCursorW(None, cursor_id).unwrap_or_default() })
+        Some(unsafe { LoadCursorW(std::ptr::null_mut(), cursor_id) })
     }
 
     /// Reacts based on the dragging movement of the mouse
@@ -234,7 +234,7 @@ impl Fence {
     }
 
     pub fn from_state(cover: &DesktopCover, state: FenceState) -> Result<Arc<Self>> {
-        let hinstance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
+        let hinstance = unsafe { GetModuleHandleW(std::ptr::null()) };
         let use_layered = App::config().use_layered_window;
         let parent_hwnd = if use_layered {
             App::get().hwnd_shell.get().unwrap().0
@@ -243,13 +243,9 @@ impl Fence {
         };
         debug!("parent_hwnd={:?}", parent_hwnd);
         Base::create_window(
-            if use_layered {
-                WS_EX_LAYERED
-            } else {
-                WINDOW_EX_STYLE(0)
-            },
+            if use_layered { WS_EX_LAYERED } else { 0 },
             register_classname("Fence"),
-            PCWSTR::null(),
+            std::ptr::null(),
             WS_POPUP | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
             state.area.x,
             state.area.y,
@@ -280,7 +276,7 @@ impl Fence {
                     unsafe {
                         let _ = SetWindowPos(
                             fence.base().hwnd(),
-                            Some(HWND_BOTTOM),
+                            HWND_BOTTOM,
                             0,
                             0,
                             0,
@@ -491,10 +487,9 @@ impl Fence {
 
         unsafe {
             let hdwp = BeginDeferWindowPos(2);
-            if hdwp.is_err() {
+            if hdwp.is_null() {
                 panic!("hdwp is null");
             }
-            let hdwp = hdwp.unwrap();
             let hdwp = self.title_bar.base().resize_to_deferred(
                 title_area.x,
                 title_area.y,
@@ -519,8 +514,8 @@ impl Fence {
         // https://stackoverflow.com/a/18613002
         let hwnd = self.base().hwnd();
         unsafe {
-            let hdc_screen = GetDC(None);
-            let hdc_mem = CreateCompatibleDC(Some(hdc_screen));
+            let hdc_screen = GetDC(std::ptr::null_mut());
+            let hdc_mem = CreateCompatibleDC(hdc_screen);
 
             let area = self.base.area();
             let width = area.width.load(Ordering::Relaxed);
@@ -532,12 +527,18 @@ impl Fence {
             bmi.bmiHeader.biHeight = -height; // top-down
             bmi.bmiHeader.biPlanes = 1;
             bmi.bmiHeader.biBitCount = 32;
-            bmi.bmiHeader.biCompression = BI_RGB.0;
+            bmi.bmiHeader.biCompression = BI_RGB;
 
             let mut bits = std::ptr::null_mut();
-            let h_bitmap =
-                CreateDIBSection(Some(hdc_mem), &bmi, DIB_RGB_COLORS, &mut bits, None, 0).unwrap();
-            let old_bitmap = SelectObject(hdc_mem, h_bitmap.into());
+            let h_bitmap = CreateDIBSection(
+                hdc_mem,
+                &bmi,
+                DIB_RGB_COLORS,
+                &mut bits,
+                std::ptr::null_mut(),
+                0,
+            );
+            let old_bitmap = SelectObject(hdc_mem, h_bitmap as HGDIOBJ);
             let pixel_count = (width * height) as usize;
             let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, pixel_count);
             let config = App::config();
@@ -547,8 +548,8 @@ impl Fence {
             SendMessageW(
                 hwnd,
                 WM_PRINT,
-                Some(WPARAM(hdc_mem.0 as _)),
-                Some(LPARAM((PRF_CLIENT | PRF_CHILDREN | PRF_OWNED) as _)),
+                hdc_mem as WPARAM,
+                (PRF_CLIENT | PRF_CHILDREN | PRF_OWNED) as LPARAM,
             );
 
             let mut size = SIZE {
@@ -565,13 +566,13 @@ impl Fence {
 
             let _ = UpdateLayeredWindow(
                 hwnd,
-                Some(hdc_screen),
-                None,
-                Some(&mut size),
-                Some(hdc_mem),
-                Some(&mut pt_src),
-                COLORREF(0),
-                Some(&mut blend),
+                hdc_screen,
+                std::ptr::null(),
+                &size,
+                hdc_mem,
+                &pt_src,
+                0,
+                &blend,
                 ULW_ALPHA,
             );
 
@@ -579,7 +580,7 @@ impl Fence {
             SelectObject(hdc_mem, old_bitmap);
             let _ = DeleteObject(h_bitmap.into());
             let _ = DeleteDC(hdc_mem);
-            let _ = ReleaseDC(None, hdc_screen);
+            let _ = ReleaseDC(std::ptr::null_mut(), hdc_screen);
         }
     }
 
@@ -590,7 +591,7 @@ impl Fence {
     /// Shows the context menu at absolute mouse position x, y
     pub fn show_context_menu(&self, x: i32, y: i32) {
         let hwnd = self.base().hwnd();
-        let h_menu = unsafe { CreatePopupMenu().unwrap_or_default() };
+        let h_menu = unsafe { CreatePopupMenu() };
 
         unsafe {
             let _ = AppendMenuW(h_menu, MF_STRING, IDM_IMPORT, w!("&Import"));
@@ -607,9 +608,9 @@ impl Fence {
                 w!("Open in Explorer"),
             );
             let _ = AppendMenuW(h_menu, MF_STRING, IDM_ADD_ICON, w!("Add &icon"));
-            let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR::null());
+            let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, std::ptr::null());
 
-            let h_sticky_menu = CreatePopupMenu().unwrap_or_default();
+            let h_sticky_menu = CreatePopupMenu();
             let checky_sticky = |pos: Option<FenceStickyPosition>| {
                 if self.sticky() == pos {
                     MF_CHECKED
@@ -652,7 +653,7 @@ impl Fence {
             let _ = AppendMenuW(
                 h_menu,
                 MF_POPUP,
-                h_sticky_menu.0 as usize,
+                h_sticky_menu as usize,
                 w!("Sticky position"),
             );
 
@@ -665,9 +666,9 @@ impl Fence {
                 TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                 x,
                 y,
-                Some(0),
+                0,
                 hwnd,
-                None,
+                std::ptr::null(),
             );
             let _ = DestroyMenu(h_menu);
         }
@@ -794,11 +795,11 @@ impl Fence {
                         .collect();
                     unsafe {
                         let _ = ShellExecuteW(
-                            None,
+                            std::ptr::null_mut(),
                             w!("open"),
-                            PCWSTR(path_wide.as_ptr()),
-                            PCWSTR::null(),
-                            PCWSTR::null(),
+                            path_wide.as_ptr(),
+                            std::ptr::null(),
+                            std::ptr::null(),
                             SW_SHOWNORMAL,
                         );
                     }
@@ -834,22 +835,22 @@ impl Window for Fence {
 
                 if let Some(cursor) = self.hitman.on_set_cursor(self, pt.x, pt.y) {
                     unsafe {
-                        SetCursor(Some(cursor));
-                        LRESULT(TRUE.0 as isize)
+                        SetCursor(cursor);
+                        TRUE as isize
                     }
                 } else {
                     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
                 }
             }
             WM_LBUTTONDBLCLK => {
-                let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
-                let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+                let rel_x = (lparam & 0xFFFF) as i16 as i32;
+                let rel_y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
                 self.hitman.on_lbutton_dblclk(self, rel_x, rel_y);
-                LRESULT(0)
+                0
             }
             WM_LBUTTONDOWN => {
-                let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
-                let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+                let rel_x = (lparam & 0xFFFF) as i16 as i32;
+                let rel_y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
                 if self.hitman.on_lbutton_down(self, rel_x, rel_y) {
                     let mut pt = POINT { x: 0, y: 0 };
@@ -868,7 +869,7 @@ impl Window for Fence {
                         cover.capture_mouse(Weak::upgrade(&self.self_weak).unwrap(), pt);
                     }
                 }
-                LRESULT(0)
+                0
             }
             WM_MOVE if App::config().use_layered_window => unsafe {
                 self.scroll_area.base().redraw(false);
@@ -887,22 +888,22 @@ impl Window for Fence {
                 drop(last);
 
                 self.hitman.on_mouse_move(self, dx, dy);
-                LRESULT(0)
+                0
             }
             WM_LBUTTONUP if App::config().use_layered_window => {
-                let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
-                let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+                let rel_x = (lparam & 0xFFFF) as i16 as i32;
+                let rel_y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
                 self.hitman.on_lbutton_up(self, rel_x, rel_y);
                 unsafe {
                     let _ = ReleaseCapture();
                 };
-                LRESULT(0)
+                0
             }
             WM_RBUTTONUP => {
-                let rel_x = (lparam.0 & 0xFFFF) as i16 as i32;
-                let rel_y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+                let rel_x = (lparam & 0xFFFF) as i16 as i32;
+                let rel_y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
                 self.hitman.on_rbutton_up(self, rel_x, rel_y);
-                LRESULT(0)
+                0
             }
             WM_PAINT if !App::config().use_layered_window => unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
@@ -914,28 +915,28 @@ impl Window for Fence {
                     .fence_bg_color
                     .paint_background(hdc, &rect);
                 let _ = EndPaint(hwnd, &ps);
-                LRESULT(0)
+                0
             },
             WM_USER_PAINT_WITH_ALPHA if App::config().use_layered_window => {
                 self.paint_with_alpha();
-                LRESULT(0)
+                0
             }
             WM_ACTIVATE => {
-                let activation = (wparam.0 & 0xFFFF) as u16 as u32;
+                let activation = (wparam & 0xFFFF) as u16 as u32;
                 if activation == WA_INACTIVE {
                     self.hitman.unfocus();
                 }
                 unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
             WM_COMMAND => {
-                let command = (wparam.0 & 0xFFFF) as u16 as usize;
+                let command = (wparam & 0xFFFF) as u16 as usize;
                 if let Some(hit) = self.hitman.m.lock().take() {
                     let cover = App::get().cover.get().unwrap();
                     Weak::upgrade(&self.self_weak)
                         .unwrap()
                         .on_command(cover, command, hit);
                 }
-                LRESULT(0)
+                0
             }
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         }

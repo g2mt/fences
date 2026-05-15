@@ -14,7 +14,7 @@ pub static APP_DIR: OnceLock<PathBuf> = OnceLock::new();
 pub fn init_app_dir() -> Result<()> {
     let mut path = [0u16; MAX_PATH as usize];
     unsafe {
-        if SHGetSpecialFolderPathW(None, &mut path, CSIDL_PERSONAL as i32, false).as_bool() == false
+        if SHGetSpecialFolderPathW(std::ptr::null_mut(), path.as_mut_ptr(), CSIDL_PERSONAL as i32, 0) == 0
         {
             return Err(anyhow::anyhow!("Failed to get Documents folder"));
         }

@@ -48,9 +48,9 @@ unsafe extern "system" fn input_wndproc(
 ) -> LRESULT {
     match msg {
         WM_NCCREATE => unsafe {
-            let hinstance = GetModuleHandleW(None).unwrap_or_default();
+            let hinstance = GetModuleHandleW(std::ptr::null());
 
-            let cs = lparam.0 as *const CREATESTRUCTW;
+            let cs = lparam as *const CREATESTRUCTW;
             let data = &mut *((*cs).lpCreateParams as *mut InputDialogData);
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, data as *mut InputDialogData as isize);
 
@@ -72,7 +72,7 @@ unsafe extern "system" fn input_wndproc(
                 0,
                 0,
                 hwnd,
-                Some(HMENU(ID_EDIT as *mut core::ffi::c_void)),
+                Some(ID_EDIT as HMENU),
                 hinstance.into(),
             );
             data.edit_hwnd = edit;
@@ -85,7 +85,7 @@ unsafe extern "system" fn input_wndproc(
                 0,
                 0,
                 hwnd,
-                Some(HMENU(ID_OK as *mut core::ffi::c_void)),
+                Some(ID_OK as HMENU),
                 hinstance.into(),
             );
 
@@ -97,7 +97,7 @@ unsafe extern "system" fn input_wndproc(
                 0,
                 0,
                 hwnd,
-                Some(HMENU(ID_CANCEL as *mut core::ffi::c_void)),
+                Some(ID_CANCEL as HMENU),
                 hinstance.into(),
             );
 
@@ -145,7 +145,7 @@ unsafe extern "system" fn input_wndproc(
                 .encode_utf16()
                 .chain(std::iter::once(0))
                 .collect();
-            let _ = SetWindowTextW(data.edit_hwnd, PCWSTR(default_utf16.as_ptr()));
+            let _ = SetWindowTextW(data.edit_hwnd, default_utf16.as_ptr());
 
             layout_widgets(hwnd, data);
 
@@ -157,12 +157,12 @@ unsafe extern "system" fn input_wndproc(
                 let data = &*data_ptr;
                 layout_widgets(hwnd, data);
             }
-            LRESULT(0)
+            0
         },
-        WM_DESTROY => LRESULT(0),
+        WM_DESTROY => 0,
         WM_COMMAND => unsafe {
-            let id = (wparam.0 as u32) & 0xFFFF;
-            let hi = ((wparam.0 as u32) >> 16) as u16;
+            let id = (wparam as u32) & 0xFFFF;
+            let hi = ((wparam as u32) >> 16) as u16;
             if hi == BN_CLICKED as u16 {
                 let data_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut InputDialogData;
                 let data = &mut *data_ptr;
@@ -170,7 +170,7 @@ unsafe extern "system" fn input_wndproc(
                     ID_OK => {
                         let len = GetWindowTextLengthW(data.edit_hwnd);
                         let mut buf: Vec<u16> = vec![0; (len + 1) as usize];
-                        GetWindowTextW(data.edit_hwnd, &mut buf);
+                        GetWindowTextW(data.edit_hwnd, buf.as_mut_ptr(), (len + 1) as i32);
                         let s = String::from_utf16_lossy(&buf[..len as usize]);
 
                         let mut state = data.state.lock();
@@ -193,7 +193,7 @@ unsafe extern "system" fn input_wndproc(
                     _ => {}
                 }
             }
-            LRESULT(0)
+            0
         },
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
@@ -210,7 +210,7 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
     }));
 
     unsafe {
-        let hinstance = GetModuleHandleW(None).unwrap_or_default();
+        let hinstance = GetModuleHandleW(std::ptr::null());
 
         if CLASS_REGISTERED
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
@@ -219,8 +219,8 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
             let mut wc: WNDCLASSW = std::mem::zeroed();
             wc.style = CS_HREDRAW | CS_VREDRAW;
             wc.lpfnWndProc = Some(input_wndproc);
-            wc.hInstance = hinstance.into();
-            wc.hbrBackground = HBRUSH((COLOR_BTNFACE.0 + 1) as *mut core::ffi::c_void);
+            wc.hInstance = hinstance;
+            wc.hbrBackground = (COLOR_BTNFACE + 1) as HBRUSH;
             wc.lpszClassName = w!("InputDialogClass");
             RegisterClassW(&wc);
         }
@@ -249,19 +249,19 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
         let hwnd = CreateWindowExW(
             WS_EX_CLIENTEDGE,
             w!("InputDialogClass"),
-            PCWSTR(title_utf16.as_ptr()),
+            title_utf16.as_ptr(),
             WS_OVERLAPPEDWINDOW,
             dlg_x,
             dlg_y,
             DLG_WIDTH,
             DLG_HEIGHT,
-            None,
-            None,
-            Some(hinstance.into()),
-            Some(data_ptr as *mut core::ffi::c_void),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            hinstance,
+            data_ptr as *mut core::ffi::c_void,
         );
 
-        if let Ok(hwnd) = hwnd {
+        if hwnd != std::ptr::null_mut() {
             let _ = ShowWindow(hwnd, SW_SHOWNORMAL);
             let _ = UpdateWindow(hwnd);
         } else {

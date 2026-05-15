@@ -7,7 +7,7 @@ use windows_sys::core::w;
 
 use crate::app::App;
 
-const PW_RENDERFULLCONTENT: PRINT_WINDOW_FLAGS = PRINT_WINDOW_FLAGS(0x00000002);
+const PW_RENDERFULLCONTENT: PRINT_WINDOW_FLAGS = 0x00000002;
 
 #[derive(Default)]
 pub struct DesktopMirror {
@@ -22,11 +22,11 @@ unsafe impl Sync for DesktopMirror {}
 impl DesktopMirror {
     fn reset(&mut self) {
         unsafe {
-            if !self.bitmap.is_invalid() {
+            if !self.bitmap.is_null() {
                 let _ = DeleteObject(self.bitmap.into());
             }
             self.bitmap = Default::default();
-            if !self.hdc.is_invalid() {
+            if !self.hdc.is_null() {
                 let _ = DeleteDC(self.hdc);
             }
             self.hdc = Default::default();
@@ -41,11 +41,11 @@ impl DesktopMirror {
         if width != self.width || height != self.height {
             self.reset();
             unsafe {
-                let screen_dc = GetDC(None);
-                let hdc = CreateCompatibleDC(Some(screen_dc));
+                let screen_dc = GetDC(std::ptr::null_mut());
+                let hdc = CreateCompatibleDC(screen_dc);
                 let bitmap = CreateCompatibleBitmap(screen_dc, width, height);
                 SelectObject(hdc, bitmap.into());
-                ReleaseDC(None, screen_dc);
+                ReleaseDC(std::ptr::null_mut(), screen_dc);
                 self.bitmap = bitmap;
                 self.hdc = hdc;
             }
@@ -55,8 +55,8 @@ impl DesktopMirror {
             // Progman hosts the desktop. On systems with an active wallpaper slideshow/
             // Windows 10+, a WorkerW window behind the icons may hold the wallpaper,
             // but Progman + PW_RENDERFULLCONTENT still renders wallpaper + icons fine.
-            let desktop_hwnd = FindWindowW(w!("Progman"), None);
-            if let Ok(desktop_hwnd) = desktop_hwnd {
+            let desktop_hwnd = FindWindowW(w!("Progman"), std::ptr::null());
+            if desktop_hwnd != std::ptr::null_mut() {
                 let _ = PrintWindow(desktop_hwnd, self.hdc, PW_RENDERFULLCONTENT);
             }
         }

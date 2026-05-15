@@ -4,7 +4,6 @@ use anyhow::{anyhow, Result};
 use tracing::{error, info};
 use tracing_subscriber::prelude::*;
 use windows_sys::core::*;
-use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::UI::Controls::{
     InitCommonControlsEx, ICC_LISTVIEW_CLASSES, INITCOMMONCONTROLSEX,
 };
@@ -47,17 +46,15 @@ fn ensure_single_instance() -> Result<()> {
     );
 
     unsafe {
-        let hwnd = FindWindowExW(None, None, w!("BottomWindowClass"), PCWSTR::null())
-            .unwrap_or(HWND::default());
-        let win_pid = GetWindowThreadProcessId(hwnd, None);
+        let hwnd = FindWindowExW(std::ptr::null_mut(), std::ptr::null_mut(), w!("BottomWindowClass"), std::ptr::null());
+        if hwnd == std::ptr::null_mut() {
+            return Err(anyhow!("Unable to find desktop cover class"));
+        }
+        let win_pid = GetWindowThreadProcessId(hwnd, std::ptr::null_mut());
         if win_pid != pid {
             return Err(anyhow!("Handle not owned by PID"));
         }
-        if !hwnd.is_invalid() {
-            let _ = PostMessageW(Some(hwnd), WM_DESTROY, WPARAM(0), LPARAM(0));
-        } else {
-            return Err(anyhow!("Unable to find desktop cover class"));
-        }
+        let _ = PostMessageW(hwnd, WM_DESTROY, 0, 0);
     }
 
     // Wait up to ~10 seconds for the id file to be deleted
@@ -126,7 +123,7 @@ fn main() -> Result<()> {
         }
         unsafe {
             let mut msg = std::mem::zeroed();
-            while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+            while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) != 0 {
                 let _ = TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }

@@ -32,7 +32,7 @@ pub fn register_classname_ex(name: &str, mut wc: WNDCLASSW) -> ClassName {
     ) -> LRESULT {
         unsafe {
             if msg == WM_NCCREATE {
-                let cs = lparam.0 as *const CREATESTRUCTW;
+                let cs = lparam as *const CREATESTRUCTW;
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, (*cs).lpCreateParams as isize);
                 return DefWindowProcW(hwnd, msg, wparam, lparam);
             }
@@ -55,9 +55,9 @@ pub fn register_classname_ex(name: &str, mut wc: WNDCLASSW) -> ClassName {
         return existing.clone();
     }
     unsafe {
-        let hinstance = GetModuleHandleW(None).unwrap_or_default();
-        wc.hInstance = hinstance.into();
-        wc.lpszClassName = PCWSTR(class_name.0.as_ptr());
+        let hinstance = GetModuleHandleW(std::ptr::null());
+        wc.hInstance = hinstance;
+        wc.lpszClassName = class_name.0.as_ptr();
         wc.lpfnWndProc = Some(base_wndproc);
         if RegisterClassW(&wc) == 0 {
             panic!("RegisterClassW returned 0");
@@ -71,7 +71,7 @@ pub fn register_classname(name: &str) -> ClassName {
     register_classname_ex(name, unsafe {
         let mut wc: WNDCLASSW = std::mem::zeroed();
         wc.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
-        wc.hCursor = LoadCursorW(None, IDC_ARROW).unwrap_or_default();
+        wc.hCursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
         wc
     })
 }
@@ -149,26 +149,25 @@ impl Base {
         let hwnd = unsafe {
             CreateWindowExW(
                 dwexstyle,
-                PCWSTR(classname.0.as_ptr()),
+                classname.0.as_ptr(),
                 lpwindowname,
                 dwstyle,
                 x,
                 y,
                 nwidth,
                 nheight,
-                Some(hwndparent),
-                hmenu,
-                Some(hinstance),
-                Some(&*self_ref as *const Base as *const _),
+                hwndparent,
+                hmenu.unwrap_or(std::ptr::null_mut()),
+                hinstance,
+                &*self_ref as *const Base as *const _,
             )
         };
-        if hwnd.is_err() {
+        if hwnd == std::ptr::null_mut() {
             return Err(anyhow!(
                 "CreateWindowExW failed, GetLastError()={:?}",
                 unsafe { GetLastError() }
             ));
         }
-        let hwnd = hwnd.unwrap();
         unsafe {
             let mut_ref = Pin::get_unchecked_mut(self_ref.as_mut());
             mut_ref.hwnd = hwnd;
@@ -182,7 +181,7 @@ impl Base {
 
     pub fn redraw(&self, immediate: bool) {
         unsafe {
-            let _ = InvalidateRect(Some(self.hwnd), None, true);
+            let _ = InvalidateRect(self.hwnd, std::ptr::null(), 1);
             if immediate {
                 let _ = UpdateWindow(self.hwnd);
             }
@@ -205,7 +204,7 @@ impl Base {
         unsafe {
             let _ = SetWindowPos(
                 self.hwnd,
-                None,
+                std::ptr::null_mut(),
                 x,
                 y,
                 width,
@@ -259,14 +258,13 @@ impl Base {
             DeferWindowPos(
                 hwinposinfo,
                 self.hwnd,
-                None,
+                std::ptr::null_mut(),
                 left,
                 top,
                 width,
                 height,
                 SWP_NOZORDER | SWP_NOACTIVATE,
             )
-            .unwrap_or(hwinposinfo)
         }
     }
 }

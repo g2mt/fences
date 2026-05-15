@@ -19,15 +19,27 @@ pub fn confirm(
     }));
 
     let state_clone = state.clone();
-    let text_str = unsafe { text.to_string().unwrap_or_default() };
-    let caption_str = unsafe { caption.to_string().unwrap_or_default() };
+    let text_u16: Vec<u16> = unsafe {
+        let mut len = 0;
+        while *text.add(len) != 0 {
+            len += 1;
+        }
+        std::slice::from_raw_parts(text, len).to_vec()
+    };
+    let caption_u16: Vec<u16> = unsafe {
+        let mut len = 0;
+        while *caption.add(len) != 0 {
+            len += 1;
+        }
+        std::slice::from_raw_parts(caption, len).to_vec()
+    };
 
     std::thread::spawn(move || {
         let result = unsafe {
             MessageBoxW(
-                None,
-                PCWSTR(HSTRING::from(&text_str).as_ptr()),
-                PCWSTR(HSTRING::from(&caption_str).as_ptr()),
+                std::ptr::null_mut(),
+                text_u16.as_ptr(),
+                caption_u16.as_ptr(),
                 utype,
             )
         };
