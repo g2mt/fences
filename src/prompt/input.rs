@@ -37,7 +37,7 @@ fn layout_widgets(hwnd: HWND, data: &InputDialogData) {
     unsafe {
         let _ = GetClientRect(hwnd, &mut rect);
     };
-    data.layout.arrange(&rect);
+    data.layout.arrange(rect);
 }
 
 unsafe extern "system" fn input_wndproc(

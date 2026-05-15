@@ -336,7 +336,7 @@ impl ImportDialog {
             let _ = GetClientRect(hwnd, &mut rect);
         };
         let inner = self.inner.lock();
-        inner.layout.arrange(&rect);
+        inner.layout.arrange(rect.clone());
     }
 
     /// Toggle the action of the selected row between Keep and Remove.

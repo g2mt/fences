@@ -22,14 +22,18 @@ pub struct Layout {
 }
 
 impl Layout {
-    pub fn arrange(&self, rect: &RECT) {
+    pub fn arrange(&self, mut rect: RECT) {
+        rect.left += self.margin;
+        rect.right -= self.margin;
+        rect.top += self.margin;
+        rect.bottom -= self.margin;
         match self.orientation {
             Orientation::Vertical => self.arrange_vertical(rect),
             Orientation::Horizontal => self.arrange_horizontal(rect),
         }
     }
 
-    fn arrange_vertical(&self, rect: &RECT) {
+    fn arrange_vertical(&self, rect: RECT) {
         let content_w = rect.right - rect.left;
         let content_h = (rect.bottom - rect.top - 2 * self.margin).max(0);
         let item_count = self.items.len();
@@ -84,7 +88,7 @@ impl Layout {
                             right: rect.left + content_w,
                             bottom: y + size,
                         };
-                        layout.arrange(&child);
+                        layout.arrange(child.clone());
                     }
                     y += size;
                 }
@@ -95,7 +99,7 @@ impl Layout {
         }
     }
 
-    fn arrange_horizontal(&self, rect: &RECT) {
+    fn arrange_horizontal(&self, rect: RECT) {
         let content_w = (rect.right - rect.left - 2 * self.margin).max(0);
         let content_h = rect.bottom - rect.top;
         let item_count = self.items.len();
@@ -150,7 +154,7 @@ impl Layout {
                             right: x + size,
                             bottom: rect.top + content_h,
                         };
-                        layout.arrange(&child);
+                        layout.arrange(child.clone());
                     }
                     x += size;
                 }
@@ -166,8 +170,8 @@ impl Default for Layout {
     fn default() -> Self {
         Self {
             orientation: Orientation::Vertical,
-            margin: 10,
-            gap: 5,
+            margin: 5,
+            gap: 3,
             items: vec![],
         }
     }
