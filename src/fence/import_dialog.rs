@@ -278,8 +278,6 @@ impl ImportDialog {
 
                 let layout = Layout {
                     orientation: Orientation::Vertical,
-                    margin: 10,
-                    gap: 10,
                     items: vec![
                         Item::Fill {
                             hwnd: HWNDWrapper(lv_hwnd),
@@ -288,8 +286,6 @@ impl ImportDialog {
                         Item::Nested {
                             layout: Box::new(Layout {
                                 orientation: Orientation::Horizontal,
-                                margin: 10,
-                                gap: 10,
                                 items: vec![
                                     Item::Fill {
                                         hwnd: HWNDWrapper(HWND::default()),
@@ -304,10 +300,12 @@ impl ImportDialog {
                                         size: BUTTON_WIDTH,
                                     },
                                 ],
+                                ..Default::default()
                             }),
                             size: BUTTON_HEIGHT,
                         },
                     ],
+                    ..Default::default()
                 };
 
                 let dialog = Arc::new(Self {

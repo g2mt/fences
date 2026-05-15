@@ -1,12 +1,12 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use parking_lot::Mutex;
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 use crate::fut::{PromptFuture, PromptState};
 use crate::layout::{Item, Layout, Orientation};
@@ -96,8 +96,6 @@ unsafe extern "system" fn input_wndproc(
 
             data.layout = Layout {
                 orientation: Orientation::Vertical,
-                margin: 10,
-                gap: 6,
                 items: vec![
                     Item::Fixed {
                         hwnd: HWNDWrapper(label),
@@ -110,8 +108,6 @@ unsafe extern "system" fn input_wndproc(
                     Item::Nested {
                         layout: Box::new(Layout {
                             orientation: Orientation::Horizontal,
-                            margin: 10,
-                            gap: 10,
                             items: vec![
                                 Item::Fill {
                                     hwnd: HWNDWrapper(HWND::default()),
@@ -126,10 +122,12 @@ unsafe extern "system" fn input_wndproc(
                                     size: BTN_WIDTH,
                                 },
                             ],
+                            ..Default::default()
                         }),
                         size: BTN_HEIGHT,
                     },
                 ],
+                ..Default::default()
             };
 
             // Set the edit's initial text
@@ -228,12 +226,7 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
         let data_ptr = Box::into_raw(Box::new(InputDialogData {
             message: message.to_string(),
             default_text: default.to_string(),
-            layout: Layout {
-                orientation: Orientation::Vertical,
-                margin: 0,
-                gap: 0,
-                items: vec![],
-            },
+            layout: Layout::default(),
             edit_hwnd: HWND::default(),
             state: state.clone(),
         }));

@@ -161,3 +161,14 @@ impl Layout {
         }
     }
 }
+
+impl Default for Layout {
+    fn default() -> Self {
+        Self {
+            orientation: Orientation::Vertical,
+            margin: 10,
+            gap: 5,
+            items: vec![],
+        }
+    }
+}
