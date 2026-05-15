@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
 use parking_lot::Mutex;
-use windows::Win32::Foundation::{LPARAM, WPARAM};
-use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
+use windows_sys::Win32::Foundation::{LPARAM, WPARAM};
+use windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW;
 
 use crate::desktop_cover::WM_USER_WAKE_FUTURE;
 use crate::utils::HWNDWrapper;

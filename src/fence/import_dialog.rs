@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::Mutex;
-use windows::core::*;
-use windows::Win32::Foundation::*;
-use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
-use windows::Win32::System::LibraryLoader::*;
-use windows::Win32::UI::Controls::*;
-use windows::Win32::UI::Shell::*;
-use windows::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
+use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
+use windows_sys::Win32::System::LibraryLoader::*;
+use windows_sys::Win32::UI::Controls::*;
+use windows_sys::Win32::UI::Shell::*;
+use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 use crate::layout::{Item, Layout, Orientation};
 use crate::utils::HWNDWrapper;
@@ -140,7 +140,7 @@ impl ImportDialog {
                     let mut col0: LVCOLUMNW = std::mem::zeroed();
                     col0.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
                     col0.cx = 40;
-                    col0.pszText = windows::core::PWSTR(col0_text.as_ptr() as *mut _);
+                    col0.pszText = windows_sys::core::PWSTR(col0_text.as_ptr() as *mut _);
                     col0.iSubItem = COL_ICON;
                     let _ = SendMessageW(
                         lv_hwnd,
@@ -155,7 +155,7 @@ impl ImportDialog {
                     let mut col1: LVCOLUMNW = std::mem::zeroed();
                     col1.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
                     col1.cx = 380;
-                    col1.pszText = windows::core::PWSTR(col1_text.as_ptr() as *mut _);
+                    col1.pszText = windows_sys::core::PWSTR(col1_text.as_ptr() as *mut _);
                     col1.iSubItem = COL_PATH;
                     let _ = SendMessageW(
                         lv_hwnd,
@@ -170,7 +170,7 @@ impl ImportDialog {
                     let mut col2: LVCOLUMNW = std::mem::zeroed();
                     col2.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
                     col2.cx = 140;
-                    col2.pszText = windows::core::PWSTR(col2_text.as_ptr() as *mut _);
+                    col2.pszText = windows_sys::core::PWSTR(col2_text.as_ptr() as *mut _);
                     col2.iSubItem = COL_ACTION;
                     let _ = SendMessageW(
                         lv_hwnd,
@@ -227,7 +227,7 @@ impl ImportDialog {
                         lvi_path.mask = LVIF_TEXT;
                         lvi_path.iItem = i as i32;
                         lvi_path.iSubItem = COL_PATH;
-                        lvi_path.pszText = windows::core::PWSTR(path_u16.as_ptr() as *mut _);
+                        lvi_path.pszText = windows_sys::core::PWSTR(path_u16.as_ptr() as *mut _);
                         let _ = SendMessageW(
                             lv_hwnd,
                             LVM_SETITEMW,
@@ -249,7 +249,7 @@ impl ImportDialog {
                         lvi_action.mask = LVIF_TEXT;
                         lvi_action.iItem = i as i32;
                         lvi_action.iSubItem = COL_ACTION;
-                        lvi_action.pszText = windows::core::PWSTR(action_u16.as_ptr() as *mut _);
+                        lvi_action.pszText = windows_sys::core::PWSTR(action_u16.as_ptr() as *mut _);
                         let _ = SendMessageW(
                             lv_hwnd,
                             LVM_SETITEMW,
@@ -387,7 +387,7 @@ impl ImportDialog {
             lvi.mask = LVIF_TEXT;
             lvi.iItem = idx as i32;
             lvi.iSubItem = COL_ACTION;
-            lvi.pszText = windows::core::PWSTR(action_u16.as_ptr() as *mut _);
+            lvi.pszText = windows_sys::core::PWSTR(action_u16.as_ptr() as *mut _);
             let _ = SendMessageW(
                 lv,
                 LVM_SETITEMW,

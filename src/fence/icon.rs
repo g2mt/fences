@@ -4,13 +4,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use parking_lot::Mutex;
 use tracing::{error, info};
-use windows::Win32::Foundation::*;
-use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
-use windows::Win32::UI::Controls::Dialogs::*;
-use windows::Win32::UI::Shell::*;
-use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
+use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
+use windows_sys::Win32::UI::Controls::Dialogs::*;
+use windows_sys::Win32::UI::Shell::*;
+use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 use crate::app::App;
 use crate::commands::*;
@@ -100,9 +100,9 @@ impl Icon {
 
     #[cfg(windows)]
     pub fn run(&self) {
-        use std::os::windows::process::CommandExt;
+        use std::os::windows_sys::process::CommandExt;
 
-        use windows::Win32::System::Threading::CREATE_NO_WINDOW;
+        use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
         if let Some(path) = self.path() {
             info!("Running {}", path);
@@ -220,7 +220,7 @@ impl Icon {
         let mut ofn: OPENFILENAMEW = unsafe { std::mem::zeroed() };
         ofn.lStructSize = std::mem::size_of::<OPENFILENAMEW>() as u32;
         ofn.hwndOwner = self.base.hwnd();
-        ofn.lpstrFile = windows::core::PWSTR(file_buf.as_mut_ptr());
+        ofn.lpstrFile = windows_sys::core::PWSTR(file_buf.as_mut_ptr());
         ofn.nMaxFile = MAX_PATH;
         ofn.lpstrFilter = w!("All Files\0*.*\0\0");
         ofn.nFilterIndex = 1;

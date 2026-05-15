@@ -2,8 +2,8 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use anyhow::Result;
-use windows::Win32::Foundation::*;
-use windows::Win32::UI::Shell::*;
+use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::UI::Shell::*;
 
 pub static LOG_PATH: &'static str = "log.txt";
 pub static STATE_PATH: &'static str = "state.json";

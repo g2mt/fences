@@ -6,10 +6,10 @@ use std::time::SystemTime;
 use anyhow::{Result, anyhow};
 use parking_lot::Mutex;
 use tracing::{error, info, warn};
-use windows::Win32::Foundation::RECT;
-use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
+use windows_sys::Win32::Foundation::RECT;
+use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 use crate::config::config::Config;
 use crate::config::save_thread::SaveThread;
@@ -170,7 +170,7 @@ impl App {
                 CLIP_DEFAULT_PRECIS,
                 CLEARTYPE_QUALITY,
                 VARIABLE_PITCH.0 as u32,
-                windows::core::PCWSTR(font_name_u16.as_ptr()),
+                windows_sys::core::PCWSTR(font_name_u16.as_ptr()),
             );
 
             let old_font = SelectObject(hdc, hfont.into());

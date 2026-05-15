@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use parking_lot::Mutex;
-use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::*;
+use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 use crate::fut::{PromptFuture, PromptState};
 
 pub fn confirm(
-    _hwnd: Option<windows::Win32::Foundation::HWND>,
+    _hwnd: Option<windows_sys::Win32::Foundation::HWND>,
     text: PCWSTR,
     caption: PCWSTR,
     utype: MESSAGEBOX_STYLE,

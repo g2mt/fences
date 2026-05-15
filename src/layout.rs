@@ -1,5 +1,5 @@
-use windows::Win32::Foundation::*;
-use windows::Win32::UI::WindowsAndMessaging::MoveWindow;
+use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::UI::WindowsAndMessaging::MoveWindow;
 
 use crate::utils::HWNDWrapper;
 

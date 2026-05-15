@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 use tracing::{debug, info};
-use windows::Win32::Foundation::*;
-use windows::Win32::System::Com::CoTaskMemFree;
-use windows::Win32::UI::Shell::*;
-use windows::core::w;
+use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::System::Com::CoTaskMemFree;
+use windows_sys::Win32::UI::Shell::*;
+use windows_sys::core::w;
 
 use crate::fut::{PromptFuture, PromptState};
 
@@ -35,7 +35,7 @@ fn browse_for_folder_sync() -> Option<String> {
     let mut browse_info = BROWSEINFOW {
         hwndOwner: HWND(std::ptr::null_mut()),
         pidlRoot: std::ptr::null_mut(),
-        pszDisplayName: windows::core::PWSTR(std::ptr::null_mut()),
+        pszDisplayName: windows_sys::core::PWSTR(std::ptr::null_mut()),
         lpszTitle: w!("Select a folder"),
         ulFlags: BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE,
         lpfn: None,

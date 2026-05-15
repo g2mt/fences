@@ -1,6 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use windows::Win32::Foundation::*;
-use windows::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::Graphics::Gdi::*;
 
 #[cfg(test)]
 mod tests;

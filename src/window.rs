@@ -6,11 +6,11 @@ use std::sync::{Arc, LazyLock, OnceLock, Weak};
 use anyhow::{anyhow, Result};
 use parking_lot::{Mutex, MutexGuard};
 use tracing::debug;
-use windows::core::*;
-use windows::Win32::Foundation::*;
-use windows::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
-use windows::Win32::System::LibraryLoader::*;
-use windows::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
+use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
+use windows_sys::Win32::System::LibraryLoader::*;
+use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 use crate::geo::Area;
 

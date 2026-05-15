@@ -3,11 +3,11 @@ use std::sync::atomic::Ordering;
 
 use anyhow::Result;
 use parking_lot::{Mutex, MutexGuard};
-use windows::Win32::Foundation::*;
-use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::UI::Controls::*;
-use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::PCWSTR;
+use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::Graphics::Gdi::*;
+use windows_sys::Win32::UI::Controls::*;
+use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::PCWSTR;
 
 use crate::app::App;
 use crate::fence::icon::Icon;

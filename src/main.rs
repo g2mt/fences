@@ -3,12 +3,12 @@
 use anyhow::{anyhow, Result};
 use tracing::{error, info};
 use tracing_subscriber::prelude::*;
-use windows::core::*;
-use windows::Win32::Foundation::*;
-use windows::Win32::UI::Controls::{
+use windows_sys::core::*;
+use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::UI::Controls::{
     InitCommonControlsEx, ICC_LISTVIEW_CLASSES, INITCOMMONCONTROLSEX,
 };
-use windows::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 mod app;
 mod commands;
