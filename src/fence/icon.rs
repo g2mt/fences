@@ -24,9 +24,7 @@ pub struct Icon {
 
 impl Icon {
     pub fn new(parent_hwnd: HWND, title: &str, path: Option<&str>, x: i32, y: i32) -> Arc<Self> {
-        let hinstance = unsafe {
-            GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE
-        };
+        let hinstance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
         let title_u16: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
 
         let state = Mutex::new(IconState {

@@ -55,15 +55,8 @@ unsafe extern "system" fn input_wndproc(
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, data as *mut InputDialogData as isize);
 
             // Create a static message label
-            let label = crate::controls::create_label(
-                &data.message,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                hinstance.into(),
-            );
+            let label =
+                crate::controls::create_label(&data.message, 0, 0, 0, 0, hwnd, hinstance.into());
 
             // Create edit control
             let edit = crate::controls::create_edit(

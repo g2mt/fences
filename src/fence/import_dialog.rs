@@ -2,17 +2,17 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::Mutex;
-use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 use crate::layout::{Item, Layout, Orientation};
 use crate::utils::HWNDWrapper;
-use crate::window::{register_classname_ex, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname_ex};
 
 const ID_LISTVIEW: u32 = 1001;
 const ID_IMPORT_BTN: u32 = 1002;
@@ -99,10 +99,7 @@ impl ImportDialog {
                         0,
                         w!("SysListView32"),
                         std::ptr::null(),
-                        WS_CHILD
-                            | WS_VISIBLE
-                            | WS_BORDER
-                            | (LVS_REPORT | LVS_SINGLESEL),
+                        WS_CHILD | WS_VISIBLE | WS_BORDER | (LVS_REPORT | LVS_SINGLESEL),
                         0,
                         0,
                         0,

@@ -20,9 +20,7 @@ pub struct ScrollArea {
 
 impl ScrollArea {
     pub fn new(parent_hwnd: HWND, fence_area: &Area<i32>) -> Result<Arc<Self>> {
-        let hinstance = unsafe {
-            GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE
-        };
+        let hinstance = unsafe { GetWindowLongPtrW(parent_hwnd, GWLP_HINSTANCE) as HINSTANCE };
         let config = App::config();
         let border = config.fence.border_thickness;
         let title_h = config.fence.title_bar_height;

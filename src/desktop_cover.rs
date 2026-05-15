@@ -50,14 +50,12 @@ impl DesktopCover {
             app.hwnd_shell.get_or_init(|| unsafe {
                 // https://stackoverflow.com/a/32589338
                 let progman = FindWindowW(w!("Progman"), std::ptr::null());
-                HWNDWrapper(
-                    FindWindowExW(
-                        progman,
-                        HWND::default(),
-                        w!("SHELLDLL_DefView"),
-                        std::ptr::null(),
-                    )
-                )
+                HWNDWrapper(FindWindowExW(
+                    progman,
+                    HWND::default(),
+                    w!("SHELLDLL_DefView"),
+                    std::ptr::null(),
+                ))
             });
         }
 

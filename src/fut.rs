@@ -41,12 +41,7 @@ pub struct WindowWaker {
 impl std::task::Wake for WindowWaker {
     fn wake(self: Arc<Self>) {
         unsafe {
-            let _ = PostMessageW(
-                self.hwnd_w.0,
-                WM_USER_WAKE_FUTURE,
-                0 as WPARAM,
-                0 as LPARAM,
-            );
+            let _ = PostMessageW(self.hwnd_w.0, WM_USER_WAKE_FUTURE, 0 as WPARAM, 0 as LPARAM);
         }
     }
 }
@@ -67,12 +62,7 @@ impl AsyncExecutor {
     pub fn spawn(&self, fut: impl Future<Output = ()> + Send + 'static) {
         self.tasks.lock().push(Box::pin(fut));
         unsafe {
-            let _ = PostMessageW(
-                self.hwnd_w.0,
-                WM_USER_WAKE_FUTURE,
-                0,
-                0,
-            );
+            let _ = PostMessageW(self.hwnd_w.0, WM_USER_WAKE_FUTURE, 0, 0);
         }
     }
 

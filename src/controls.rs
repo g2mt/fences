@@ -1,9 +1,9 @@
 use std::cell::LazyCell;
 
-use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::{CreateFontIndirectW, HFONT};
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 thread_local! {
     static CONTROL_FONT: LazyCell<HFONT> = LazyCell::new(|| unsafe {
@@ -48,12 +48,7 @@ pub fn create_button(
     };
     unsafe {
         CONTROL_FONT.with(|font| {
-            SendMessageW(
-                hwnd,
-                WM_SETFONT,
-                (**font) as WPARAM,
-                1 as LPARAM,
-            );
+            SendMessageW(hwnd, WM_SETFONT, (**font) as WPARAM, 1 as LPARAM);
         });
     }
     hwnd
@@ -87,12 +82,7 @@ pub fn create_label(
     };
     unsafe {
         CONTROL_FONT.with(|font| {
-            SendMessageW(
-                hwnd,
-                WM_SETFONT,
-                (**font) as WPARAM,
-                1 as LPARAM,
-            );
+            SendMessageW(hwnd, WM_SETFONT, (**font) as WPARAM, 1 as LPARAM);
         });
     }
     hwnd
@@ -125,12 +115,7 @@ pub fn create_edit(
     };
     unsafe {
         CONTROL_FONT.with(|font| {
-            SendMessageW(
-                hwnd,
-                WM_SETFONT,
-                (**font) as WPARAM,
-                1 as LPARAM,
-            );
+            SendMessageW(hwnd, WM_SETFONT, (**font) as WPARAM, 1 as LPARAM);
         });
     }
     hwnd

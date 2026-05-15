@@ -1,13 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use tracing::{error, info};
 use tracing_subscriber::prelude::*;
-use windows_sys::core::*;
 use windows_sys::Win32::UI::Controls::{
-    InitCommonControlsEx, ICC_LISTVIEW_CLASSES, INITCOMMONCONTROLSEX,
+    ICC_LISTVIEW_CLASSES, INITCOMMONCONTROLSEX, InitCommonControlsEx,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 mod app;
 mod commands;
@@ -27,7 +27,7 @@ mod window;
 use crate::app::App;
 use crate::config::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
-use crate::paths::{app_file, init_app_dir, ID_PATH, LOG_PATH};
+use crate::paths::{ID_PATH, LOG_PATH, app_file, init_app_dir};
 
 fn ensure_single_instance() -> Result<()> {
     let id_path = App::get().id_path.get().unwrap();
@@ -46,7 +46,12 @@ fn ensure_single_instance() -> Result<()> {
     );
 
     unsafe {
-        let hwnd = FindWindowExW(std::ptr::null_mut(), std::ptr::null_mut(), w!("BottomWindowClass"), std::ptr::null());
+        let hwnd = FindWindowExW(
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            w!("BottomWindowClass"),
+            std::ptr::null(),
+        );
         if hwnd == std::ptr::null_mut() {
             return Err(anyhow!("Unable to find desktop cover class"));
         }

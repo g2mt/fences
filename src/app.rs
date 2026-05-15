@@ -123,7 +123,9 @@ impl App {
         // Check if file has been modified since we last read it
         if let Ok(current_modified) = std::fs::metadata(&path).and_then(|m| m.modified()) {
             if current_modified != *modified {
-                let text = w!("The config file has been modified by another program.\nDo you want to override it?");
+                let text = w!(
+                    "The config file has been modified by another program.\nDo you want to override it?"
+                );
                 let caption = w!("Config File Changed");
                 let result = unsafe {
                     MessageBoxW(
@@ -175,7 +177,7 @@ impl App {
 
             let old_font = SelectObject(hdc, hfont.into());
 
-            let mut text_u16: Vec<u16> = text.encode_utf16().collect();
+            let text_u16: Vec<u16> = text.encode_utf16().collect();
             DrawTextW(hdc, text_u16.as_ptr(), text_u16.len() as i32, rect, format);
 
             SelectObject(hdc, old_font.into());
