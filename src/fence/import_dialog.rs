@@ -300,6 +300,7 @@ impl ImportDialog {
                                         size: BUTTON_WIDTH,
                                     },
                                 ],
+                                margin: 0,
                                 ..Default::default()
                             }),
                             size: BUTTON_HEIGHT,

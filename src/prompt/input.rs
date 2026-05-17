@@ -122,6 +122,7 @@ unsafe extern "system" fn input_wndproc(
                                     size: BTN_WIDTH,
                                 },
                             ],
+                            margin: 0,
                             ..Default::default()
                         }),
                         size: BTN_HEIGHT,
