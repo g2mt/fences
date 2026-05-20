@@ -17,6 +17,7 @@ use crate::window::{register_classname_ex, Base, BaseRef, Window};
 const ID_LISTVIEW: u32 = 1001;
 const ID_IMPORT_BTN: u32 = 1002;
 const ID_CANCEL_BTN: u32 = 1003;
+const ID_SHOW_LNK_ONLY: u32 = 1004;
 
 const COL_ICON: i32 = 0;
 const COL_PATH: i32 = 1;
@@ -39,6 +40,10 @@ pub struct ImportItem {
 
 struct ImportDialogInner {
     items: Vec<ImportItem>,
+    // Maps list view row indices to inner.items indices, required because
+    // the list view may show a filtered subset (e.g. only .lnk files)
+    visible_indices: Vec<usize>,
+    show_lnk_only: bool,
     himagelist: HIMAGELIST,
     layout: Layout,
 }
@@ -173,85 +178,6 @@ impl ImportDialog {
                     );
                 }
 
-                // Populate rows
-                for (i, item) in items.iter().enumerate() {
-                    // Load icon for this item
-                    let icon_index = unsafe {
-                        let path_u16: Vec<u16> =
-                            item.path.encode_utf16().chain(std::iter::once(0)).collect();
-                        let mut shfi: SHFILEINFOW = std::mem::zeroed();
-                        SHGetFileInfoW(
-                            path_u16.as_ptr(),
-                            0,
-                            &mut shfi,
-                            std::mem::size_of::<SHFILEINFOW>() as u32,
-                            SHGFI_ICON | SHGFI_SMALLICON,
-                        );
-                        let idx = if shfi.hIcon != std::ptr::null_mut() {
-                            ImageList_ReplaceIcon(himagelist, -1, shfi.hIcon)
-                        } else {
-                            let hicon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
-                            ImageList_ReplaceIcon(himagelist, -1, hicon)
-                        };
-                        if shfi.hIcon != std::ptr::null_mut() {
-                            let _ = DestroyIcon(shfi.hIcon);
-                        }
-                        idx
-                    };
-
-                    unsafe {
-                        // Insert row with icon in column 0
-                        let mut lvi: LVITEMW = std::mem::zeroed();
-                        lvi.mask = LVIF_IMAGE;
-                        lvi.iItem = i as i32;
-                        lvi.iSubItem = COL_ICON;
-                        lvi.iImage = icon_index;
-                        let _ = SendMessageW(
-                            lv_hwnd,
-                            LVM_INSERTITEMW,
-                            0 as WPARAM,
-                            &lvi as *const _ as LPARAM,
-                        );
-
-                        // Column 1: path text
-                        let path_u16: Vec<u16> =
-                            item.path.encode_utf16().chain(std::iter::once(0)).collect();
-                        let mut lvi_path: LVITEMW = std::mem::zeroed();
-                        lvi_path.mask = LVIF_TEXT;
-                        lvi_path.iItem = i as i32;
-                        lvi_path.iSubItem = COL_PATH;
-                        lvi_path.pszText = path_u16.as_ptr() as *mut _;
-                        let _ = SendMessageW(
-                            lv_hwnd,
-                            LVM_SETITEMW,
-                            0 as WPARAM,
-                            &lvi_path as *const _ as LPARAM,
-                        );
-
-                        // Column 2: action text
-                        let action_str = if item.action == ACTION_KEEP {
-                            "Keep"
-                        } else {
-                            "Remove"
-                        };
-                        let action_u16: Vec<u16> = action_str
-                            .encode_utf16()
-                            .chain(std::iter::once(0))
-                            .collect();
-                        let mut lvi_action: LVITEMW = std::mem::zeroed();
-                        lvi_action.mask = LVIF_TEXT;
-                        lvi_action.iItem = i as i32;
-                        lvi_action.iSubItem = COL_ACTION;
-                        lvi_action.pszText = action_u16.as_ptr() as *mut _;
-                        let _ = SendMessageW(
-                            lv_hwnd,
-                            LVM_SETITEMW,
-                            0 as WPARAM,
-                            &lvi_action as *const _ as LPARAM,
-                        );
-                    }
-                }
-
                 // Import button
                 let import_btn = crate::controls::create_button(
                     "Import",
@@ -276,9 +202,25 @@ impl ImportDialog {
                     hinstance.into(),
                 );
 
+                // Checkbox for LNK filter
+                let lnk_checkbox = crate::controls::create_checkbox(
+                    "Show only shortcuts (.LNK)",
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    Some(ID_SHOW_LNK_ONLY as HMENU),
+                    hinstance.into(),
+                );
+
                 let layout = Layout {
                     orientation: Orientation::Vertical,
                     items: vec![
+                        Item::Fixed {
+                            hwnd: HWNDWrapper(lnk_checkbox),
+                            size: 22,
+                        },
                         Item::Fill {
                             hwnd: HWNDWrapper(lv_hwnd),
                             min: 0,
@@ -313,12 +255,15 @@ impl ImportDialog {
                     base,
                     inner: Mutex::new(ImportDialogInner {
                         items,
+                        visible_indices: Vec::new(),
+                        show_lnk_only: false,
                         himagelist,
                         layout,
                     }),
                     on_import: Box::new(on_import),
                 });
 
+                dialog.populate_listview();
                 dialog.layout_widgets();
 
                 Ok(dialog)
@@ -340,6 +285,112 @@ impl ImportDialog {
         inner.layout.arrange(rect.clone());
     }
 
+    fn populate_listview(&self) {
+        let lv = self.get_listview_hwnd();
+        let mut inner = self.inner.lock();
+
+        // Clear existing items
+        unsafe {
+            let _ = SendMessageW(lv, LVM_DELETEALLITEMS, 0 as WPARAM, 0 as LPARAM);
+        }
+
+        // Build filtered visible indices
+        let show_lnk_only = inner.show_lnk_only;
+        let mut visible = Vec::new();
+        for (i, item) in inner.items.iter().enumerate() {
+            let show = if show_lnk_only {
+                item.path.to_lowercase().ends_with(".lnk")
+            } else {
+                true
+            };
+            if show {
+                visible.push(i);
+            }
+        }
+        inner.visible_indices = visible;
+
+        // Load icons for visible items
+        let himagelist = inner.himagelist;
+        for &item_idx in &inner.visible_indices {
+            let item = &inner.items[item_idx];
+            let icon_index = unsafe {
+                let path_u16: Vec<u16> =
+                    item.path.encode_utf16().chain(std::iter::once(0)).collect();
+                let mut shfi: SHFILEINFOW = std::mem::zeroed();
+                SHGetFileInfoW(
+                    path_u16.as_ptr(),
+                    0,
+                    &mut shfi,
+                    std::mem::size_of::<SHFILEINFOW>() as u32,
+                    SHGFI_ICON | SHGFI_SMALLICON,
+                );
+                let idx = if shfi.hIcon != std::ptr::null_mut() {
+                    ImageList_ReplaceIcon(himagelist, -1, shfi.hIcon)
+                } else {
+                    let hicon = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
+                    ImageList_ReplaceIcon(himagelist, -1, hicon)
+                };
+                if shfi.hIcon != std::ptr::null_mut() {
+                    let _ = DestroyIcon(shfi.hIcon);
+                }
+                idx
+            };
+
+            let row = inner.visible_indices.iter().position(|&x| x == item_idx).unwrap() as i32;
+            unsafe {
+                // Insert row with icon in column 0
+                let mut lvi: LVITEMW = std::mem::zeroed();
+                lvi.mask = LVIF_IMAGE;
+                lvi.iItem = row;
+                lvi.iSubItem = COL_ICON;
+                lvi.iImage = icon_index;
+                let _ = SendMessageW(
+                    lv,
+                    LVM_INSERTITEMW,
+                    0 as WPARAM,
+                    &lvi as *const _ as LPARAM,
+                );
+
+                // Column 1: path text
+                let path_u16: Vec<u16> =
+                    item.path.encode_utf16().chain(std::iter::once(0)).collect();
+                let mut lvi_path: LVITEMW = std::mem::zeroed();
+                lvi_path.mask = LVIF_TEXT;
+                lvi_path.iItem = row;
+                lvi_path.iSubItem = COL_PATH;
+                lvi_path.pszText = path_u16.as_ptr() as *mut _;
+                let _ = SendMessageW(
+                    lv,
+                    LVM_SETITEMW,
+                    0 as WPARAM,
+                    &lvi_path as *const _ as LPARAM,
+                );
+
+                // Column 2: action text
+                let action_str = if item.action == ACTION_KEEP {
+                    "Keep"
+                } else {
+                    "Remove"
+                };
+                let action_u16: Vec<u16> = action_str
+                    .encode_utf16()
+                    .chain(std::iter::once(0))
+                    .collect();
+                let mut lvi_action: LVITEMW = std::mem::zeroed();
+                lvi_action.mask = LVIF_TEXT;
+                lvi_action.iItem = row;
+                lvi_action.iSubItem = COL_ACTION;
+                lvi_action.pszText = action_u16.as_ptr() as *mut _;
+                let _ = SendMessageW(
+                    lv,
+                    LVM_SETITEMW,
+                    0 as WPARAM,
+                    &lvi_action as *const _ as LPARAM,
+                );
+            }
+        }
+    }
+
     /// Toggle the action of the selected row between Keep and Remove.
     fn toggle_selected_action(&self) {
         let lv = self.get_listview_hwnd();
@@ -354,12 +405,13 @@ impl ImportDialog {
         if sel < 0 {
             return;
         }
-        let idx = sel as usize;
+        let visible_idx = sel as usize;
         let mut inner = self.inner.lock();
-        if idx >= inner.items.len() {
+        if visible_idx >= inner.visible_indices.len() {
             return;
         }
-        let item = &mut inner.items[idx];
+        let item_idx = inner.visible_indices[visible_idx];
+        let item = &mut inner.items[item_idx];
         item.action = if item.action == ACTION_KEEP {
             ACTION_REMOVE
         } else {
@@ -377,7 +429,7 @@ impl ImportDialog {
         unsafe {
             let mut lvi: LVITEMW = std::mem::zeroed();
             lvi.mask = LVIF_TEXT;
-            lvi.iItem = idx as i32;
+            lvi.iItem = visible_idx as i32;
             lvi.iSubItem = COL_ACTION;
             lvi.pszText = action_u16.as_ptr() as *mut _;
             let _ = SendMessageW(lv, LVM_SETITEMW, 0 as WPARAM, &lvi as *const _ as LPARAM);
@@ -423,6 +475,18 @@ impl Window for ImportDialog {
                         unsafe {
                             let _ = DestroyWindow(hwnd);
                         };
+                        0
+                    }
+                    ID_SHOW_LNK_ONLY => {
+                        let hi = ((wparam as u32) >> 16) as u16;
+                        tracing::debug!("SHOW_LNK_ONLY hi={}", hi);
+                        if hi == BN_CLICKED as u16 {
+                            let mut inner = self.inner.lock();
+                            inner.show_lnk_only = !inner.show_lnk_only;
+                            tracing::debug!("show_lnk_only toggled to {}", inner.show_lnk_only);
+                            drop(inner);
+                            self.populate_listview();
+                        }
                         0
                     }
                     _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },

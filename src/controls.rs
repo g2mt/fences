@@ -88,6 +88,41 @@ pub fn create_label(
     hwnd
 }
 
+pub fn create_checkbox(
+    text: &'static str,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    hwndparent: HWND,
+    hmenu: Option<HMENU>,
+    hinstance: HINSTANCE,
+) -> HWND {
+    let text_u16: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    let hwnd = unsafe {
+        CreateWindowExW(
+            0,
+            w!("BUTTON"),
+            text_u16.as_ptr(),
+            WS_CHILD | WS_VISIBLE | (BS_AUTOCHECKBOX as u32),
+            x,
+            y,
+            width,
+            height,
+            hwndparent,
+            hmenu.unwrap_or(std::ptr::null_mut()),
+            hinstance,
+            std::ptr::null(),
+        )
+    };
+    unsafe {
+        CONTROL_FONT.with(|font| {
+            SendMessageW(hwnd, WM_SETFONT, (**font) as WPARAM, 1 as LPARAM);
+        });
+    }
+    hwnd
+}
+
 pub fn create_edit(
     x: i32,
     y: i32,

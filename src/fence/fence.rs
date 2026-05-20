@@ -362,12 +362,12 @@ impl Fence {
 
         let folder_path = Path::new(imported_from.as_ref());
 
-        // Read all .lnk files from the directory
+        // Read all files from the directory
         let mut dir_items: Vec<(String, String)> = Vec::new(); // (title, path)
         if let Ok(entries) = std::fs::read_dir(folder_path) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().and_then(|s| s.to_str()) == Some("lnk") {
+                if path.is_file() {
                     if let (Some(name), Some(path_str)) = (
                         path.file_stem()
                             .and_then(|s| s.to_str())
@@ -460,7 +460,7 @@ impl Fence {
         if let Ok(entries) = std::fs::read_dir(folder_path) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().and_then(|s| s.to_str()) == Some("lnk") {
+                if path.is_file() {
                     if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
                         fence.add_icon_with_path(name, path.to_str());
                     }
