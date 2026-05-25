@@ -2,17 +2,17 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::Mutex;
-use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 use crate::layout::{Item, Layout, Orientation};
 use crate::utils::HWNDWrapper;
-use crate::window::{register_classname_ex, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname_ex};
 
 const ID_LISTVIEW: u32 = 1001;
 const ID_IMPORT_BTN: u32 = 1002;
@@ -336,7 +336,11 @@ impl ImportDialog {
                 idx
             };
 
-            let row = inner.visible_indices.iter().position(|&x| x == item_idx).unwrap() as i32;
+            let row = inner
+                .visible_indices
+                .iter()
+                .position(|&x| x == item_idx)
+                .unwrap() as i32;
             unsafe {
                 // Insert row with icon in column 0
                 let mut lvi: LVITEMW = std::mem::zeroed();
@@ -344,12 +348,7 @@ impl ImportDialog {
                 lvi.iItem = row;
                 lvi.iSubItem = COL_ICON;
                 lvi.iImage = icon_index;
-                let _ = SendMessageW(
-                    lv,
-                    LVM_INSERTITEMW,
-                    0 as WPARAM,
-                    &lvi as *const _ as LPARAM,
-                );
+                let _ = SendMessageW(lv, LVM_INSERTITEMW, 0 as WPARAM, &lvi as *const _ as LPARAM);
 
                 // Column 1: path text
                 let path_u16: Vec<u16> =
