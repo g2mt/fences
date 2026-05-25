@@ -5,13 +5,13 @@ use std::sync::{Arc, Weak};
 use anyhow::Result;
 use parking_lot::Mutex;
 use tracing::{debug, error};
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows_sys::Win32::UI::Shell::ShellExecuteW;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 use crate::app::App;
 use crate::commands::*;
@@ -22,7 +22,7 @@ use crate::fence::scroll_area::ScrollArea;
 use crate::fence::title_bar::TitleBar;
 use crate::geo::Area;
 use crate::prompt;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Custom events
 pub const WM_USER_PAINT_WITH_ALPHA: u32 = WM_USER + 1;
@@ -162,9 +162,8 @@ impl HitManager {
         }
 
         if let Some(Hit::Icon(idx)) = hit {
-            if let Some(icon) = fence.scroll_area.icons().get(idx) {
-                icon.show_context_menu(pt.x, pt.y);
-            }
+            let icon = fence.scroll_area.icons()[idx].clone();
+            icon.show_context_menu(pt.x, pt.y);
         } else {
             fence.show_context_menu(pt.x, pt.y);
         }
