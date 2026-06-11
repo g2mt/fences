@@ -1,5 +1,5 @@
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use anyhow::Result;
 use parking_lot::{Mutex, MutexGuard};
@@ -12,7 +12,7 @@ use crate::app::App;
 use crate::config::state::IconState;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 pub struct ScrollArea {
     base: BaseRef,
