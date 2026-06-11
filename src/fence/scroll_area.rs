@@ -60,10 +60,14 @@ impl ScrollArea {
         self.icons.lock().get(index).cloned()
     }
 
-    pub fn set_icons_from_state(&self, states: &[IconState]) {
+    pub fn set_icons_from_state(
+        &self,
+        states: impl Iterator<Item = impl std::borrow::Borrow<IconState>>,
+    ) {
         let mut icons = self.icons.lock();
         icons.clear();
         for state in states {
+            let state = state.borrow();
             icons.push(Icon::new(
                 self.base.hwnd(),
                 &state.title,
@@ -85,10 +89,6 @@ impl ScrollArea {
         if index < icons.len() {
             icons.remove(index);
         }
-    }
-
-    pub fn clear_icons(&self) {
-        self.icons.lock().clear();
     }
 
     pub fn reflow_icons(&self) {

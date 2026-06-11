@@ -269,7 +269,7 @@ impl Fence {
                     last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
                     hitman: HitManager::new(),
                 });
-                fence.set_icons_from_state(&state.icons);
+                fence.set_icons_from_state(state.icons.iter());
                 unsafe { DragAcceptFiles(fence.base().hwnd(), 1) };
                 if use_layered {
                     fence.paint_with_alpha();
@@ -330,7 +330,7 @@ impl Fence {
         *self.sticky_pos.lock() = sticky;
     }
 
-    pub fn set_icons_from_state(&self, icons: &[IconState]) {
+    pub fn set_icons_from_state(&self, icons: impl Iterator<Item = impl std::borrow::Borrow<IconState>>) {
         self.scroll_area.set_icons_from_state(icons);
         self.scroll_area.reflow_icons();
     }
@@ -389,8 +389,10 @@ impl Fence {
             let icon_path = icon.path().map(|p| p.to_string()).unwrap_or_default();
             let still_present = dir_items.iter().any(|(_, dp)| *dp == icon_path);
             import_items.push(ImportItem {
-                title: icon.title(),
-                path: Arc::from(icon_path.as_str()),
+                state: IconState {
+                    title: icon.title(),
+                    path: icon.path(),
+                },
                 action: if still_present {
                     import_dialog::ACTION_KEEP
                 } else {
@@ -408,8 +410,10 @@ impl Fence {
                     .any(|i| i.path().map(|p| p.to_string()).unwrap_or_default() == *path_str);
                 if !already_present {
                     import_items.push(ImportItem {
-                        title: Arc::from(name.as_str()),
-                        path: Arc::from(path_str.as_str()),
+                        state: IconState {
+                            title: Arc::from(name.as_str()),
+                            path: Some(Arc::from(path_str.as_str())),
+                        },
                         action: import_dialog::ACTION_KEEP,
                     });
                 }
@@ -417,13 +421,8 @@ impl Fence {
         }
 
         let fence = self.clone();
-        let import_dialog = match ImportDialog::create_window(import_items, move |kept_items| {
-            // Remove all existing icons
-            fence.scroll_area.clear_icons();
-            // Add kept items
-            for item in kept_items {
-                fence.add_icon(&item.title, Some(&item.path));
-            }
+        let import_dialog = match ImportDialog::create_window(import_items, move |kept_states| {
+            fence.set_icons_from_state(kept_states.iter());
         }) {
             Ok(import_dialog) => import_dialog,
             Err(e) => {

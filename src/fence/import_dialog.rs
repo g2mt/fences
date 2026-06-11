@@ -10,6 +10,7 @@ use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::core::*;
 
+use crate::config::state::IconState;
 use crate::layout::{Item, Layout, Orientation};
 use crate::utils::HWNDWrapper;
 use crate::window::{Base, BaseRef, Window, register_classname_ex};
@@ -33,8 +34,7 @@ const BUTTON_HEIGHT: i32 = 30;
 
 #[derive(Clone)]
 pub struct ImportItem {
-    pub title: Arc<str>,
-    pub path: Arc<str>,
+    pub state: IconState,
     pub action: u32, // ACTION_KEEP or ACTION_REMOVE
 }
 
@@ -51,13 +51,13 @@ struct ImportDialogInner {
 pub struct ImportDialog {
     base: BaseRef,
     inner: Mutex<ImportDialogInner>,
-    on_import: Box<dyn Fn(Vec<ImportItem>) + Send + Sync + 'static>,
+    on_import: Box<dyn Fn(Vec<IconState>) + Send + Sync + 'static>,
 }
 
 impl ImportDialog {
     pub fn create_window(
         items: Vec<ImportItem>,
-        on_import: impl Fn(Vec<ImportItem>) + Send + Sync + 'static,
+        on_import: impl Fn(Vec<IconState>) + Send + Sync + 'static,
     ) -> Result<Arc<Self>> {
         let hinstance = unsafe { GetModuleHandleW(std::ptr::null()) };
 
@@ -299,7 +299,7 @@ impl ImportDialog {
         let mut visible = Vec::new();
         for (i, item) in inner.items.iter().enumerate() {
             let show = if show_lnk_only {
-                item.path.to_lowercase().ends_with(".lnk")
+                item.state.path.as_deref().map_or(false, |p| p.to_lowercase().ends_with(".lnk"))
             } else {
                 true
             };
@@ -314,8 +314,11 @@ impl ImportDialog {
         for &item_idx in &inner.visible_indices {
             let item = &inner.items[item_idx];
             let icon_index = unsafe {
-                let path_u16: Vec<u16> =
-                    item.path.encode_utf16().chain(std::iter::once(0)).collect();
+                let path_u16: Vec<u16> = if let Some(ref p) = item.state.path {
+                    p.encode_utf16().chain(std::iter::once(0)).collect()
+                } else {
+                    continue;
+                };
                 let mut shfi: SHFILEINFOW = std::mem::zeroed();
                 SHGetFileInfoW(
                     path_u16.as_ptr(),
@@ -351,8 +354,11 @@ impl ImportDialog {
                 let _ = SendMessageW(lv, LVM_INSERTITEMW, 0 as WPARAM, &lvi as *const _ as LPARAM);
 
                 // Column 1: path text
-                let path_u16: Vec<u16> =
-                    item.path.encode_utf16().chain(std::iter::once(0)).collect();
+                let path_u16: Vec<u16> = if let Some(ref p) = item.state.path {
+                    p.encode_utf16().chain(std::iter::once(0)).collect()
+                } else {
+                    continue;
+                };
                 let mut lvi_path: LVITEMW = std::mem::zeroed();
                 lvi_path.mask = LVIF_TEXT;
                 lvi_path.iItem = row;
@@ -437,11 +443,11 @@ impl ImportDialog {
 
     fn do_import(&self) {
         let inner = self.inner.lock();
-        let kept: Vec<ImportItem> = inner
+        let kept: Vec<IconState> = inner
             .items
             .iter()
             .filter(|i| i.action == ACTION_KEEP)
-            .cloned()
+            .map(|i| i.state.clone())
             .collect();
         drop(inner);
         (self.on_import)(kept);
