@@ -24,9 +24,6 @@ const COL_ICON: i32 = 0;
 const COL_PATH: i32 = 1;
 const COL_ACTION: i32 = 2;
 
-pub const ACTION_KEEP: u32 = 0;
-pub const ACTION_REMOVE: u32 = 1;
-
 const DLG_DEFAULT_WIDTH: i32 = 600;
 const DLG_DEFAULT_HEIGHT: i32 = 450;
 const BUTTON_WIDTH: i32 = 90;
@@ -35,7 +32,7 @@ const BUTTON_HEIGHT: i32 = 30;
 #[derive(Clone)]
 pub struct ImportItem {
     pub state: IconState,
-    pub action: u32, // ACTION_KEEP or ACTION_REMOVE
+    pub keep: bool,
 }
 
 struct ImportDialogInner {
@@ -299,7 +296,10 @@ impl ImportDialog {
         let mut visible = Vec::new();
         for (i, item) in inner.items.iter().enumerate() {
             let show = if show_lnk_only {
-                item.state.path.as_deref().map_or(false, |p| p.to_lowercase().ends_with(".lnk"))
+                item.state
+                    .path
+                    .as_deref()
+                    .map_or(false, |p| p.to_lowercase().ends_with(".lnk"))
             } else {
                 true
             };
@@ -372,11 +372,7 @@ impl ImportDialog {
                 );
 
                 // Column 2: action text
-                let action_str = if item.action == ACTION_KEEP {
-                    "Keep"
-                } else {
-                    "Remove"
-                };
+                let action_str = if item.keep { "Keep" } else { "Remove" };
                 let action_u16: Vec<u16> = action_str
                     .encode_utf16()
                     .chain(std::iter::once(0))
@@ -417,16 +413,8 @@ impl ImportDialog {
         }
         let item_idx = inner.visible_indices[visible_idx];
         let item = &mut inner.items[item_idx];
-        item.action = if item.action == ACTION_KEEP {
-            ACTION_REMOVE
-        } else {
-            ACTION_KEEP
-        };
-        let action_str = if item.action == ACTION_KEEP {
-            "Keep"
-        } else {
-            "Remove"
-        };
+        item.keep = !item.keep;
+        let action_str = if item.keep { "Keep" } else { "Remove" };
         let action_u16: Vec<u16> = action_str
             .encode_utf16()
             .chain(std::iter::once(0))
@@ -446,7 +434,7 @@ impl ImportDialog {
         let kept: Vec<IconState> = inner
             .items
             .iter()
-            .filter(|i| i.action == ACTION_KEEP)
+            .filter(|i| i.keep)
             .map(|i| i.state.clone())
             .collect();
         drop(inner);

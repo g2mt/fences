@@ -5,26 +5,26 @@ use std::sync::{Arc, Weak};
 use anyhow::Result;
 use parking_lot::Mutex;
 use tracing::{debug, error};
-use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows_sys::Win32::UI::Shell::{
-    DragAcceptFiles, DragFinish, DragQueryFileW, DragQueryPoint, ShellExecuteW, HDROP,
+    DragAcceptFiles, DragFinish, DragQueryFileW, DragQueryPoint, HDROP, ShellExecuteW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 use crate::app::App;
 use crate::commands::*;
 use crate::config::state::{FenceState, FenceStickyPosition, IconState};
 use crate::desktop_cover::DesktopCover;
-use crate::fence::import_dialog::{self, ImportDialog, ImportItem};
+use crate::fence::import_dialog::{ImportDialog, ImportItem};
 use crate::fence::scroll_area::ScrollArea;
 use crate::fence::title_bar::TitleBar;
 use crate::geo::Area;
 use crate::prompt;
-use crate::window::{register_classname, Base, BaseRef, Window};
+use crate::window::{Base, BaseRef, Window, register_classname};
 
 // Custom events
 pub const WM_USER_PAINT_WITH_ALPHA: u32 = WM_USER + 1;
@@ -330,7 +330,10 @@ impl Fence {
         *self.sticky_pos.lock() = sticky;
     }
 
-    pub fn set_icons_from_state(&self, icons: impl Iterator<Item = impl std::borrow::Borrow<IconState>>) {
+    pub fn set_icons_from_state(
+        &self,
+        icons: impl Iterator<Item = impl std::borrow::Borrow<IconState>>,
+    ) {
         self.scroll_area.set_icons_from_state(icons);
         self.scroll_area.reflow_icons();
     }
@@ -393,11 +396,7 @@ impl Fence {
                     title: icon.title(),
                     path: icon.path(),
                 },
-                action: if still_present {
-                    import_dialog::ACTION_KEEP
-                } else {
-                    import_dialog::ACTION_REMOVE
-                },
+                keep: still_present,
             });
         }
 
@@ -414,7 +413,7 @@ impl Fence {
                             title: Arc::from(name.as_str()),
                             path: Some(Arc::from(path_str.as_str())),
                         },
-                        action: import_dialog::ACTION_KEEP,
+                        keep: true,
                     });
                 }
             }
