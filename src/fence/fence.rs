@@ -851,7 +851,8 @@ impl Fence {
 
         // Collect file paths from the drop
         let file_count = unsafe { DragQueryFileW(hdrop, 0xFFFFFFFF, std::ptr::null_mut(), 0) };
-        let mut paths: Vec<(String, String)> = Vec::new();
+        let mut states: Vec<IconState> = Vec::new();
+        let import_dir = self.imported_from();
 
         for i in 0..file_count {
             let char_count = unsafe { DragQueryFileW(hdrop, i, std::ptr::null_mut(), 0) } as usize;
@@ -860,29 +861,50 @@ impl Fence {
                 let _ = DragQueryFileW(hdrop, i, buf.as_mut_ptr(), buf.len() as u32);
             };
             let path_str = String::from_utf16_lossy(&buf[..char_count]);
-            let path = std::path::Path::new(&path_str);
-            if path.is_file() {
-                if let (Some(name), Some(path_str)) = (
-                    path.file_stem()
-                        .and_then(|s| s.to_str())
-                        .map(|s| s.to_string()),
-                    path.to_str().map(|s| s.to_string()),
-                ) {
-                    paths.push((name, path_str));
-                }
+            let src = std::path::Path::new(&path_str);
+            if !src.is_file() {
+                continue;
             }
+
+            let (name, final_path) = if let Some(ref import_dir) = import_dir {
+                // Copy file to import directory
+                let dest = std::path::Path::new(import_dir.as_ref())
+                    .join(src.file_name().unwrap_or_default());
+                if let Err(e) = std::fs::copy(src, &dest) {
+                    error!("Failed to copy {} to {}: {}", path_str, dest.display(), e);
+                    continue;
+                }
+                let name = dest
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("");
+                let final_path = dest.to_str().unwrap_or("");
+                (name.to_string(), final_path.to_string())
+            } else {
+                let name = src
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.to_string());
+                let final_path = src.to_str().map(|s| s.to_string());
+                match (name, final_path) {
+                    (Some(n), Some(p)) => (n, p),
+                    _ => continue,
+                }
+            };
+
+            states.push(IconState {
+                title: Arc::from(name.as_str()),
+                path: Some(Arc::from(final_path.as_str())),
+            });
         }
 
         unsafe { DragFinish(hdrop) };
 
-        if paths.is_empty() {
+        if states.is_empty() {
             return;
         }
 
-        // Add icons from the dropped files
-        for (name, path_str) in &paths {
-            self.add_icon(name, Some(path_str));
-        }
+        self.set_icons_from_state(states.iter());
         self.scroll_area.base().redraw(true);
         App::get().save_thread.get().unwrap().set_unsaved();
     }
