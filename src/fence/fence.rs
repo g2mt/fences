@@ -9,7 +9,7 @@ use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
-use windows_sys::Win32::UI::Shell::ShellExecuteW;
+use windows_sys::Win32::UI::Shell::{DragAcceptFiles, DragFinish, DragQueryFileW, DragQueryPoint, ShellExecuteW, HDROP};
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::core::*;
 
@@ -270,6 +270,7 @@ impl Fence {
                 for icon_state in state.icons {
                     fence.add_icon(&icon_state.title, icon_state.path.as_deref());
                 }
+                unsafe { DragAcceptFiles(fence.base().hwnd(), 1) };
                 if use_layered {
                     fence.paint_with_alpha();
                     unsafe {
@@ -807,6 +808,62 @@ impl Fence {
 
         should_save
     }
+
+    /// Handles WM_DROPFILES: extracts file paths from the drop and adds them as icons.
+    fn on_drop_files(&self, hdrop: HDROP, rel_x: i32, rel_y: i32) {
+        let config = App::config();
+        let title_h = config.fence.title_bar_height;
+        let border = config.fence.border_thickness;
+        let area = self.base().area();
+        let client_width = area.width.load(Ordering::Relaxed) - border * 2;
+        let client_height = area.height.load(Ordering::Relaxed) - title_h - border;
+
+        // Only accept drops within the scroll area (below title bar, inside borders)
+        if rel_x < border || rel_x >= border + client_width {
+            unsafe { DragFinish(hdrop) };
+            return;
+        }
+        if rel_y < title_h || rel_y >= title_h + client_height {
+            unsafe { DragFinish(hdrop) };
+            return;
+        }
+
+        // Collect file paths from the drop
+        let file_count = unsafe { DragQueryFileW(hdrop, 0xFFFFFFFF, std::ptr::null_mut(), 0) };
+        let mut paths: Vec<(String, String)> = Vec::new();
+
+        for i in 0..file_count {
+            let char_count =
+                unsafe { DragQueryFileW(hdrop, i, std::ptr::null_mut(), 0) } as usize;
+            let mut buf: Vec<u16> = vec![0u16; char_count + 1];
+            unsafe {
+                let _ = DragQueryFileW(hdrop, i, buf.as_mut_ptr(), buf.len() as u32);
+            };
+            let path_str = String::from_utf16_lossy(&buf[..char_count]);
+            let path = std::path::Path::new(&path_str);
+            if path.is_file() {
+                if let (Some(name), Some(path_str)) = (
+                    path.file_stem().and_then(|s| s.to_str()).map(|s| s.to_string()),
+                    path.to_str().map(|s| s.to_string()),
+                ) {
+                    paths.push((name, path_str));
+                }
+            }
+        }
+
+        unsafe { DragFinish(hdrop) };
+
+        if paths.is_empty() {
+            return;
+        }
+
+        // Add icons from the dropped files
+        for (name, path_str) in &paths {
+            self.add_icon(name, Some(path_str));
+        }
+        self.scroll_area.base().redraw(true);
+        App::get().save_thread.get().unwrap().set_unsaved();
+    }
 }
 
 impl Window for Fence {
@@ -914,6 +971,17 @@ impl Window for Fence {
             },
             WM_USER_PAINT_WITH_ALPHA if App::config().use_layered_window => {
                 self.paint_with_alpha();
+                0
+            }
+            WM_DROPFILES => {
+                let hdrop = wparam as HDROP;
+                let mut pt = POINT { x: 0, y: 0 };
+                unsafe {
+                    let _ = DragQueryPoint(hdrop, &mut pt);
+                };
+                let rel_x = pt.x;
+                let rel_y = pt.y;
+                self.on_drop_files(hdrop, rel_x, rel_y);
                 0
             }
             WM_ACTIVATE => {
