@@ -457,14 +457,19 @@ impl Fence {
         fence.set_imported_from(Some(Arc::from(path_str.as_str())));
 
         if let Ok(entries) = std::fs::read_dir(folder_path) {
-            for entry in entries.flatten() {
+            fence.set_icons_from_state(entries.filter_map(|entry| {
+                let entry = entry.ok()?;
                 let path = entry.path();
-                if path.is_file() {
-                    if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                        fence.add_icon(name, path.to_str());
-                    }
+                if !path.is_file() {
+                    return None;
                 }
-            }
+                let name = path.file_stem().and_then(|s| s.to_str())?;
+                let path_str = path.to_str()?;
+                Some(IconState {
+                    title: Arc::from(name),
+                    path: Some(Arc::from(path_str)),
+                })
+            }));
         }
 
         Ok(Some(fence))
