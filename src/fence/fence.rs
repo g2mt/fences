@@ -5,13 +5,15 @@ use std::sync::{Arc, Weak};
 use anyhow::Result;
 use parking_lot::Mutex;
 use tracing::{debug, error};
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
-use windows_sys::Win32::UI::Shell::{DragAcceptFiles, DragFinish, DragQueryFileW, DragQueryPoint, ShellExecuteW, HDROP};
+use windows_sys::Win32::UI::Shell::{
+    DragAcceptFiles, DragFinish, DragQueryFileW, DragQueryPoint, ShellExecuteW, HDROP,
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 use crate::app::App;
 use crate::commands::*;
@@ -22,7 +24,7 @@ use crate::fence::scroll_area::ScrollArea;
 use crate::fence::title_bar::TitleBar;
 use crate::geo::Area;
 use crate::prompt;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Custom events
 pub const WM_USER_PAINT_WITH_ALPHA: u32 = WM_USER + 1;
@@ -163,7 +165,7 @@ impl HitManager {
 
         if let Some(Hit::Icon(idx)) = hit {
             let icon = fence.scroll_area.icons()[idx].clone();
-            icon.show_context_menu(pt.x, pt.y);
+            icon.show_context_menu(pt.x, pt.y, fence.base.hwnd());
         } else {
             fence.show_context_menu(pt.x, pt.y);
         }
@@ -742,8 +744,21 @@ impl Fence {
             }
             IDM_DELETE_ICON => {
                 if let Hit::Icon(icon_idx) = hit_type {
-                    self.remove_icon(icon_idx);
-                    should_save = true;
+                    let fence = self.clone();
+                    cover.executor().spawn(async move {
+                        let result = prompt::confirm(
+                            None,
+                            w!("Are you sure you want to delete this icon?"),
+                            w!("Confirm Deletion"),
+                            MB_YESNO | MB_ICONQUESTION,
+                        )
+                        .await;
+                        if result == IDYES {
+                            fence.remove_icon(icon_idx);
+                            let app = App::get();
+                            app.save_thread.get().unwrap().set_unsaved();
+                        }
+                    });
                 }
             }
             IDM_IMPORT => {
@@ -833,8 +848,7 @@ impl Fence {
         let mut paths: Vec<(String, String)> = Vec::new();
 
         for i in 0..file_count {
-            let char_count =
-                unsafe { DragQueryFileW(hdrop, i, std::ptr::null_mut(), 0) } as usize;
+            let char_count = unsafe { DragQueryFileW(hdrop, i, std::ptr::null_mut(), 0) } as usize;
             let mut buf: Vec<u16> = vec![0u16; char_count + 1];
             unsafe {
                 let _ = DragQueryFileW(hdrop, i, buf.as_mut_ptr(), buf.len() as u32);
@@ -843,7 +857,9 @@ impl Fence {
             let path = std::path::Path::new(&path_str);
             if path.is_file() {
                 if let (Some(name), Some(path_str)) = (
-                    path.file_stem().and_then(|s| s.to_str()).map(|s| s.to_string()),
+                    path.file_stem()
+                        .and_then(|s| s.to_str())
+                        .map(|s| s.to_string()),
                     path.to_str().map(|s| s.to_string()),
                 ) {
                     paths.push((name, path_str));

@@ -1,20 +1,20 @@
 use std::process::Command;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use parking_lot::Mutex;
 use tracing::{error, info};
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Controls::Dialogs::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 use crate::app::App;
 use crate::commands::*;
 use crate::config::state::IconState;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub struct Icon {
     base: BaseRef,
@@ -249,8 +249,7 @@ impl Icon {
     }
 
     /// Shows the context menu at absolute mouse position x, y
-    pub fn show_context_menu(&self, x: i32, y: i32) {
-        let hwnd = self.base.hwnd();
+    pub fn show_context_menu(&self, x: i32, y: i32, fence_hwnd: HWND) {
         let h_menu = unsafe { CreatePopupMenu() };
 
         unsafe {
@@ -259,14 +258,14 @@ impl Icon {
             let _ = AppendMenuW(h_menu, MF_STRING, IDM_SET_ICON_PATH, w!("Set &path"));
             let _ = AppendMenuW(h_menu, MF_STRING, IDM_DELETE_ICON, w!("&Delete"));
 
-            let _ = SetForegroundWindow(hwnd);
+            let _ = SetForegroundWindow(fence_hwnd);
             let _ = TrackPopupMenu(
                 h_menu,
                 TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                 x,
                 y,
                 0,
-                hwnd,
+                fence_hwnd,
                 std::ptr::null(),
             );
             let _ = DestroyMenu(h_menu);
