@@ -268,7 +268,7 @@ impl Fence {
                     hitman: HitManager::new(),
                 });
                 for icon_state in state.icons {
-                    fence.add_icon_with_path(&icon_state.title, icon_state.path.as_deref());
+                    fence.add_icon(&icon_state.title, icon_state.path.as_deref());
                 }
                 if use_layered {
                     fence.paint_with_alpha();
@@ -329,11 +329,7 @@ impl Fence {
         *self.sticky_pos.lock() = sticky;
     }
 
-    pub fn add_icon(&self, title: &str) {
-        self.add_icon_with_path(title, None);
-    }
-
-    pub fn add_icon_with_path(&self, title: &str, path: Option<&str>) {
+    pub fn add_icon(&self, title: &str, path: Option<&str>) {
         self.scroll_area.add_icon(title, path);
         self.scroll_area.reflow_icons();
     }
@@ -420,7 +416,7 @@ impl Fence {
             fence.scroll_area.clear_icons();
             // Add kept items
             for item in kept_items {
-                fence.add_icon_with_path(&item.title, Some(&item.path));
+                fence.add_icon(&item.title, Some(&item.path));
             }
         }) {
             Ok(import_dialog) => import_dialog,
@@ -461,7 +457,7 @@ impl Fence {
                 let path = entry.path();
                 if path.is_file() {
                     if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                        fence.add_icon_with_path(name, path.to_str());
+                        fence.add_icon(name, path.to_str());
                     }
                 }
             }
@@ -679,7 +675,7 @@ impl Fence {
         match command {
             IDM_ADD_ICON => {
                 let title = format!("Icon #{}", self.scroll_area.icons().len());
-                self.add_icon(&title);
+                self.add_icon(&title, None);
                 should_save = true;
             }
             IDM_RENAME_FENCE => {
