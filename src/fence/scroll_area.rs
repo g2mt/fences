@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::{Mutex, MutexGuard};
@@ -9,9 +9,10 @@ use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 use crate::app::App;
+use crate::config::state::IconState;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 pub struct ScrollArea {
     base: BaseRef,
@@ -57,6 +58,20 @@ impl ScrollArea {
 
     pub fn icon_by_index(&self, index: usize) -> Option<Arc<Icon>> {
         self.icons.lock().get(index).cloned()
+    }
+
+    pub fn set_icons_from_state(&self, states: &[IconState]) {
+        let mut icons = self.icons.lock();
+        icons.clear();
+        for state in states {
+            icons.push(Icon::new(
+                self.base.hwnd(),
+                &state.title,
+                state.path.as_deref(),
+                0,
+                0,
+            ));
+        }
     }
 
     pub fn add_icon(&self, title: &str, path: Option<&str>) {

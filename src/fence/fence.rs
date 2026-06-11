@@ -269,9 +269,7 @@ impl Fence {
                     last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
                     hitman: HitManager::new(),
                 });
-                for icon_state in state.icons {
-                    fence.add_icon(&icon_state.title, icon_state.path.as_deref());
-                }
+                fence.set_icons_from_state(&state.icons);
                 unsafe { DragAcceptFiles(fence.base().hwnd(), 1) };
                 if use_layered {
                     fence.paint_with_alpha();
@@ -330,6 +328,11 @@ impl Fence {
 
     pub fn set_sticky(&self, sticky: Option<crate::config::state::FenceStickyPosition>) {
         *self.sticky_pos.lock() = sticky;
+    }
+
+    pub fn set_icons_from_state(&self, icons: &[IconState]) {
+        self.scroll_area.set_icons_from_state(icons);
+        self.scroll_area.reflow_icons();
     }
 
     pub fn add_icon(&self, title: &str, path: Option<&str>) {
