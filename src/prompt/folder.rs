@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use parking_lot::Mutex;
+use crate::mutex::Mutex;
 use tracing::{debug, info};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::System::Com::CoTaskMemFree;

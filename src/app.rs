@@ -3,13 +3,12 @@ use std::sync::atomic::AtomicI32;
 use std::sync::{Arc, LazyLock, OnceLock};
 use std::time::SystemTime;
 
-use anyhow::{Result, anyhow};
-use parking_lot::Mutex;
+use anyhow::{anyhow, Result};
 use tracing::{error, info, warn};
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::RECT;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 use crate::config::config::Config;
 use crate::config::save_thread::SaveThread;
@@ -18,7 +17,8 @@ use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
 use crate::fence::{FenceList, ImportDialog};
 use crate::geo::Bounds;
-use crate::paths::{STATE_PATH, app_file};
+use crate::mutex::Mutex;
+use crate::paths::{app_file, STATE_PATH};
 use crate::utils::HWNDWrapper;
 
 #[derive(Default)]

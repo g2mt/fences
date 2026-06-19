@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use parking_lot::Mutex;
+use crate::mutex::Mutex;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::core::*;
 

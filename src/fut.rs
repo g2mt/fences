@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
-use parking_lot::Mutex;
+use crate::mutex::Mutex;
 use windows_sys::Win32::Foundation::{LPARAM, WPARAM};
 use windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW;
 

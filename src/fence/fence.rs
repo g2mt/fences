@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Weak};
 
 use anyhow::Result;
-use parking_lot::Mutex;
+use crate::mutex::Mutex;
 use tracing::{debug, error};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;

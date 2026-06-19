@@ -1,13 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use tracing::{error, info};
 use tracing_subscriber::prelude::*;
+use windows_sys::core::*;
 use windows_sys::Win32::UI::Controls::{
-    ICC_LISTVIEW_CLASSES, INITCOMMONCONTROLSEX, InitCommonControlsEx,
+    InitCommonControlsEx, ICC_LISTVIEW_CLASSES, INITCOMMONCONTROLSEX,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 mod app;
 mod commands;
@@ -19,6 +19,7 @@ mod fence;
 mod fut;
 mod geo;
 mod layout;
+mod mutex;
 mod paths;
 mod prompt;
 mod utils;
@@ -27,7 +28,7 @@ mod window;
 use crate::app::App;
 use crate::config::save_thread::SaveThread;
 use crate::desktop_cover::DesktopCover;
-use crate::paths::{ID_PATH, LOG_PATH, app_file, init_app_dir};
+use crate::paths::{app_file, init_app_dir, ID_PATH, LOG_PATH};
 
 fn ensure_single_instance() -> Result<()> {
     let id_path = App::get().id_path.get().unwrap();

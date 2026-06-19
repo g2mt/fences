@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, LazyLock, OnceLock, Weak};
 
 use anyhow::{Result, anyhow};
-use parking_lot::{Mutex, MutexGuard};
+use crate::mutex::{Mutex, MutexGuard};
 use tracing::debug;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
