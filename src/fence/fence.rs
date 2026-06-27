@@ -3,17 +3,16 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Weak};
 
 use anyhow::Result;
-use crate::mutex::Mutex;
 use tracing::{debug, error};
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows_sys::Win32::UI::Shell::{
-    DragAcceptFiles, DragFinish, DragQueryFileW, DragQueryPoint, HDROP, ShellExecuteW,
+    DragAcceptFiles, DragFinish, DragQueryFileW, DragQueryPoint, ShellExecuteW, HDROP,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 use crate::app::App;
 use crate::commands::*;
@@ -23,8 +22,9 @@ use crate::fence::import_dialog::{ImportDialog, ImportItem};
 use crate::fence::scroll_area::ScrollArea;
 use crate::fence::title_bar::TitleBar;
 use crate::geo::Area;
+use crate::mutex::Mutex;
 use crate::prompt;
-use crate::window::{Base, BaseRef, Window, register_classname};
+use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Custom events
 pub const WM_USER_PAINT_WITH_ALPHA: u32 = WM_USER + 1;
@@ -105,10 +105,6 @@ impl HitManager {
         Self {
             m: Mutex::new(None),
         }
-    }
-
-    fn unfocus(&self) -> Option<Hit> {
-        self.m.lock().take()
     }
 
     /// Updates the Hit value based on relative mouse position, returning the copied Hit value
@@ -592,6 +588,14 @@ impl Fence {
         &self.hitman
     }
 
+    pub fn unfocus(&self) {
+        self.hitman.m.lock().take();
+        for icon in self.scroll_area.icons().iter() {
+            icon.set_selected(false);
+        }
+        self.scroll_area.base().redraw(true);
+    }
+
     /// Shows the context menu at absolute mouse position x, y
     pub fn show_context_menu(&self, x: i32, y: i32) {
         let hwnd = self.base().hwnd();
@@ -874,10 +878,7 @@ impl Fence {
                     error!("Failed to copy {} to {}: {}", path_str, dest.display(), e);
                     continue;
                 }
-                let name = dest
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("");
+                let name = dest.file_stem().and_then(|s| s.to_str()).unwrap_or("");
                 let final_path = dest.to_str().unwrap_or("");
                 (name.to_string(), final_path.to_string())
             } else {
@@ -919,7 +920,7 @@ impl Window for Fence {
         let hwnd = self.base().hwnd();
         match msg {
             WM_DISPLAYCHANGE => {
-                self.hitman.unfocus();
+                self.unfocus();
                 unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
             WM_SETCURSOR => {
@@ -1031,7 +1032,7 @@ impl Window for Fence {
             WM_ACTIVATE => {
                 let activation = (wparam & 0xFFFF) as u16 as u32;
                 if activation == WA_INACTIVE {
-                    self.hitman.unfocus();
+                    self.unfocus();
                 }
                 unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
