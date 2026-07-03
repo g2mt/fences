@@ -265,7 +265,7 @@ impl Fence {
                     last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
                     hitman: HitManager::new(),
                 });
-                fence.set_icons_from_state(state.icons.iter());
+                fence.add_icons_from_state(state.icons.iter(), true);
                 unsafe { DragAcceptFiles(fence.base().hwnd(), 1) };
                 if use_layered {
                     fence.paint_with_alpha();
@@ -326,11 +326,12 @@ impl Fence {
         *self.sticky_pos.lock() = sticky;
     }
 
-    pub fn set_icons_from_state(
+    pub fn add_icons_from_state(
         &self,
         icons: impl Iterator<Item = impl std::borrow::Borrow<IconState>>,
+        clear: bool,
     ) {
-        self.scroll_area.set_icons_from_state(icons);
+        self.scroll_area.add_icons_from_state(icons, clear);
         self.scroll_area.reflow_icons();
     }
 
@@ -417,7 +418,7 @@ impl Fence {
 
         let fence = self.clone();
         let import_dialog = match ImportDialog::create_window(import_items, move |kept_states| {
-            fence.set_icons_from_state(kept_states.iter());
+            fence.add_icons_from_state(kept_states.iter(), true);
         }) {
             Ok(import_dialog) => import_dialog,
             Err(e) => {
@@ -453,19 +454,22 @@ impl Fence {
         fence.set_imported_from(Some(Arc::from(path_str.as_str())));
 
         if let Ok(entries) = std::fs::read_dir(folder_path) {
-            fence.set_icons_from_state(entries.filter_map(|entry| {
-                let entry = entry.ok()?;
-                let path = entry.path();
-                if !path.is_file() {
-                    return None;
-                }
-                let name = path.file_stem().and_then(|s| s.to_str())?;
-                let path_str = path.to_str()?;
-                Some(IconState {
-                    title: Arc::from(name),
-                    path: Some(Arc::from(path_str)),
-                })
-            }));
+            fence.add_icons_from_state(
+                entries.filter_map(|entry| {
+                    let entry = entry.ok()?;
+                    let path = entry.path();
+                    if !path.is_file() {
+                        return None;
+                    }
+                    let name = path.file_stem().and_then(|s| s.to_str())?;
+                    let path_str = path.to_str()?;
+                    Some(IconState {
+                        title: Arc::from(name),
+                        path: Some(Arc::from(path_str)),
+                    })
+                }),
+                true,
+            );
         }
 
         Ok(Some(fence))
@@ -905,7 +909,7 @@ impl Fence {
             return;
         }
 
-        self.set_icons_from_state(states.iter());
+        self.add_icons_from_state(states.iter(), false);
         self.scroll_area.base().redraw(true);
         App::get().save_thread.get().unwrap().set_unsaved();
     }

@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use anyhow::Result;
-use crate::mutex::{Mutex, MutexGuard};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Controls::*;
@@ -12,6 +11,7 @@ use crate::app::App;
 use crate::config::state::IconState;
 use crate::fence::icon::Icon;
 use crate::geo::Area;
+use crate::mutex::{Mutex, MutexGuard};
 use crate::window::{Base, BaseRef, Window, register_classname};
 
 pub struct ScrollArea {
@@ -60,12 +60,15 @@ impl ScrollArea {
         self.icons.lock().get(index).cloned()
     }
 
-    pub fn set_icons_from_state(
+    pub fn add_icons_from_state(
         &self,
         states: impl Iterator<Item = impl std::borrow::Borrow<IconState>>,
+        clear: bool,
     ) {
         let mut icons = self.icons.lock();
-        icons.clear();
+        if clear {
+            icons.clear();
+        }
         for state in states {
             let state = state.borrow();
             icons.push(Icon::new(

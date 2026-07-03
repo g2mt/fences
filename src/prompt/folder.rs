@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use crate::mutex::Mutex;
 use tracing::{debug, info};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::System::Com::CoTaskMemFree;
@@ -8,6 +7,7 @@ use windows_sys::Win32::UI::Shell::*;
 use windows_sys::core::w;
 
 use crate::fut::{PromptFuture, PromptState};
+use crate::mutex::Mutex;
 
 pub fn browse_for_folder() -> PromptFuture<Option<String>> {
     let state = Arc::new(Mutex::new(PromptState {

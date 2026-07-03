@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use crate::mutex::Mutex;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::core::*;
 
 use crate::fut::{PromptFuture, PromptState};
+use crate::mutex::Mutex;
 
 pub fn confirm(
     _hwnd: Option<windows_sys::Win32::Foundation::HWND>,

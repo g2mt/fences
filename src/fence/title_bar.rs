@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use crate::mutex::Mutex;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -9,6 +8,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 use crate::app::App;
 use crate::geo::Area;
+use crate::mutex::Mutex;
 use crate::window::{Base, BaseRef, Window, register_classname};
 
 pub struct TitleBar {

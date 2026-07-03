@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::mutex::Mutex;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
@@ -10,6 +9,7 @@ use windows_sys::core::*;
 
 use crate::fut::{PromptFuture, PromptState};
 use crate::layout::{Item, Layout, Orientation};
+use crate::mutex::Mutex;
 use crate::utils::HWNDWrapper;
 
 const ID_EDIT: u32 = 101;

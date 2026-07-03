@@ -4,7 +4,6 @@ use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, LazyLock, OnceLock, Weak};
 
 use anyhow::{Result, anyhow};
-use crate::mutex::{Mutex, MutexGuard};
 use tracing::debug;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
@@ -13,6 +12,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::core::*;
 
 use crate::geo::Area;
+use crate::mutex::{Mutex, MutexGuard};
 
 // Class names
 

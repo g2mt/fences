@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use crate::mutex::Mutex;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
@@ -12,6 +11,7 @@ use windows_sys::core::*;
 
 use crate::config::state::IconState;
 use crate::layout::{Item, Layout, Orientation};
+use crate::mutex::Mutex;
 use crate::utils::HWNDWrapper;
 use crate::window::{Base, BaseRef, Window, register_classname_ex};
 

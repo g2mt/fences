@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use anyhow::Result;
-use crate::mutex::Mutex;
 use tracing::{debug, error, info};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
@@ -18,6 +17,7 @@ use crate::commands::*;
 use crate::config::state::AppState;
 use crate::fence::Fence;
 use crate::fut::AsyncExecutor;
+use crate::mutex::Mutex;
 use crate::utils::HWNDWrapper;
 use crate::window::{Base, BaseRef, Window, register_classname};
 

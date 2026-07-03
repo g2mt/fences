@@ -3,11 +3,11 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
-use crate::mutex::Mutex;
 use windows_sys::Win32::Foundation::{LPARAM, WPARAM};
 use windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW;
 
 use crate::desktop_cover::WM_USER_WAKE_FUTURE;
+use crate::mutex::Mutex;
 use crate::utils::HWNDWrapper;
 
 pub struct PromptState<T> {
