@@ -1,4 +1,6 @@
-# rsfences
+# Desktop Fences
+
+![screenshot](docs/fence.png)
 
 Organise desktop shortcuts and files into resizable, movable containers ("fences") on the Windows desktop.
 
@@ -10,10 +12,15 @@ Organise desktop shortcuts and files into resizable, movable containers ("fences
 
 ## Usage
 
-- **Add fence** (tray menu): Creates a new empty fence at the centre of the screen.
-- **Add fence from folder** (tray menu): Opens a folder picker and populates a fence with its contents.
-- **Reload** (tray menu): Spawns a new instance and exits the current one.
-- **Exit** (tray menu): Closes the application and saves state.
+System tray menu:
+
+- **Add fence**: Creates a new empty fence at the centre of the screen.
+- **Add fence from folder**: Opens a folder picker and populates a fence with its contents.
+- **Reload**: Spawns a new instance and exits the current one.
+- **Exit**: Closes the application and saves state.
+
+Fence interaction:
+
 - **Right-click a fence**: Rename, delete, add icons, open in Explorer, or set sticky position (snap to screen corner).
 - **Drag title bar**: Move the fence.
 - **Drag edges / corners**: Resize the fence.
