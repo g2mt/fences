@@ -2,11 +2,6 @@
 
 Organise desktop shortcuts and files into resizable, movable containers ("fences") on the Windows desktop.
 
-Fences sit on the wallpaper behind the desktop icon layer, and can be moved, resized, renamed, and populated with file/folder shortcuts.
-
-## How it works
-
-- Fences sit on the desktop wallpaper, behind your existing desktop icons.
 - Drag a fence by its title bar to move it; drag its edges or corners to resize it.
 - Drop files or folders onto a fence to add shortcuts. Right-click inside to add, run, rename, or remove icons.
 - Dropping a folder opens an import dialog to pick which items to include.
