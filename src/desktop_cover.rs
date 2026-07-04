@@ -4,6 +4,10 @@ use std::sync::atomic::Ordering;
 
 use anyhow::Result;
 use tracing::{debug, error, info};
+use win_wrapper::fut::AsyncExecutor;
+use win_wrapper::mutex::Mutex;
+use win_wrapper::utils::HWNDWrapper;
+use win_wrapper::window::{Base, BaseRef, Window, register_classname};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -16,10 +20,6 @@ use crate::app::App;
 use crate::commands::*;
 use crate::config::state::AppState;
 use crate::fence::Fence;
-use crate::fut::AsyncExecutor;
-use crate::mutex::Mutex;
-use crate::utils::HWNDWrapper;
-use crate::window::{Base, BaseRef, Window, register_classname};
 
 // Custom events
 pub const WM_USER_SHELLICON: u32 = WM_USER + 1;
@@ -32,7 +32,7 @@ pub struct CapturedMouseState {
 
 pub struct DesktopCover {
     base: BaseRef,
-    executor: AsyncExecutor,
+    executor: AsyncExecutor<{ WM_USER_WAKE_FUTURE }>,
     captured_mouse_state: Mutex<Option<CapturedMouseState>>,
 }
 
@@ -112,7 +112,7 @@ impl DesktopCover {
 
                 let cover = Arc::new(Self {
                     base,
-                    executor: AsyncExecutor::new(HWNDWrapper(hwnd)),
+                    executor: AsyncExecutor::<{ WM_USER_WAKE_FUTURE }>::new(HWNDWrapper(hwnd)),
                     captured_mouse_state: Mutex::new(None),
                 });
                 Ok(cover)
@@ -120,7 +120,7 @@ impl DesktopCover {
         )
     }
 
-    pub fn executor(&self) -> &AsyncExecutor {
+    pub fn executor(&self) -> &AsyncExecutor<{ WM_USER_WAKE_FUTURE }> {
         &self.executor
     }
 

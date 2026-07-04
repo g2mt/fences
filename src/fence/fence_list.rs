@@ -3,12 +3,12 @@ use std::sync::atomic::Ordering;
 
 use anyhow::Result;
 use tracing::info;
+use win_wrapper::window::Window;
 
 use crate::app::App;
 use crate::config::state::{FenceState, FenceStickyPosition};
 use crate::desktop_cover::DesktopCover;
 use crate::fence::fence::Fence;
-use crate::window::Window;
 
 #[derive(Default)]
 pub struct FenceList {

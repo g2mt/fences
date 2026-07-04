@@ -3,6 +3,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use tracing::{error, info};
+use win_wrapper::mutex::Mutex;
+use win_wrapper::window::{Base, BaseRef, Window, register_classname};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Controls::Dialogs::*;
@@ -13,8 +15,6 @@ use windows_sys::core::*;
 use crate::app::App;
 use crate::commands::*;
 use crate::config::state::IconState;
-use crate::mutex::Mutex;
-use crate::window::{Base, BaseRef, Window, register_classname};
 
 pub struct Icon {
     base: BaseRef,

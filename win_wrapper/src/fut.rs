@@ -6,7 +6,6 @@ use std::task::{Context, Poll, Waker};
 use windows_sys::Win32::Foundation::{LPARAM, WPARAM};
 use windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW;
 
-use crate::desktop_cover::WM_USER_WAKE_FUTURE;
 use crate::mutex::Mutex;
 use crate::utils::HWNDWrapper;
 
@@ -34,24 +33,24 @@ impl<T> Future for PromptFuture<T> {
     }
 }
 
-pub struct WindowWaker {
+pub struct WindowWaker<const MSG: u32> {
     hwnd_w: HWNDWrapper,
 }
 
-impl std::task::Wake for WindowWaker {
+impl<const MSG: u32> std::task::Wake for WindowWaker<MSG> {
     fn wake(self: Arc<Self>) {
         unsafe {
-            let _ = PostMessageW(self.hwnd_w.0, WM_USER_WAKE_FUTURE, 0 as WPARAM, 0 as LPARAM);
+            let _ = PostMessageW(self.hwnd_w.0, MSG, 0 as WPARAM, 0 as LPARAM);
         }
     }
 }
 
-pub struct AsyncExecutor {
+pub struct AsyncExecutor<const MSG: u32> {
     pub tasks: Mutex<Vec<Pin<Box<dyn Future<Output = ()> + Send>>>>,
     hwnd_w: HWNDWrapper,
 }
 
-impl AsyncExecutor {
+impl<const MSG: u32> AsyncExecutor<MSG> {
     pub fn new(hwnd_w: HWNDWrapper) -> Self {
         Self {
             tasks: Mutex::new(Vec::new()),
@@ -62,13 +61,13 @@ impl AsyncExecutor {
     pub fn spawn(&self, fut: impl Future<Output = ()> + Send + 'static) {
         self.tasks.lock().push(Box::pin(fut));
         unsafe {
-            let _ = PostMessageW(self.hwnd_w.0, WM_USER_WAKE_FUTURE, 0, 0);
+            let _ = PostMessageW(self.hwnd_w.0, MSG, 0, 0);
         }
     }
 
     pub fn poll_all(&self) {
         let mut tasks = self.tasks.lock();
-        let waker = Arc::new(WindowWaker {
+        let waker = Arc::new(WindowWaker::<MSG> {
             hwnd_w: self.hwnd_w,
         })
         .into();

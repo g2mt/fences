@@ -4,7 +4,6 @@ use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, LazyLock, OnceLock, Weak};
 
 use anyhow::{Result, anyhow};
-use tracing::debug;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
 use windows_sys::Win32::System::LibraryLoader::*;
@@ -273,7 +272,6 @@ impl Drop for Base {
     fn drop(&mut self) {
         unsafe {
             if self.hwnd != HWND::default() {
-                debug!("DestroyWindow({:?})", self.hwnd);
                 let _ = DestroyWindow(self.hwnd);
             }
             self.hwnd = HWND::default();

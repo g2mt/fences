@@ -5,6 +5,9 @@ use std::time::SystemTime;
 
 use anyhow::{Result, anyhow};
 use tracing::{error, info, warn};
+use win_wrapper::geo::Bounds;
+use win_wrapper::mutex::Mutex;
+use win_wrapper::utils::HWNDWrapper;
 use windows_sys::Win32::Foundation::RECT;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
@@ -16,10 +19,7 @@ use crate::config::state::AppState;
 use crate::desktop_cover::DesktopCover;
 use crate::desktop_mirror::DesktopMirror;
 use crate::fence::{FenceList, ImportDialog};
-use crate::geo::Bounds;
-use crate::mutex::Mutex;
 use crate::paths::{STATE_PATH, app_file};
-use crate::utils::HWNDWrapper;
 
 #[derive(Default)]
 pub struct App {

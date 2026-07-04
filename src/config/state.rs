@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-
-use crate::geo::Area;
+use win_wrapper::geo::Area;
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct AppState {

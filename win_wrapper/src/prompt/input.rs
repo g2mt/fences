@@ -7,6 +7,7 @@ use windows_sys::Win32::System::LibraryLoader::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::core::*;
 
+use crate::controls;
 use crate::fut::{PromptFuture, PromptState};
 use crate::layout::{Item, Layout, Orientation};
 use crate::mutex::Mutex;
@@ -55,23 +56,15 @@ unsafe extern "system" fn input_wndproc(
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, data as *mut InputDialogData as isize);
 
             // Create a static message label
-            let label =
-                crate::controls::create_label(&data.message, 0, 0, 0, 0, hwnd, hinstance.into());
+            let label = controls::create_label(&data.message, 0, 0, 0, 0, hwnd, hinstance.into());
 
             // Create edit control
-            let edit = crate::controls::create_edit(
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                Some(ID_EDIT as HMENU),
-                hinstance.into(),
-            );
+            let edit =
+                controls::create_edit(0, 0, 0, 0, hwnd, Some(ID_EDIT as HMENU), hinstance.into());
             data.edit_hwnd = edit;
 
             // Create OK button
-            let ok_btn = crate::controls::create_button(
+            let ok_btn = controls::create_button(
                 "OK",
                 0,
                 0,
@@ -83,7 +76,7 @@ unsafe extern "system" fn input_wndproc(
             );
 
             // Create Cancel button
-            let cancel_btn = crate::controls::create_button(
+            let cancel_btn = controls::create_button(
                 "Cancel",
                 0,
                 0,
@@ -217,10 +210,9 @@ pub fn input(title: &str, message: &str, default: &str) -> PromptFuture<Option<S
             RegisterClassW(&wc);
         }
 
-        // Center dialog on screen
-        let bounds = crate::app::App::get().screen_bounds();
-        let screen_w = bounds.width.load(std::sync::atomic::Ordering::Relaxed);
-        let screen_h = bounds.height.load(std::sync::atomic::Ordering::Relaxed);
+        // Center dialog on screen using GetSystemMetrics
+        let screen_w = GetSystemMetrics(SM_CXSCREEN);
+        let screen_h = GetSystemMetrics(SM_CYSCREEN);
         let dlg_x = (screen_w - DLG_WIDTH) / 2;
         let dlg_y = (screen_h - DLG_HEIGHT) / 2;
 

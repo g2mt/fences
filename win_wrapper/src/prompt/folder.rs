@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use tracing::{debug, info};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::System::Com::CoTaskMemFree;
 use windows_sys::Win32::UI::Shell::*;
@@ -18,7 +17,6 @@ pub fn browse_for_folder() -> PromptFuture<Option<String>> {
 
     let state_clone = state.clone();
     std::thread::spawn(move || {
-        debug!("spawned thread");
         let res = browse_for_folder_sync();
         let mut s = state_clone.lock();
         s.result = Some(res);
@@ -46,7 +44,6 @@ fn browse_for_folder_sync() -> Option<String> {
     let pidl = unsafe { SHBrowseForFolderW(&mut browse_info) };
 
     if pidl.is_null() {
-        info!("User cancelled folder browse dialog");
         return None;
     }
 
@@ -61,10 +58,9 @@ fn browse_for_folder_sync() -> Option<String> {
         let path_str = String::from_utf16_lossy(
             &path[..path.iter().position(|&c| c == 0).unwrap_or(path.len())],
         );
-        info!("User selected folder: {}", path_str);
+
         Some(path_str)
     } else {
-        info!("Failed to get path from folder browse dialog");
         None
     }
 }

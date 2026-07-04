@@ -45,8 +45,7 @@ impl<T> Mutex<T> {
     #[track_caller]
     pub fn lock(&self) -> MutexGuard<'_, T> {
         fn lock_timed_out(caller: &'static Location<'static>) -> ! {
-            tracing::error!("mutex lock timed out after 5s — caller: {caller}");
-            panic!("timed out while locking mutex at {caller}");
+            panic!("mutex lock timed out at {caller}");
         }
 
         #[cfg(feature = "parking_lot")]

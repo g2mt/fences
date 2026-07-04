@@ -12,18 +12,10 @@ use windows_sys::core::*;
 mod app;
 mod commands;
 mod config;
-mod controls;
 mod desktop_cover;
 mod desktop_mirror;
 mod fence;
-mod fut;
-mod geo;
-mod layout;
-mod mutex;
 mod paths;
-mod prompt;
-mod utils;
-mod window;
 
 use crate::app::App;
 use crate::config::save_thread::SaveThread;

@@ -4,15 +4,19 @@ use std::sync::{Arc, Weak};
 
 use anyhow::Result;
 use tracing::{debug, error};
-use windows_sys::core::*;
+use win_wrapper::geo::Area;
+use win_wrapper::mutex::Mutex;
+use win_wrapper::prompt;
+use win_wrapper::window::{Base, BaseRef, Window, register_classname};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows_sys::Win32::UI::Shell::{
-    DragAcceptFiles, DragFinish, DragQueryFileW, DragQueryPoint, ShellExecuteW, HDROP,
+    DragAcceptFiles, DragFinish, DragQueryFileW, DragQueryPoint, HDROP, ShellExecuteW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 
 use crate::app::App;
 use crate::commands::*;
@@ -21,10 +25,6 @@ use crate::desktop_cover::DesktopCover;
 use crate::fence::import_dialog::{ImportDialog, ImportItem};
 use crate::fence::scroll_area::ScrollArea;
 use crate::fence::title_bar::TitleBar;
-use crate::geo::Area;
-use crate::mutex::Mutex;
-use crate::prompt;
-use crate::window::{register_classname, Base, BaseRef, Window};
 
 // Custom events
 pub const WM_USER_PAINT_WITH_ALPHA: u32 = WM_USER + 1;
