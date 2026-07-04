@@ -1,16 +1,17 @@
 use std::process::Command;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use tracing::{error, info};
-use winwrapper::mutex::Mutex;
-use winwrapper::window::{Base, BaseRef, Window, register_classname};
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Controls::Dialogs::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
+use winwrapper::error::WinError;
+use winwrapper::mutex::Mutex;
+use winwrapper::window::{register_classname, Base, BaseRef, Window};
 
 use crate::app::App;
 use crate::commands::*;
@@ -47,7 +48,7 @@ impl Icon {
             None,
             hinstance,
             |base| {
-                Ok(Arc::new(Self {
+                Ok::<_, WinError>(Arc::new(Self {
                     base,
                     state,
                     selected: AtomicBool::new(false),

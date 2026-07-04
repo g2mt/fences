@@ -36,9 +36,9 @@ dependencies = [
  "serde_json",
  "tracing",
  "tracing-subscriber",
- "win_wrapper",
  "windows-sys",
  "winresource",
+ "winwrapper",
 ]
 
 [[package]]
@@ -375,15 +375,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
-name = "win_wrapper"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde",
- "windows-sys",
-]
-
-[[package]]
 name = "windows-link"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -412,6 +403,14 @@ checksum = "0986a8b1d586b7d3e4fe3d9ea39fb451ae22869dcea4aa109d287a374d866087"
 dependencies = [
  "toml",
  "version_check",
+]
+
+[[package]]
+name = "winwrapper"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "windows-sys",
 ]
 
 [[package]]
