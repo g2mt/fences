@@ -4,10 +4,10 @@ use std::sync::atomic::Ordering;
 
 use anyhow::Result;
 use tracing::{debug, error, info};
-use win_wrapper::fut::AsyncExecutor;
-use win_wrapper::mutex::Mutex;
-use win_wrapper::utils::HWNDWrapper;
-use win_wrapper::window::{Base, BaseRef, Window, register_classname};
+use winwrapper::fut::AsyncExecutor;
+use winwrapper::mutex::Mutex;
+use winwrapper::utils::HWNDWrapper;
+use winwrapper::window::{Base, BaseRef, Window, register_classname};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;

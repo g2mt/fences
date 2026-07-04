@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 
 use anyhow::Result;
 use tracing::info;
-use win_wrapper::window::Window;
+use winwrapper::window::Window;
 
 use crate::app::App;
 use crate::config::state::{FenceState, FenceStickyPosition};

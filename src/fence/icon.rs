@@ -3,8 +3,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use tracing::{error, info};
-use win_wrapper::mutex::Mutex;
-use win_wrapper::window::{Base, BaseRef, Window, register_classname};
+use winwrapper::mutex::Mutex;
+use winwrapper::window::{Base, BaseRef, Window, register_classname};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Controls::Dialogs::*;

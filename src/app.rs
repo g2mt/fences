@@ -5,9 +5,9 @@ use std::time::SystemTime;
 
 use anyhow::{Result, anyhow};
 use tracing::{error, info, warn};
-use win_wrapper::geo::Bounds;
-use win_wrapper::mutex::Mutex;
-use win_wrapper::utils::HWNDWrapper;
+use winwrapper::geo::Bounds;
+use winwrapper::mutex::Mutex;
+use winwrapper::utils::HWNDWrapper;
 use windows_sys::Win32::Foundation::RECT;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;

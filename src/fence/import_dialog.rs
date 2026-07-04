@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use win_wrapper::layout::{Item, Layout, Orientation};
-use win_wrapper::mutex::Mutex;
-use win_wrapper::utils::HWNDWrapper;
-use win_wrapper::window::{Base, BaseRef, Window, register_classname_ex};
+use winwrapper::layout::{Item, Layout, Orientation};
+use winwrapper::mutex::Mutex;
+use winwrapper::utils::HWNDWrapper;
+use winwrapper::window::{Base, BaseRef, Window, register_classname_ex};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
@@ -176,7 +176,7 @@ impl ImportDialog {
                 }
 
                 // Import button
-                let import_btn = win_wrapper::controls::create_button(
+                let import_btn = winwrapper::controls::create_button(
                     "Import",
                     0,
                     0,
@@ -188,7 +188,7 @@ impl ImportDialog {
                 );
 
                 // Cancel button
-                let cancel_btn = win_wrapper::controls::create_button(
+                let cancel_btn = winwrapper::controls::create_button(
                     "Cancel",
                     0,
                     0,
@@ -200,7 +200,7 @@ impl ImportDialog {
                 );
 
                 // Checkbox for LNK filter
-                let lnk_checkbox = win_wrapper::controls::create_checkbox(
+                let lnk_checkbox = winwrapper::controls::create_checkbox(
                     "Show only shortcuts (.LNK)",
                     0,
                     0,

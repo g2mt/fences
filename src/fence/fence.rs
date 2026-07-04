@@ -4,10 +4,10 @@ use std::sync::{Arc, Weak};
 
 use anyhow::Result;
 use tracing::{debug, error};
-use win_wrapper::geo::Area;
-use win_wrapper::mutex::Mutex;
-use win_wrapper::prompt;
-use win_wrapper::window::{Base, BaseRef, Window, register_classname};
+use winwrapper::geo::Area;
+use winwrapper::mutex::Mutex;
+use winwrapper::prompt;
+use winwrapper::window::{Base, BaseRef, Window, register_classname};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
