@@ -5,13 +5,13 @@ use std::time::SystemTime;
 
 use anyhow::{Result, anyhow};
 use tracing::{error, info, warn};
-use winwrapper::geo::Bounds;
-use winwrapper::mutex::Mutex;
-use winwrapper::utils::HWNDWrapper;
 use windows_sys::Win32::Foundation::RECT;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::core::*;
+use winwrapper::geo::Bounds;
+use winwrapper::mutex::Mutex;
+use winwrapper::utils::HWNDWrapper;
 
 use crate::config::config::Config;
 use crate::config::save_thread::SaveThread;

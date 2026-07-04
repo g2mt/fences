@@ -1,17 +1,17 @@
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tracing::{error, info};
-use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Controls::Dialogs::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use windows_sys::core::*;
 use winwrapper::error::WinError;
 use winwrapper::mutex::Mutex;
-use winwrapper::window::{register_classname, Base, BaseRef, Window};
+use winwrapper::window::{Base, BaseRef, Window, register_classname};
 
 use crate::app::App;
 use crate::commands::*;

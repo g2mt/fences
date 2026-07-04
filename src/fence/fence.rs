@@ -4,10 +4,6 @@ use std::sync::{Arc, Weak};
 
 use anyhow::Result;
 use tracing::{debug, error};
-use winwrapper::geo::Area;
-use winwrapper::mutex::Mutex;
-use winwrapper::prompt;
-use winwrapper::window::{Base, BaseRef, Window, register_classname};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -17,6 +13,10 @@ use windows_sys::Win32::UI::Shell::{
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::core::*;
+use winwrapper::geo::Area;
+use winwrapper::mutex::Mutex;
+use winwrapper::prompt;
+use winwrapper::window::{Base, BaseRef, Window, register_classname};
 
 use crate::app::App;
 use crate::commands::*;

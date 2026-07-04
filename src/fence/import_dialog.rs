@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use winwrapper::layout::{Item, Layout, Orientation};
-use winwrapper::mutex::Mutex;
-use winwrapper::utils::HWNDWrapper;
-use winwrapper::window::{Base, BaseRef, Window, register_classname_ex};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::*;
@@ -12,6 +8,10 @@ use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::core::*;
+use winwrapper::layout::{Item, Layout, Orientation};
+use winwrapper::mutex::Mutex;
+use winwrapper::utils::HWNDWrapper;
+use winwrapper::window::{Base, BaseRef, Window, register_classname_ex};
 
 use crate::config::state::IconState;
 

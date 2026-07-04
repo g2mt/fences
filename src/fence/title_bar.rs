@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use winwrapper::geo::Area;
-use winwrapper::mutex::Mutex;
-use winwrapper::window::{Base, BaseRef, Window, register_classname};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use winwrapper::geo::Area;
+use winwrapper::mutex::Mutex;
+use winwrapper::window::{Base, BaseRef, Window, register_classname};
 
 use crate::app::App;
 
