@@ -1,0 +1,4 @@
+- branch: master
+  path: ./winwrapper
+  tags: []
+  url: https://github.com/g2mt/winwrapper
