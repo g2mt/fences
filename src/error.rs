@@ -20,6 +20,3 @@ impl fmt::Display for WinError {
 }
 
 impl Error for WinError {}
-
-/// Convenience alias for `std::result::Result<T, WinError>`.
-pub type Result<T> = std::result::Result<T, WinError>;

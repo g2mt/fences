@@ -1,5 +1,5 @@
 pub mod controls;
-pub mod result;
+pub mod error;
 pub mod fut;
 pub mod geo;
 pub mod layout;
