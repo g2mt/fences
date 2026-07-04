@@ -713,9 +713,8 @@ impl Fence {
                 let fence = self.clone();
                 cover.executor().spawn(async move {
                     let result = prompt::confirm(
-                        None,
-                        w!("Are you sure you want to delete this fence?"),
-                        w!("Confirm Deletion"),
+                        "Are you sure you want to delete this fence?",
+                        "Confirm Deletion",
                         MB_YESNO | MB_ICONQUESTION,
                     )
                     .await;
@@ -761,9 +760,8 @@ impl Fence {
                     let fence = self.clone();
                     cover.executor().spawn(async move {
                         let result = prompt::confirm(
-                            None,
-                            w!("Are you sure you want to delete this icon?"),
-                            w!("Confirm Deletion"),
+                            "Are you sure you want to delete this icon?",
+                            "Confirm Deletion",
                             MB_YESNO | MB_ICONQUESTION,
                         )
                         .await;

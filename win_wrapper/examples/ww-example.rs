@@ -143,9 +143,8 @@ impl App {
             ID_BTN_MESSAGE => {
                 self.executor.spawn(async {
                     let _ = prompt::confirm(
-                        None,
-                        w!("Hello! This is a test message."),
-                        w!("Test Message"),
+                        "Hello! This is a test message.",
+                        "Test Message",
                         MB_OK | MB_ICONINFORMATION,
                     )
                     .await;
@@ -161,16 +160,7 @@ impl App {
                         Some(s) if !s.is_empty() => (format!("You entered:\n{s}"), "Input Result"),
                         _ => ("No input was provided.".into(), "Input Result"),
                     };
-                    let text_w: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
-                    let caption_w: Vec<u16> =
-                        caption.encode_utf16().chain(std::iter::once(0)).collect();
-                    let _ = prompt::confirm(
-                        None,
-                        text_w.as_ptr(),
-                        caption_w.as_ptr(),
-                        MB_OK | MB_ICONINFORMATION,
-                    )
-                    .await;
+                    let _ = prompt::confirm(&text, caption, MB_OK | MB_ICONINFORMATION).await;
                 });
             }
 
@@ -181,16 +171,7 @@ impl App {
                         Some(p) => (format!("Selected folder:\n{p}"), "Folder Result"),
                         None => ("No folder was selected.".into(), "Folder Result"),
                     };
-                    let text_w: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
-                    let caption_w: Vec<u16> =
-                        caption.encode_utf16().chain(std::iter::once(0)).collect();
-                    let _ = prompt::confirm(
-                        None,
-                        text_w.as_ptr(),
-                        caption_w.as_ptr(),
-                        MB_OK | MB_ICONINFORMATION,
-                    )
-                    .await;
+                    let _ = prompt::confirm(&text, caption, MB_OK | MB_ICONINFORMATION).await;
                 });
             }
 

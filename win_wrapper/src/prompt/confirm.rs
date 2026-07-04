@@ -1,15 +1,13 @@
 use std::sync::Arc;
 
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 use crate::fut::{PromptFuture, PromptState};
 use crate::mutex::Mutex;
 
 pub fn confirm(
-    _hwnd: Option<windows_sys::Win32::Foundation::HWND>,
-    text: PCWSTR,
-    caption: PCWSTR,
+    text: &str,
+    caption: &str,
     utype: MESSAGEBOX_STYLE,
 ) -> PromptFuture<MESSAGEBOX_RESULT> {
     let state = Arc::new(Mutex::new(PromptState {
@@ -19,22 +17,8 @@ pub fn confirm(
     }));
 
     let state_clone = state.clone();
-    let text_u16: Vec<u16> = unsafe {
-        let mut len = 0;
-        while *text.add(len) != 0 {
-            len += 1;
-        }
-        // include the null terminator so MessageBoxW gets a valid C string
-        std::slice::from_raw_parts(text, len + 1).to_vec()
-    };
-    let caption_u16: Vec<u16> = unsafe {
-        let mut len = 0;
-        while *caption.add(len) != 0 {
-            len += 1;
-        }
-        // include the null terminator so MessageBoxW gets a valid C string
-        std::slice::from_raw_parts(caption, len + 1).to_vec()
-    };
+    let text_u16: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    let caption_u16: Vec<u16> = caption.encode_utf16().chain(std::iter::once(0)).collect();
 
     std::thread::spawn(move || {
         let result = unsafe {
