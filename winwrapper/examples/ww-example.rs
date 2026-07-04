@@ -1,12 +1,5 @@
 use std::sync::Arc;
 
-use win_wrapper::result::Result;
-use win_wrapper::fut::AsyncExecutor;
-use win_wrapper::layout::{Item, Layout, Orientation};
-use win_wrapper::mutex::Mutex;
-use win_wrapper::utils::HWNDWrapper;
-use win_wrapper::window::{register_classname, Base, BaseRef, Window};
-use win_wrapper::{controls, prompt};
 use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -14,6 +7,15 @@ use windows_sys::Win32::UI::Controls::{
     InitCommonControlsEx, ICC_STANDARD_CLASSES, INITCOMMONCONTROLSEX,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
+use winwrapper::error::WinError;
+use winwrapper::fut::AsyncExecutor;
+use winwrapper::layout::{Item, Layout, Orientation};
+use winwrapper::mutex::Mutex;
+use winwrapper::utils::HWNDWrapper;
+use winwrapper::window::{register_classname, Base, BaseRef, Window};
+use winwrapper::{controls, prompt};
+
+type Result<T> = std::result::Result<T, WinError>;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -51,7 +53,7 @@ impl App {
         Base::create_window::<Self, _>(
             0,
             class,
-            w!("win_wrapper example"),
+            w!("winwrapper example"),
             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE,
             (unsafe { GetSystemMetrics(SM_CXSCREEN) } - WIDTH) / 2,
             (unsafe { GetSystemMetrics(SM_CYSCREEN) } - HEIGHT) / 2,

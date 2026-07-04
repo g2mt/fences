@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, LazyLock, OnceLock, Weak};
 
-use crate::result::{Result, WinError};
+use crate::error::WinError;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
 use windows_sys::Win32::System::LibraryLoader::*;
@@ -88,7 +88,7 @@ unsafe impl Sync for Base {}
 pub type BaseRef = Pin<Box<Base>>; // pinned for win32
 
 impl Base {
-    pub fn create_window<W, F>(
+    pub fn create_window<W, F, E>(
         dwexstyle: WINDOW_EX_STYLE,
         classname: ClassName,
         lpwindowname: PCWSTR,
@@ -101,45 +101,12 @@ impl Base {
         hmenu: Option<HMENU>,
         hinstance: HINSTANCE,
         f: F,
-    ) -> Result<Arc<W>>
+    ) -> std::result::Result<Arc<W>, E>
     where
-        F: FnOnce(BaseRef) -> Result<Arc<W>>,
+        F: FnOnce(BaseRef) -> std::result::Result<Arc<W>, E>,
+        E: From<WinError>,
         W: Window,
     {
-        let base = unsafe {
-            Self::create_window_uninit(
-                dwexstyle,
-                classname,
-                lpwindowname,
-                dwstyle,
-                x,
-                y,
-                nwidth,
-                nheight,
-                hwndparent,
-                hmenu,
-                hinstance,
-            )?
-        };
-        let window = f(base)?;
-        let window_ = Arc::downgrade(&window);
-        window.base().window.get_or_init(|| window_);
-        Ok(window)
-    }
-
-    unsafe fn create_window_uninit(
-        dwexstyle: WINDOW_EX_STYLE,
-        classname: ClassName,
-        lpwindowname: PCWSTR,
-        dwstyle: WINDOW_STYLE,
-        x: i32,
-        y: i32,
-        nwidth: i32,
-        nheight: i32,
-        hwndparent: HWND,
-        hmenu: Option<HMENU>,
-        hinstance: HINSTANCE,
-    ) -> Result<BaseRef> {
         let mut self_ref = Box::into_pin(Box::new(Self {
             hwnd: HWND::default(),
             window: OnceLock::new(),
@@ -162,13 +129,17 @@ impl Base {
             )
         };
         if hwnd == std::ptr::null_mut() {
-            return Err(WinError::last_error());
+            return Err(WinError::last_error().into());
         }
         unsafe {
             let mut_ref = Pin::get_unchecked_mut(self_ref.as_mut());
             mut_ref.hwnd = hwnd;
         }
-        Ok(self_ref)
+        let base = self_ref;
+        let window = f(base)?;
+        let window_ = Arc::downgrade(&window);
+        window.base().window.get_or_init(|| window_);
+        Ok(window)
     }
 
     pub fn hwnd(&self) -> HWND {
