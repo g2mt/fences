@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, LazyLock, OnceLock, Weak};
 
-use anyhow::{Result, anyhow};
+use crate::result::{Result, WinError};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
 use windows_sys::Win32::System::LibraryLoader::*;
@@ -162,10 +162,7 @@ impl Base {
             )
         };
         if hwnd == std::ptr::null_mut() {
-            return Err(anyhow!(
-                "CreateWindowExW failed, GetLastError()={:?}",
-                unsafe { GetLastError() }
-            ));
+            return Err(WinError::last_error());
         }
         unsafe {
             let mut_ref = Pin::get_unchecked_mut(self_ref.as_mut());

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use win_wrapper::result::Result;
 use win_wrapper::fut::AsyncExecutor;
 use win_wrapper::layout::{Item, Layout, Orientation};
 use win_wrapper::mutex::Mutex;
