@@ -24,14 +24,16 @@ pub fn confirm(
         while *text.add(len) != 0 {
             len += 1;
         }
-        std::slice::from_raw_parts(text, len).to_vec()
+        // include the null terminator so MessageBoxW gets a valid C string
+        std::slice::from_raw_parts(text, len + 1).to_vec()
     };
     let caption_u16: Vec<u16> = unsafe {
         let mut len = 0;
         while *caption.add(len) != 0 {
             len += 1;
         }
-        std::slice::from_raw_parts(caption, len).to_vec()
+        // include the null terminator so MessageBoxW gets a valid C string
+        std::slice::from_raw_parts(caption, len + 1).to_vec()
     };
 
     std::thread::spawn(move || {
