@@ -70,6 +70,10 @@ impl ScrollArea {
         self.icons.lock().get(index).cloned()
     }
 
+    pub fn icon_by_pos(&self, rel_x: i32, rel_y: i32) -> Option<Arc<Icon>> {
+        todo!()
+    }
+
     pub fn state(&self) -> Vec<IconState> {
         self.icons
             .lock()
@@ -104,10 +108,21 @@ impl ScrollArea {
         self.reflow_icons();
     }
 
+    /// Adds an icon with title and path. Auto creates title if empty string is passed.
     pub fn add_icon(&self, title: &str, path: Option<&str>) {
-        self.icons
-            .lock()
-            .push(Icon::new(self.base.hwnd(), title, path, 0, 0));
+        let mut icons = self.icons.lock();
+        if title == "" {
+            let len = icons.len() + 1;
+            icons.push(Icon::new(
+                self.base.hwnd(),
+                &format!("Icon #{}", len),
+                path,
+                0,
+                0,
+            ));
+        } else {
+            icons.push(Icon::new(self.base.hwnd(), title, path, 0, 0));
+        }
         self.reflow_icons();
     }
 
@@ -144,6 +159,11 @@ impl ScrollArea {
             }
         }
         self.update_scroll_info();
+    }
+
+    /// Selects an icon, or clears selection
+    pub fn select_icon(&self, idx: Option<usize>) {
+        todo!()
     }
 
     /** Events **/

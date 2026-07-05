@@ -29,7 +29,7 @@ use crate::fence::title_bar::TitleBar;
 // Custom events
 pub const WM_USER_PAINT_WITH_ALPHA: u32 = WM_USER + 1;
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Hit {
     TitleBar,
     Client,
@@ -669,8 +669,7 @@ impl Fence {
 
         match command {
             IDM_ADD_ICON => {
-                let title = format!("Icon #{}", self.scroll_area.icons().len());
-                self.scroll_area.add_icon(&title, None);
+                self.scroll_area.add_icon("", None);
                 should_save = true;
             }
             IDM_RENAME_FENCE => {
