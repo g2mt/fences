@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use anyhow::Result;
 use windows_sys::Win32::Foundation::*;
@@ -8,7 +8,7 @@ use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use winwrapper::geo::Area;
 use winwrapper::mutex::{Mutex, MutexGuard};
-use winwrapper::window::{Base, BaseRef, Window, register_classname};
+use winwrapper::window::{register_classname, Base, BaseRef, Window};
 
 use crate::app::App;
 use crate::config::state::IconState;
@@ -52,6 +52,18 @@ impl ScrollArea {
         )
     }
 
+    pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
+        let config = App::config();
+        let border = config.fence.border_thickness;
+        let title_h = config.fence.title_bar_height;
+        Area::new(
+            border,
+            title_h,
+            fence_area.width - (border * 2),
+            fence_area.height - title_h - border,
+        )
+    }
+
     pub fn icons(&self) -> MutexGuard<'_, Vec<Arc<Icon>>> {
         self.icons.lock()
     }
@@ -79,12 +91,15 @@ impl ScrollArea {
                 0,
             ));
         }
+        drop(icons);
+        self.reflow_icons();
     }
 
     pub fn add_icon(&self, title: &str, path: Option<&str>) {
         self.icons
             .lock()
             .push(Icon::new(self.base.hwnd(), title, path, 0, 0));
+        self.reflow_icons();
     }
 
     pub fn remove_icon(&self, index: usize) {
@@ -92,6 +107,8 @@ impl ScrollArea {
         if index < icons.len() {
             icons.remove(index);
         }
+        drop(icons);
+        self.reflow_icons();
     }
 
     pub fn reflow_icons(&self) {
@@ -118,18 +135,6 @@ impl ScrollArea {
             }
         }
         self.update_scroll_info();
-    }
-
-    pub fn area_from_fence_area(fence_area: &Area<i32>) -> Area<i32> {
-        let config = App::config();
-        let border = config.fence.border_thickness;
-        let title_h = config.fence.title_bar_height;
-        Area::new(
-            border,
-            title_h,
-            fence_area.width - (border * 2),
-            fence_area.height - title_h - border,
-        )
     }
 
     fn paint(&self, hdc: HDC) {

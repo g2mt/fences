@@ -265,7 +265,7 @@ impl Fence {
                     last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
                     hitman: HitManager::new(),
                 });
-                fence.add_icons_from_state(state.icons.iter(), true);
+                fence.scroll_area.add_icons_from_state(state.icons.iter(), true);
                 unsafe { DragAcceptFiles(fence.base().hwnd(), 1) };
                 if use_layered {
                     fence.paint_with_alpha();
@@ -324,25 +324,6 @@ impl Fence {
 
     pub fn set_sticky(&self, sticky: Option<crate::config::state::FenceStickyPosition>) {
         *self.sticky_pos.lock() = sticky;
-    }
-
-    pub fn add_icons_from_state(
-        &self,
-        icons: impl Iterator<Item = impl std::borrow::Borrow<IconState>>,
-        clear: bool,
-    ) {
-        self.scroll_area.add_icons_from_state(icons, clear);
-        self.scroll_area.reflow_icons();
-    }
-
-    pub fn add_icon(&self, title: &str, path: Option<&str>) {
-        self.scroll_area.add_icon(title, path);
-        self.scroll_area.reflow_icons();
-    }
-
-    pub fn remove_icon(&self, index: usize) {
-        self.scroll_area.remove_icon(index);
-        self.scroll_area.reflow_icons();
     }
 
     pub fn imported_from(&self) -> Option<Arc<str>> {
@@ -418,7 +399,7 @@ impl Fence {
 
         let fence = self.clone();
         let import_dialog = match ImportDialog::create_window(import_items, move |kept_states| {
-            fence.add_icons_from_state(kept_states.iter(), true);
+            fence.scroll_area.add_icons_from_state(kept_states.iter(), true);
         }) {
             Ok(import_dialog) => import_dialog,
             Err(e) => {
@@ -454,7 +435,7 @@ impl Fence {
         fence.set_imported_from(Some(Arc::from(path_str.as_str())));
 
         if let Ok(entries) = std::fs::read_dir(folder_path) {
-            fence.add_icons_from_state(
+            fence.scroll_area.add_icons_from_state(
                 entries.filter_map(|entry| {
                     let entry = entry.ok()?;
                     let path = entry.path();
@@ -692,7 +673,7 @@ impl Fence {
         match command {
             IDM_ADD_ICON => {
                 let title = format!("Icon #{}", self.scroll_area.icons().len());
-                self.add_icon(&title, None);
+                self.scroll_area.add_icon(&title, None);
                 should_save = true;
             }
             IDM_RENAME_FENCE => {
@@ -766,7 +747,7 @@ impl Fence {
                         )
                         .await;
                         if result == IDYES {
-                            fence.remove_icon(icon_idx);
+                            fence.scroll_area.remove_icon(icon_idx);
                             let app = App::get();
                             app.save_thread.get().unwrap().set_unsaved();
                         }
@@ -907,7 +888,7 @@ impl Fence {
             return;
         }
 
-        self.add_icons_from_state(states.iter(), false);
+        self.scroll_area.add_icons_from_state(states.iter(), false);
         self.scroll_area.base().redraw(true);
         App::get().save_thread.get().unwrap().set_unsaved();
     }
