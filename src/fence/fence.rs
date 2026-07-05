@@ -4,19 +4,19 @@ use std::sync::{Arc, Weak};
 
 use anyhow::Result;
 use tracing::{debug, error};
+use windows_sys::core::*;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows_sys::Win32::UI::Shell::{
-    DragAcceptFiles, DragFinish, DragQueryFileW, DragQueryPoint, HDROP, ShellExecuteW,
+    DragAcceptFiles, DragFinish, DragQueryFileW, DragQueryPoint, ShellExecuteW, HDROP,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 use winwrapper::geo::Area;
 use winwrapper::mutex::Mutex;
 use winwrapper::prompt;
-use winwrapper::window::{Base, BaseRef, Window, register_classname};
+use winwrapper::window::{register_classname, Base, BaseRef, Window};
 
 use crate::app::App;
 use crate::commands::*;
@@ -185,7 +185,8 @@ impl HitManager {
 
     /// Reacts based on the dragging movement of the mouse
     pub fn on_mouse_move(&self, fence: &Fence, dx: i32, dy: i32) {
-        if let Some(hit_type) = *self.m.lock() {
+        // Clone to ensure hit manager doesnt deadlock
+        if let Some(hit_type) = self.m.lock().clone() {
             match hit_type {
                 Hit::TitleBar => fence.base().move_by(dx, dy),
                 Hit::Left => fence.add_area(dx, 0, -dx, 0),
@@ -265,7 +266,9 @@ impl Fence {
                     last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
                     hitman: HitManager::new(),
                 });
-                fence.scroll_area.add_icons_from_state(state.icons.iter(), true);
+                fence
+                    .scroll_area
+                    .add_icons_from_state(state.icons.iter(), true);
                 unsafe { DragAcceptFiles(fence.base().hwnd(), 1) };
                 if use_layered {
                     fence.paint_with_alpha();
@@ -296,15 +299,7 @@ impl Fence {
                 area.width.load(Ordering::Relaxed),
                 area.height.load(Ordering::Relaxed),
             ),
-            icons: self
-                .scroll_area
-                .icons()
-                .iter()
-                .map(|i| IconState {
-                    title: i.title(),
-                    path: i.path(),
-                })
-                .collect(),
+            icons: self.scroll_area.state(),
             imported_from: self.imported_from().clone(),
             sticky_pos: self.sticky(),
         }
@@ -399,7 +394,9 @@ impl Fence {
 
         let fence = self.clone();
         let import_dialog = match ImportDialog::create_window(import_items, move |kept_states| {
-            fence.scroll_area.add_icons_from_state(kept_states.iter(), true);
+            fence
+                .scroll_area
+                .add_icons_from_state(kept_states.iter(), true);
         }) {
             Ok(import_dialog) => import_dialog,
             Err(e) => {

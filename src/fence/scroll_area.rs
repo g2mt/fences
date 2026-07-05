@@ -64,12 +64,21 @@ impl ScrollArea {
         )
     }
 
-    pub fn icons(&self) -> MutexGuard<'_, Vec<Arc<Icon>>> {
-        self.icons.lock()
-    }
+    /** Icons **/
 
     pub fn icon_by_index(&self, index: usize) -> Option<Arc<Icon>> {
         self.icons.lock().get(index).cloned()
+    }
+
+    pub fn state(&self) -> Vec<IconState> {
+        self.icons
+            .lock()
+            .iter()
+            .map(|i| IconState {
+                title: i.title(),
+                path: i.path(),
+            })
+            .collect()
     }
 
     pub fn add_icons_from_state(
@@ -136,6 +145,8 @@ impl ScrollArea {
         }
         self.update_scroll_info();
     }
+
+    /** Events **/
 
     fn paint(&self, hdc: HDC) {
         let hwnd = self.base().hwnd();
