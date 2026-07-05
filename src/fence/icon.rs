@@ -1,3 +1,4 @@
+use std::fmt;
 use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -21,6 +22,18 @@ pub struct Icon {
     base: BaseRef,
     state: Mutex<IconState>,
     selected: AtomicBool,
+}
+
+impl fmt::Debug for Icon {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Icon({:p})", self.base.hwnd())
+    }
+}
+
+impl PartialEq for Icon {
+    fn eq(&self, other: &Self) -> bool {
+        self.base.hwnd() == other.base.hwnd()
+    }
 }
 
 impl Icon {

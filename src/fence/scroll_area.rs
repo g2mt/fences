@@ -71,7 +71,11 @@ impl ScrollArea {
     }
 
     pub fn icon_by_pos(&self, rel_x: i32, rel_y: i32) -> Option<Arc<Icon>> {
-        todo!()
+        self.icons
+            .lock()
+            .iter()
+            .find(|icon| icon.contains_point(rel_x, rel_y))
+            .cloned()
     }
 
     pub fn state(&self) -> Vec<IconState> {
@@ -126,10 +130,11 @@ impl ScrollArea {
         self.reflow_icons();
     }
 
-    pub fn remove_icon(&self, index: usize) {
+    /// Removes an icon by reference (compares HWNDs).
+    pub fn remove_icon(&self, icon: &Arc<Icon>) {
         let mut icons = self.icons.lock();
-        if index < icons.len() {
-            icons.remove(index);
+        if let Some(pos) = icons.iter().position(|i| i.base().hwnd() == icon.base().hwnd()) {
+            icons.remove(pos);
         }
         drop(icons);
         self.reflow_icons();
@@ -162,8 +167,11 @@ impl ScrollArea {
     }
 
     /// Selects an icon, or clears selection
-    pub fn select_icon(&self, idx: Option<usize>) {
-        todo!()
+    pub fn select_icon(&self, icon: Option<&Arc<Icon>>) {
+        for i in self.icons.lock().iter() {
+            i.set_selected(Some(i) == icon);
+        }
+        self.base.redraw(true);
     }
 
     /** Events **/

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Weak};
@@ -22,6 +23,7 @@ use crate::app::App;
 use crate::commands::*;
 use crate::config::state::{FenceState, FenceStickyPosition, IconState};
 use crate::desktop_cover::DesktopCover;
+use crate::fence::icon::Icon;
 use crate::fence::import_dialog::{ImportDialog, ImportItem};
 use crate::fence::scroll_area::ScrollArea;
 use crate::fence::title_bar::TitleBar;
@@ -33,7 +35,7 @@ pub const WM_USER_PAINT_WITH_ALPHA: u32 = WM_USER + 1;
 pub enum Hit {
     TitleBar,
     Client,
-    Icon(usize),
+    Icon(Arc<Icon>),
     Left,
     Right,
     Top,
@@ -69,23 +71,13 @@ impl Hit {
                 if rel_y < title_h {
                     Self::TitleBar
                 } else {
-                    let mut si: SCROLLINFO = unsafe { std::mem::zeroed() };
-                    si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
-                    si.fMask = SIF_POS;
-                    unsafe {
-                        let _ = GetScrollInfo(fence.scroll_area.base().hwnd(), SB_VERT, &mut si);
-                    };
-
-                    let scroll_y = rel_y - title_h + si.nPos;
-                    let mut icon_hit = None;
-                    let icons = fence.scroll_area.icons();
-                    for (i, icon) in icons.iter().enumerate() {
-                        if icon.contains_point(rel_x, scroll_y) {
-                            icon_hit = Some(Self::Icon(i));
-                            break;
-                        }
-                    }
-                    icon_hit.unwrap_or(Self::Client)
+                    let scroll_area_rel_x = rel_x - border;
+                    let scroll_area_rel_y = rel_y - title_h;
+                    fence
+                        .scroll_area
+                        .icon_by_pos(scroll_area_rel_x, scroll_area_rel_y)
+                        .map(Self::Icon)
+                        .unwrap_or(Self::Client)
                 }
             }
         };
@@ -110,18 +102,14 @@ impl HitManager {
     /// Updates the Hit value based on relative mouse position, returning the copied Hit value
     pub fn update_hit(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> Option<Hit> {
         let hit = Hit::from_pos_in_fence(fence, rel_x, rel_y);
-        let old_hit = std::mem::replace(&mut *self.m.lock(), hit);
 
-        if old_hit != hit {
-            let selected_idx = if let Some(Hit::Icon(idx)) = hit {
-                Some(idx)
-            } else {
-                None
-            };
-            for (idx, icon) in fence.scroll_area.icons().iter().enumerate() {
-                icon.set_selected(Some(idx) == selected_idx);
-            }
-            fence.scroll_area.base().redraw(true);
+        if *self.m.lock() != hit {
+            let icon = hit.as_ref().and_then(|h| match h {
+                Hit::Icon(icon) => Some(icon),
+                _ => None,
+            });
+            fence.scroll_area.select_icon(icon);
+            *self.m.lock() = hit.clone();
         }
 
         hit
@@ -143,10 +131,8 @@ impl HitManager {
 
     /// Runs the currently selected icon on double click
     pub fn on_lbutton_dblclk(&self, fence: &Fence, rel_x: i32, rel_y: i32) {
-        if let Some(Hit::Icon(idx)) = Hit::from_pos_in_fence(fence, rel_x, rel_y) {
-            if let Some(icon) = fence.scroll_area.icons().get(idx) {
-                icon.run();
-            }
+        if let Some(Hit::Icon(icon)) = Hit::from_pos_in_fence(fence, rel_x, rel_y) {
+            icon.run();
         }
     }
 
@@ -159,8 +145,7 @@ impl HitManager {
             let _ = ClientToScreen(fence.base().hwnd(), &mut pt);
         }
 
-        if let Some(Hit::Icon(idx)) = hit {
-            let icon = fence.scroll_area.icons()[idx].clone();
+        if let Some(Hit::Icon(icon)) = hit {
             icon.show_context_menu(pt.x, pt.y, fence.base.hwnd());
         } else {
             fence.show_context_menu(pt.x, pt.y);
@@ -339,8 +324,8 @@ impl Fence {
 
         let folder_path = Path::new(imported_from.as_ref());
 
-        // Read all files from the directory
-        let mut dir_items: Vec<(String, String)> = Vec::new(); // (title, path)
+        // Read all files from the directory: path -> title
+        let mut dir_map: HashMap<String, String> = HashMap::new();
         if let Ok(entries) = std::fs::read_dir(folder_path) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -351,45 +336,44 @@ impl Fence {
                             .map(|s| s.to_string()),
                         path.to_str().map(|s| s.to_string()),
                     ) {
-                        dir_items.push((name, path_str));
+                        dir_map.insert(path_str, name);
                     }
                 }
             }
         }
 
-        // Build import items: existing icons get Keep/Remove based on whether
-        // they still exist in the directory; new items from directory get Keep.
+        let existing_states = self.scroll_area.state();
         let mut import_items: Vec<ImportItem> = Vec::new();
 
-        for icon in self.scroll_area.icons().iter() {
-            let icon_path = icon.path().map(|p| p.to_string()).unwrap_or_default();
-            let still_present = dir_items.iter().any(|(_, dp)| *dp == icon_path);
+        // Existing icons: keep if file still in the directory
+        for state in &existing_states {
+            let still_present = state
+                .path
+                .as_ref()
+                .map(|p| dir_map.contains_key(p.as_ref()))
+                .unwrap_or(false);
             import_items.push(ImportItem {
                 state: IconState {
-                    title: icon.title(),
-                    path: icon.path(),
+                    title: state.title.clone(),
+                    path: state.path.clone(),
                 },
                 keep: still_present,
             });
+            // Remove matched entry so remaining dir_map entries are new items
+            if let Some(ref p) = state.path {
+                dir_map.remove(p.as_ref());
+            }
         }
 
-        // Add new items from directory not already in the fence
-        {
-            let icons = self.scroll_area.icons();
-            for (name, path_str) in &dir_items {
-                let already_present = icons
-                    .iter()
-                    .any(|i| i.path().map(|p| p.to_string()).unwrap_or_default() == *path_str);
-                if !already_present {
-                    import_items.push(ImportItem {
-                        state: IconState {
-                            title: Arc::from(name.as_str()),
-                            path: Some(Arc::from(path_str.as_str())),
-                        },
-                        keep: true,
-                    });
-                }
-            }
+        // New items from directory not already in the fence
+        for (path_str, name) in dir_map {
+            import_items.push(ImportItem {
+                state: IconState {
+                    title: Arc::from(name.as_str()),
+                    path: Some(Arc::from(path_str.as_str())),
+                },
+                keep: true,
+            });
         }
 
         let fence = self.clone();
@@ -572,10 +556,7 @@ impl Fence {
 
     pub fn unfocus(&self) {
         self.hitman.m.lock().take();
-        for icon in self.scroll_area.icons().iter() {
-            icon.set_selected(false);
-        }
-        self.scroll_area.base().redraw(true);
+        self.scroll_area.select_icon(None);
     }
 
     /// Shows the context menu at absolute mouse position x, y
@@ -703,14 +684,12 @@ impl Fence {
                 });
             }
             IDM_RUN_ICON => {
-                if let Hit::Icon(icon_idx) = hit_type {
-                    let icon = self.scroll_area.icon_by_index(icon_idx).unwrap();
+                if let Hit::Icon(icon) = hit_type {
                     icon.run();
                 }
             }
             IDM_RENAME_ICON => {
-                if let Hit::Icon(icon_idx) = hit_type {
-                    let icon = self.scroll_area.icon_by_index(icon_idx).unwrap();
+                if let Hit::Icon(icon) = hit_type {
                     let current_title = String::from(&icon.title() as &str);
                     cover.executor().spawn(async move {
                         if let Some(new_title) =
@@ -726,14 +705,13 @@ impl Fence {
                 }
             }
             IDM_SET_ICON_PATH => {
-                if let Hit::Icon(icon_idx) = hit_type {
-                    let icon = self.scroll_area.icon_by_index(icon_idx).unwrap();
+                if let Hit::Icon(icon) = hit_type {
                     icon.set_info_from_selector();
                     should_save = true;
                 }
             }
             IDM_DELETE_ICON => {
-                if let Hit::Icon(icon_idx) = hit_type {
+                if let Hit::Icon(icon) = hit_type {
                     let fence = self.clone();
                     cover.executor().spawn(async move {
                         let result = prompt::confirm(
@@ -743,7 +721,7 @@ impl Fence {
                         )
                         .await;
                         if result == IDYES {
-                            fence.scroll_area.remove_icon(icon_idx);
+                            fence.scroll_area.remove_icon(&icon);
                             let app = App::get();
                             app.save_thread.get().unwrap().set_unsaved();
                         }
