@@ -148,6 +148,7 @@ impl Fence {
                 fence
                     .scroll_area
                     .add_icons_from_state(state.icons.iter(), true);
+                App::get().save_thread.get().unwrap().set_unsaved();
                 unsafe { DragAcceptFiles(fence.base().hwnd(), 1) };
                 if use_layered {
                     fence.paint_with_alpha();
@@ -202,6 +203,7 @@ impl Fence {
                 }),
                 true,
             );
+            App::get().save_thread.get().unwrap().set_unsaved();
         }
 
         Ok(Some(fence))
@@ -839,6 +841,7 @@ impl Fence {
             fence
                 .scroll_area
                 .add_icons_from_state(kept_states.iter(), true);
+            App::get().save_thread.get().unwrap().set_unsaved();
         }) {
             Ok(import_dialog) => import_dialog,
             Err(e) => {
