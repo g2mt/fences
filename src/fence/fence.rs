@@ -85,112 +85,6 @@ impl Hit {
     }
 }
 
-pub struct HitManager {
-    m: Mutex<Option<Hit>>,
-}
-
-/// Implements "Hit" detection for the Fence.
-/// Apart from mouse movement and cursor changes, all event handlers
-/// will set the Hit value using update_hit.
-impl HitManager {
-    fn new() -> Self {
-        Self {
-            m: Mutex::new(None),
-        }
-    }
-
-    /// Updates the Hit value based on relative mouse position, returning the copied Hit value
-    pub fn update_hit(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> Option<Hit> {
-        let hit = Hit::from_pos_in_fence(fence, rel_x, rel_y);
-
-        if *self.m.lock() != hit {
-            let icon = hit.as_ref().and_then(|h| match h {
-                Hit::Icon(icon) => Some(icon),
-                _ => None,
-            });
-            fence.scroll_area.select_icon(icon);
-            *self.m.lock() = hit.clone();
-        }
-
-        hit
-    }
-
-    /// Handles changing the Hit value from left mouse button down. Returns true if mouse is
-    /// captured
-    pub fn on_lbutton_down(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> bool {
-        match self.update_hit(fence, rel_x, rel_y) {
-            None | Some(Hit::Icon(_)) | Some(Hit::Client) => false,
-            _ => true,
-        }
-    }
-
-    /// Unsets the Hit value from left mouse button up
-    pub fn on_lbutton_up(&self, _fence: &Fence, _rel_x: i32, _rel_y: i32) {
-        *self.m.lock() = None;
-    }
-
-    /// Runs the currently selected icon on double click
-    pub fn on_lbutton_dblclk(&self, fence: &Fence, rel_x: i32, rel_y: i32) {
-        if let Some(Hit::Icon(icon)) = Hit::from_pos_in_fence(fence, rel_x, rel_y) {
-            icon.run();
-        }
-    }
-
-    /// Activates context menu for either Fence or Icon based on the current Hit value
-    /// THis also unsets the current Hit value
-    pub fn on_rbutton_up(&self, fence: &Fence, rel_x: i32, rel_y: i32) {
-        let hit = self.update_hit(fence, rel_x, rel_y);
-        let mut pt = POINT { x: rel_x, y: rel_y };
-        unsafe {
-            let _ = ClientToScreen(fence.base().hwnd(), &mut pt);
-        }
-
-        if let Some(Hit::Icon(icon)) = hit {
-            icon.show_context_menu(pt.x, pt.y, fence.base.hwnd());
-        } else {
-            fence.show_context_menu(pt.x, pt.y);
-        }
-    }
-
-    /// Returns the cursor at that specific location for
-    /// the current Hit value, or IDC_ARROW if out of bounds
-    pub fn on_set_cursor(&self, fence: &Fence, rel_x: i32, rel_y: i32) -> Option<HCURSOR> {
-        let hit = Hit::from_pos_in_fence(fence, rel_x, rel_y);
-        let cursor_id = match hit {
-            None => return None,
-            Some(Hit::TitleBar) => IDC_SIZEALL,
-            Some(Hit::Left) | Some(Hit::Right) => IDC_SIZEWE,
-            Some(Hit::Top) | Some(Hit::Bottom) => IDC_SIZENS,
-            Some(Hit::TopLeft) | Some(Hit::BottomRight) => IDC_SIZENWSE,
-            Some(Hit::TopRight) | Some(Hit::BottomLeft) => IDC_SIZENESW,
-            _ => IDC_ARROW,
-        };
-        Some(unsafe { LoadCursorW(std::ptr::null_mut(), cursor_id) })
-    }
-
-    /// Reacts based on the dragging movement of the mouse
-    pub fn on_mouse_move(&self, fence: &Fence, dx: i32, dy: i32) {
-        // Clone to ensure hit manager doesnt deadlock
-        if let Some(hit_type) = self.m.lock().clone() {
-            match hit_type {
-                Hit::TitleBar => fence.base().move_by(dx, dy),
-                Hit::Left => fence.add_area(dx, 0, -dx, 0),
-                Hit::Right => fence.add_area(0, 0, dx, 0),
-                Hit::Top => fence.add_area(0, dy, 0, -dy),
-                Hit::Bottom => fence.add_area(0, 0, 0, dy),
-                Hit::TopLeft => fence.add_area(dx, dy, -dx, -dy),
-                Hit::TopRight => fence.add_area(0, dy, dx, -dy),
-                Hit::BottomLeft => fence.add_area(dx, 0, -dx, dy),
-                Hit::BottomRight => fence.add_area(0, 0, dx, dy),
-                Hit::Client | Hit::Icon(_) => return,
-            }
-
-            fence.base().redraw(true);
-            App::get().save_thread.get().unwrap().set_unsaved();
-        }
-    }
-}
-
 pub struct Fence {
     self_weak: Weak<Fence>,
     base: BaseRef,
@@ -199,7 +93,7 @@ pub struct Fence {
     imported_from: Mutex<Option<Arc<str>>>,
     sticky_pos: Mutex<Option<FenceStickyPosition>>,
     last_mouse_pos: Mutex<POINT>,
-    hitman: HitManager,
+    hit: Mutex<Option<Hit>>,
 }
 
 impl Fence {
@@ -249,7 +143,7 @@ impl Fence {
                     imported_from: Mutex::new(state.imported_from.clone()),
                     sticky_pos: Mutex::new(state.sticky_pos),
                     last_mouse_pos: Mutex::new(POINT { x: 0, y: 0 }),
-                    hitman: HitManager::new(),
+                    hit: Mutex::new(None),
                 });
                 fence
                     .scroll_area
@@ -272,130 +166,6 @@ impl Fence {
                 Ok(fence)
             },
         )
-    }
-
-    pub fn state(&self) -> FenceState {
-        let area = self.base.area();
-        FenceState {
-            title: self.title_bar.title(),
-            area: Area::new(
-                area.x.load(Ordering::Relaxed),
-                area.y.load(Ordering::Relaxed),
-                area.width.load(Ordering::Relaxed),
-                area.height.load(Ordering::Relaxed),
-            ),
-            icons: self.scroll_area.state(),
-            imported_from: self.imported_from().clone(),
-            sticky_pos: self.sticky(),
-        }
-    }
-
-    pub fn title(&self) -> Arc<str> {
-        self.title_bar.title()
-    }
-
-    pub fn set_title(&self, title: Arc<str>) {
-        self.title_bar.set_title(title);
-    }
-
-    pub fn sticky(&self) -> Option<crate::config::state::FenceStickyPosition> {
-        *self.sticky_pos.lock()
-    }
-
-    pub fn set_sticky(&self, sticky: Option<crate::config::state::FenceStickyPosition>) {
-        *self.sticky_pos.lock() = sticky;
-    }
-
-    pub fn imported_from(&self) -> Option<Arc<str>> {
-        self.imported_from.lock().clone()
-    }
-
-    pub fn set_imported_from(&self, imported_from: Option<Arc<str>>) {
-        *self.imported_from.lock() = imported_from;
-    }
-
-    pub fn show_import_existing_dialog(self: &Arc<Self>) {
-        App::get().import_dialog.lock().take();
-        let imported_from = if let Some(p) = self.imported_from() {
-            p
-        } else {
-            return;
-        };
-
-        let folder_path = Path::new(imported_from.as_ref());
-
-        // Read all files from the directory: path -> title
-        let mut dir_map: HashMap<String, String> = HashMap::new();
-        if let Ok(entries) = std::fs::read_dir(folder_path) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_file() {
-                    if let (Some(name), Some(path_str)) = (
-                        path.file_stem()
-                            .and_then(|s| s.to_str())
-                            .map(|s| s.to_string()),
-                        path.to_str().map(|s| s.to_string()),
-                    ) {
-                        dir_map.insert(path_str, name);
-                    }
-                }
-            }
-        }
-
-        let existing_states = self.scroll_area.state();
-        let mut import_items: Vec<ImportItem> = Vec::new();
-
-        // Existing icons: keep if file still in the directory
-        for state in &existing_states {
-            let still_present = state
-                .path
-                .as_ref()
-                .map(|p| dir_map.contains_key(p.as_ref()))
-                .unwrap_or(false);
-            import_items.push(ImportItem {
-                state: IconState {
-                    title: state.title.clone(),
-                    path: state.path.clone(),
-                },
-                keep: still_present,
-            });
-            // Remove matched entry so remaining dir_map entries are new items
-            if let Some(ref p) = state.path {
-                dir_map.remove(p.as_ref());
-            }
-        }
-
-        // New items from directory not already in the fence
-        for (path_str, name) in dir_map {
-            import_items.push(ImportItem {
-                state: IconState {
-                    title: Arc::from(name.as_str()),
-                    path: Some(Arc::from(path_str.as_str())),
-                },
-                keep: true,
-            });
-        }
-
-        let fence = self.clone();
-        let import_dialog = match ImportDialog::create_window(import_items, move |kept_states| {
-            fence
-                .scroll_area
-                .add_icons_from_state(kept_states.iter(), true);
-        }) {
-            Ok(import_dialog) => import_dialog,
-            Err(e) => {
-                error!("{}", e);
-                return;
-            }
-        };
-        *App::get().import_dialog.lock() = Some(import_dialog);
-    }
-
-    pub async fn show_import_from_dialog(self: &Arc<Self>) {
-        if let Some(path_str) = prompt::browse_for_folder().await {
-            self.set_imported_from(Some(Arc::from(path_str.as_str())));
-            self.show_import_existing_dialog();
-        }
     }
 
     pub async fn from_folder_selector(cover: &DesktopCover) -> Result<Option<Arc<Self>>> {
@@ -437,126 +207,106 @@ impl Fence {
         Ok(Some(fence))
     }
 
-    pub fn add_area(&self, dl: i32, dt: i32, dw: i32, dh: i32) {
-        self.base.add_area(dl, dt, dw, dh);
+    /** Accessors **/
 
+    pub fn state(&self) -> FenceState {
         let area = self.base.area();
-        let fence_area = Area::new(
-            area.x.load(Ordering::Relaxed),
-            area.y.load(Ordering::Relaxed),
-            area.width.load(Ordering::Relaxed),
-            area.height.load(Ordering::Relaxed),
-        );
-
-        let title_area = TitleBar::area_from_fence_area(&fence_area);
-        let scroll_area = ScrollArea::area_from_fence_area(&fence_area);
-
-        unsafe {
-            let hdwp = BeginDeferWindowPos(2);
-            if hdwp.is_null() {
-                panic!("hdwp is null");
-            }
-            let hdwp = self.title_bar.base().resize_to_deferred(
-                title_area.x,
-                title_area.y,
-                title_area.width,
-                title_area.height,
-                hdwp,
-            );
-            let hdwp = self.scroll_area.base().resize_to_deferred(
-                scroll_area.x,
-                scroll_area.y,
-                scroll_area.width,
-                scroll_area.height,
-                hdwp,
-            );
-            let _ = EndDeferWindowPos(hdwp);
-        }
-
-        self.scroll_area.reflow_icons();
-    }
-
-    pub fn paint_with_alpha(&self) {
-        // https://stackoverflow.com/a/18613002
-        let hwnd = self.base().hwnd();
-        unsafe {
-            let hdc_screen = GetDC(std::ptr::null_mut());
-            let hdc_mem = CreateCompatibleDC(hdc_screen);
-
-            let area = self.base.area();
-            let width = area.width.load(Ordering::Relaxed);
-            let height = area.height.load(Ordering::Relaxed);
-
-            let mut bmi: BITMAPINFO = std::mem::zeroed();
-            bmi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
-            bmi.bmiHeader.biWidth = width;
-            bmi.bmiHeader.biHeight = -height; // top-down
-            bmi.bmiHeader.biPlanes = 1;
-            bmi.bmiHeader.biBitCount = 32;
-            bmi.bmiHeader.biCompression = BI_RGB;
-
-            let mut bits = std::ptr::null_mut();
-            let h_bitmap = CreateDIBSection(
-                hdc_mem,
-                &bmi,
-                DIB_RGB_COLORS,
-                &mut bits,
-                std::ptr::null_mut(),
-                0,
-            );
-            let old_bitmap = SelectObject(hdc_mem, h_bitmap as HGDIOBJ);
-            let pixel_count = (width * height) as usize;
-            let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, pixel_count);
-            let config = App::config();
-            for p in pixels.iter_mut() {
-                *p = config.fence.fence_bg_color.argb();
-            }
-            SendMessageW(
-                hwnd,
-                WM_PRINT,
-                hdc_mem as WPARAM,
-                (PRF_CLIENT | PRF_CHILDREN | PRF_OWNED) as LPARAM,
-            );
-
-            let size = SIZE {
-                cx: width,
-                cy: height,
-            };
-            let pt_src = POINT { x: 0, y: 0 };
-            let blend = BLENDFUNCTION {
-                BlendOp: AC_SRC_OVER as u8,
-                BlendFlags: 0,
-                SourceConstantAlpha: 255,
-                AlphaFormat: AC_SRC_ALPHA as u8,
-            };
-
-            let _ = UpdateLayeredWindow(
-                hwnd,
-                hdc_screen,
-                std::ptr::null(),
-                &size,
-                hdc_mem,
-                &pt_src,
-                0,
-                &blend,
-                ULW_ALPHA,
-            );
-
-            // TODO: cache h_bitmap, hdc_mem
-            SelectObject(hdc_mem, old_bitmap);
-            let _ = DeleteObject(h_bitmap.into());
-            let _ = DeleteDC(hdc_mem);
-            let _ = ReleaseDC(std::ptr::null_mut(), hdc_screen);
+        FenceState {
+            title: self.title_bar.title(),
+            area: Area::new(
+                area.x.load(Ordering::Relaxed),
+                area.y.load(Ordering::Relaxed),
+                area.width.load(Ordering::Relaxed),
+                area.height.load(Ordering::Relaxed),
+            ),
+            icons: self.scroll_area.state(),
+            imported_from: self.imported_from().clone(),
+            sticky_pos: self.sticky(),
         }
     }
 
-    pub fn hitman(&self) -> &HitManager {
-        &self.hitman
+    pub fn title(&self) -> Arc<str> {
+        self.title_bar.title()
+    }
+
+    pub fn set_title(&self, title: Arc<str>) {
+        self.title_bar.set_title(title);
+    }
+
+    pub fn sticky(&self) -> Option<crate::config::state::FenceStickyPosition> {
+        *self.sticky_pos.lock()
+    }
+
+    pub fn set_sticky(&self, sticky: Option<crate::config::state::FenceStickyPosition>) {
+        *self.sticky_pos.lock() = sticky;
+    }
+
+    pub fn imported_from(&self) -> Option<Arc<str>> {
+        self.imported_from.lock().clone()
+    }
+
+    pub fn set_imported_from(&self, imported_from: Option<Arc<str>>) {
+        *self.imported_from.lock() = imported_from;
     }
 
     pub fn unfocus(&self) {
-        self.hitman.m.lock().take();
+        self.hit.lock().take();
         self.scroll_area.select_icon(None);
+    }
+
+    /** Event Handlers **/
+
+    /// Updates the Hit value based on relative mouse position, returning the copied Hit value
+    fn update_hit(&self, rel_x: i32, rel_y: i32) -> Option<Hit> {
+        let hit = Hit::from_pos_in_fence(self, rel_x, rel_y);
+
+        if *self.hit.lock() != hit {
+            let icon = hit.as_ref().and_then(|h| match h {
+                Hit::Icon(icon) => Some(icon),
+                _ => None,
+            });
+            self.scroll_area.select_icon(icon);
+            *self.hit.lock() = hit.clone();
+        }
+
+        hit
+    }
+
+    /// Handles changing the Hit value from left mouse button down. Returns true if mouse is
+    /// captured
+    pub fn on_lbutton_down(&self, rel_x: i32, rel_y: i32) -> bool {
+        match self.update_hit(rel_x, rel_y) {
+            None | Some(Hit::Icon(_)) | Some(Hit::Client) => false,
+            _ => true,
+        }
+    }
+
+    /// Unsets the Hit value from left mouse button up
+    pub fn on_lbutton_up(&self, _rel_x: i32, _rel_y: i32) {
+        *self.hit.lock() = None;
+    }
+
+    /// Runs the currently selected icon on double click
+    pub fn on_lbutton_dblclk(&self, rel_x: i32, rel_y: i32) {
+        if let Some(Hit::Icon(icon)) = Hit::from_pos_in_fence(self, rel_x, rel_y) {
+            icon.run();
+        }
+    }
+
+    /// Activates context menu for either Fence or Icon based on the current Hit value.
+    /// This also unsets the current Hit value.
+    pub fn on_rbutton_up(&self, rel_x: i32, rel_y: i32) {
+        let hit = self.update_hit(rel_x, rel_y);
+        let mut pt = POINT { x: rel_x, y: rel_y };
+        unsafe {
+            let _ = ClientToScreen(self.base().hwnd(), &mut pt);
+        }
+
+        if let Some(Hit::Icon(icon)) = hit {
+            icon.show_context_menu(pt.x, pt.y, self.base.hwnd());
+        } else {
+            self.show_context_menu(pt.x, pt.y);
+        }
     }
 
     /// Shows the context menu at absolute mouse position x, y
@@ -642,6 +392,44 @@ impl Fence {
                 std::ptr::null(),
             );
             let _ = DestroyMenu(h_menu);
+        }
+    }
+
+    /// Returns the cursor at that specific location for
+    /// the current Hit value, or IDC_ARROW if out of bounds
+    pub fn on_set_cursor(&self, rel_x: i32, rel_y: i32) -> Option<HCURSOR> {
+        let hit = Hit::from_pos_in_fence(self, rel_x, rel_y);
+        let cursor_id = match hit {
+            None => return None,
+            Some(Hit::TitleBar) => IDC_SIZEALL,
+            Some(Hit::Left) | Some(Hit::Right) => IDC_SIZEWE,
+            Some(Hit::Top) | Some(Hit::Bottom) => IDC_SIZENS,
+            Some(Hit::TopLeft) | Some(Hit::BottomRight) => IDC_SIZENWSE,
+            Some(Hit::TopRight) | Some(Hit::BottomLeft) => IDC_SIZENESW,
+            _ => IDC_ARROW,
+        };
+        Some(unsafe { LoadCursorW(std::ptr::null_mut(), cursor_id) })
+    }
+
+    /// Reacts based on the dragging movement of the mouse
+    pub fn on_mouse_move(&self, dx: i32, dy: i32) {
+        // Clone to ensure hit doesnt deadlock
+        if let Some(hit_type) = self.hit.lock().clone() {
+            match hit_type {
+                Hit::TitleBar => self.base().move_by(dx, dy),
+                Hit::Left => self.add_area(dx, 0, -dx, 0),
+                Hit::Right => self.add_area(0, 0, dx, 0),
+                Hit::Top => self.add_area(0, dy, 0, -dy),
+                Hit::Bottom => self.add_area(0, 0, 0, dy),
+                Hit::TopLeft => self.add_area(dx, dy, -dx, -dy),
+                Hit::TopRight => self.add_area(0, dy, dx, -dy),
+                Hit::BottomLeft => self.add_area(dx, 0, -dx, dy),
+                Hit::BottomRight => self.add_area(0, 0, dx, dy),
+                Hit::Client | Hit::Icon(_) => return,
+            }
+
+            self.base().redraw(true);
+            App::get().save_thread.get().unwrap().set_unsaved();
         }
     }
 
@@ -866,6 +654,207 @@ impl Fence {
         self.scroll_area.base().redraw(true);
         App::get().save_thread.get().unwrap().set_unsaved();
     }
+
+    /** Layout / Drawing **/
+
+    pub fn add_area(&self, dl: i32, dt: i32, dw: i32, dh: i32) {
+        self.base.add_area(dl, dt, dw, dh);
+
+        let area = self.base.area();
+        let fence_area = Area::new(
+            area.x.load(Ordering::Relaxed),
+            area.y.load(Ordering::Relaxed),
+            area.width.load(Ordering::Relaxed),
+            area.height.load(Ordering::Relaxed),
+        );
+
+        let title_area = TitleBar::area_from_fence_area(&fence_area);
+        let scroll_area = ScrollArea::area_from_fence_area(&fence_area);
+
+        unsafe {
+            let hdwp = BeginDeferWindowPos(2);
+            if hdwp.is_null() {
+                panic!("hdwp is null");
+            }
+            let hdwp = self.title_bar.base().resize_to_deferred(
+                title_area.x,
+                title_area.y,
+                title_area.width,
+                title_area.height,
+                hdwp,
+            );
+            let hdwp = self.scroll_area.base().resize_to_deferred(
+                scroll_area.x,
+                scroll_area.y,
+                scroll_area.width,
+                scroll_area.height,
+                hdwp,
+            );
+            let _ = EndDeferWindowPos(hdwp);
+        }
+
+        self.scroll_area.reflow_icons();
+    }
+
+    pub fn paint_with_alpha(&self) {
+        // https://stackoverflow.com/a/18613002
+        let hwnd = self.base().hwnd();
+        unsafe {
+            let hdc_screen = GetDC(std::ptr::null_mut());
+            let hdc_mem = CreateCompatibleDC(hdc_screen);
+
+            let area = self.base.area();
+            let width = area.width.load(Ordering::Relaxed);
+            let height = area.height.load(Ordering::Relaxed);
+
+            let mut bmi: BITMAPINFO = std::mem::zeroed();
+            bmi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+            bmi.bmiHeader.biWidth = width;
+            bmi.bmiHeader.biHeight = -height; // top-down
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = BI_RGB;
+
+            let mut bits = std::ptr::null_mut();
+            let h_bitmap = CreateDIBSection(
+                hdc_mem,
+                &bmi,
+                DIB_RGB_COLORS,
+                &mut bits,
+                std::ptr::null_mut(),
+                0,
+            );
+            let old_bitmap = SelectObject(hdc_mem, h_bitmap as HGDIOBJ);
+            let pixel_count = (width * height) as usize;
+            let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, pixel_count);
+            let config = App::config();
+            for p in pixels.iter_mut() {
+                *p = config.fence.fence_bg_color.argb();
+            }
+            SendMessageW(
+                hwnd,
+                WM_PRINT,
+                hdc_mem as WPARAM,
+                (PRF_CLIENT | PRF_CHILDREN | PRF_OWNED) as LPARAM,
+            );
+
+            let size = SIZE {
+                cx: width,
+                cy: height,
+            };
+            let pt_src = POINT { x: 0, y: 0 };
+            let blend = BLENDFUNCTION {
+                BlendOp: AC_SRC_OVER as u8,
+                BlendFlags: 0,
+                SourceConstantAlpha: 255,
+                AlphaFormat: AC_SRC_ALPHA as u8,
+            };
+
+            let _ = UpdateLayeredWindow(
+                hwnd,
+                hdc_screen,
+                std::ptr::null(),
+                &size,
+                hdc_mem,
+                &pt_src,
+                0,
+                &blend,
+                ULW_ALPHA,
+            );
+
+            // TODO: cache h_bitmap, hdc_mem
+            SelectObject(hdc_mem, old_bitmap);
+            let _ = DeleteObject(h_bitmap.into());
+            let _ = DeleteDC(hdc_mem);
+            let _ = ReleaseDC(std::ptr::null_mut(), hdc_screen);
+        }
+    }
+
+    /** Dialogs / Async Actions **/
+
+    pub fn show_import_existing_dialog(self: &Arc<Self>) {
+        App::get().import_dialog.lock().take();
+        let imported_from = if let Some(p) = self.imported_from() {
+            p
+        } else {
+            return;
+        };
+
+        let folder_path = Path::new(imported_from.as_ref());
+
+        // Read all files from the directory: path -> title
+        let mut dir_map: HashMap<String, String> = HashMap::new();
+        if let Ok(entries) = std::fs::read_dir(folder_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    if let (Some(name), Some(path_str)) = (
+                        path.file_stem()
+                            .and_then(|s| s.to_str())
+                            .map(|s| s.to_string()),
+                        path.to_str().map(|s| s.to_string()),
+                    ) {
+                        dir_map.insert(path_str, name);
+                    }
+                }
+            }
+        }
+
+        let existing_states = self.scroll_area.state();
+        let mut import_items: Vec<ImportItem> = Vec::new();
+
+        // Existing icons: keep if file still in the directory
+        for state in &existing_states {
+            let still_present = state
+                .path
+                .as_ref()
+                .map(|p| dir_map.contains_key(p.as_ref()))
+                .unwrap_or(false);
+            import_items.push(ImportItem {
+                state: IconState {
+                    title: state.title.clone(),
+                    path: state.path.clone(),
+                },
+                keep: still_present,
+            });
+            // Remove matched entry so remaining dir_map entries are new items
+            if let Some(ref p) = state.path {
+                dir_map.remove(p.as_ref());
+            }
+        }
+
+        // New items from directory not already in the fence
+        for (path_str, name) in dir_map {
+            import_items.push(ImportItem {
+                state: IconState {
+                    title: Arc::from(name.as_str()),
+                    path: Some(Arc::from(path_str.as_str())),
+                },
+                keep: true,
+            });
+        }
+
+        let fence = self.clone();
+        let import_dialog = match ImportDialog::create_window(import_items, move |kept_states| {
+            fence
+                .scroll_area
+                .add_icons_from_state(kept_states.iter(), true);
+        }) {
+            Ok(import_dialog) => import_dialog,
+            Err(e) => {
+                error!("{}", e);
+                return;
+            }
+        };
+        *App::get().import_dialog.lock() = Some(import_dialog);
+    }
+
+    pub async fn show_import_from_dialog(self: &Arc<Self>) {
+        if let Some(path_str) = prompt::browse_for_folder().await {
+            self.set_imported_from(Some(Arc::from(path_str.as_str())));
+            self.show_import_existing_dialog();
+        }
+    }
 }
 
 impl Window for Fence {
@@ -887,7 +876,7 @@ impl Window for Fence {
                     let _ = ScreenToClient(hwnd, &mut pt);
                 };
 
-                if let Some(cursor) = self.hitman.on_set_cursor(self, pt.x, pt.y) {
+                if let Some(cursor) = self.on_set_cursor(pt.x, pt.y) {
                     unsafe {
                         SetCursor(cursor);
                         TRUE as isize
@@ -899,14 +888,14 @@ impl Window for Fence {
             WM_LBUTTONDBLCLK => {
                 let rel_x = (lparam & 0xFFFF) as i16 as i32;
                 let rel_y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
-                self.hitman.on_lbutton_dblclk(self, rel_x, rel_y);
+                self.on_lbutton_dblclk(rel_x, rel_y);
                 0
             }
             WM_LBUTTONDOWN => {
                 let rel_x = (lparam & 0xFFFF) as i16 as i32;
                 let rel_y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
-                if self.hitman.on_lbutton_down(self, rel_x, rel_y) {
+                if self.on_lbutton_down(rel_x, rel_y) {
                     let mut pt = POINT { x: 0, y: 0 };
                     unsafe {
                         let _ = GetCursorPos(&mut pt);
@@ -941,13 +930,13 @@ impl Window for Fence {
                 *last = pt;
                 drop(last);
 
-                self.hitman.on_mouse_move(self, dx, dy);
+                self.on_mouse_move(dx, dy);
                 0
             }
             WM_LBUTTONUP if App::config().use_layered_window => {
                 let rel_x = (lparam & 0xFFFF) as i16 as i32;
                 let rel_y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
-                self.hitman.on_lbutton_up(self, rel_x, rel_y);
+                self.on_lbutton_up(rel_x, rel_y);
                 unsafe {
                     let _ = ReleaseCapture();
                 };
@@ -956,7 +945,7 @@ impl Window for Fence {
             WM_RBUTTONUP => {
                 let rel_x = (lparam & 0xFFFF) as i16 as i32;
                 let rel_y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
-                self.hitman.on_rbutton_up(self, rel_x, rel_y);
+                self.on_rbutton_up(rel_x, rel_y);
                 0
             }
             WM_PAINT if !App::config().use_layered_window => unsafe {
@@ -995,7 +984,7 @@ impl Window for Fence {
             }
             WM_COMMAND => {
                 let command = (wparam & 0xFFFF) as u16 as usize;
-                if let Some(hit) = self.hitman.m.lock().take() {
+                if let Some(hit) = self.hit.lock().take() {
                     let cover = App::get().cover.get().unwrap();
                     Weak::upgrade(&self.self_weak)
                         .unwrap()

@@ -7,7 +7,7 @@ use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use winwrapper::geo::Area;
-use winwrapper::mutex::{Mutex, MutexGuard};
+use winwrapper::mutex::Mutex;
 use winwrapper::window::{register_classname, Base, BaseRef, Window};
 
 use crate::app::App;
@@ -65,10 +65,6 @@ impl ScrollArea {
     }
 
     /** Icons **/
-
-    pub fn icon_by_index(&self, index: usize) -> Option<Arc<Icon>> {
-        self.icons.lock().get(index).cloned()
-    }
 
     pub fn icon_by_pos(&self, rel_x: i32, rel_y: i32) -> Option<Arc<Icon>> {
         self.icons
@@ -130,10 +126,9 @@ impl ScrollArea {
         self.reflow_icons();
     }
 
-    /// Removes an icon by reference (compares HWNDs).
     pub fn remove_icon(&self, icon: &Arc<Icon>) {
         let mut icons = self.icons.lock();
-        if let Some(pos) = icons.iter().position(|i| i.base().hwnd() == icon.base().hwnd()) {
+        if let Some(pos) = icons.iter().position(|i| i == icon) {
             icons.remove(pos);
         }
         drop(icons);

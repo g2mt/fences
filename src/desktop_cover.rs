@@ -331,7 +331,7 @@ impl Window for DesktopCover {
                     let dx = pt.x - last.x;
                     let dy = pt.y - last.y;
                     *last = pt;
-                    state.fence.hitman().on_mouse_move(&*state.fence, dx, dy);
+                    state.fence.on_mouse_move(dx, dy);
                 }
                 0
             }
@@ -348,7 +348,7 @@ impl Window for DesktopCover {
                     let area = fence.base().area();
                     let x = area.x.load(Ordering::Relaxed);
                     let y = area.y.load(Ordering::Relaxed);
-                    fence.hitman().on_lbutton_up(&fence, pt.x - x, pt.y - y);
+                    fence.on_lbutton_up(pt.x - x, pt.y - y);
                 }
                 unsafe {
                     let _ = ReleaseCapture();
