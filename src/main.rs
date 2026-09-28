@@ -1,13 +1,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use anyhow::{Result, anyhow};
+use std::path::Path;
 use tracing::{error, info};
 use tracing_subscriber::prelude::*;
+use windows_sys::Win32::Foundation::CloseHandle;
+use windows_sys::Win32::System::Threading::*;
 use windows_sys::Win32::UI::Controls::{
     ICC_LISTVIEW_CLASSES, INITCOMMONCONTROLSEX, InitCommonControlsEx,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::core::*;
 
 mod app;
 mod commands;
@@ -33,37 +35,77 @@ fn ensure_single_instance() -> Result<()> {
     } else {
         return Ok(());
     };
-    info!(
-        "Found existing instance with pid {}, signaling it to exit",
-        pid
-    );
 
-    unsafe {
-        let hwnd = FindWindowExW(
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            w!("BottomWindowClass"),
-            std::ptr::null(),
+    let process = unsafe {
+        OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE,
+            0,
+            pid,
+        )
+    };
+    if process.is_null() {
+        return Err(anyhow!("Unable to open existing process with pid {}", pid));
+    }
+    let mut image_path = vec![0u16; 32_768];
+    let mut image_path_len = image_path.len() as u32;
+    let queried_path = unsafe {
+        let success = QueryFullProcessImageNameW(
+            process,
+            0,
+            image_path.as_mut_ptr(),
+            &mut image_path_len,
         );
-        if hwnd == std::ptr::null_mut() {
-            return Err(anyhow!("Unable to find desktop cover class"));
-        }
-        let win_pid = GetWindowThreadProcessId(hwnd, std::ptr::null_mut());
-        if win_pid != pid {
-            return Err(anyhow!("Handle not owned by PID"));
-        }
-        let _ = PostMessageW(hwnd, WM_DESTROY, 0, 0);
+        success != 0
+    };
+    if !queried_path {
+        unsafe { CloseHandle(process) };
+        return Err(anyhow!("Unable to get executable path for pid {}", pid));
     }
 
-    // Wait up to ~10 seconds for the id file to be deleted
-    let start = std::time::Instant::now();
-    while id_path.exists() {
-        if start.elapsed() > std::time::Duration::from_secs(2) {
-            return Err(anyhow!("Timed out waiting for existing instance to exit"));
+    let path_match = (|| -> Result<bool> {
+        let process_path = String::from_utf16_lossy(&image_path[..image_path_len as usize]);
+        let process_path = std::fs::canonicalize(Path::new(&process_path))?;
+        let current_path = std::fs::canonicalize(std::env::current_exe()?)?;
+        Ok(process_path
+            .to_string_lossy()
+            .eq_ignore_ascii_case(&current_path.to_string_lossy()))
+    })();
+    match path_match {
+        Ok(true) => {}
+        Ok(false) => {
+            unsafe { CloseHandle(process) };
+            info!("PID {} belongs to a different executable; not terminating it", pid);
+            return Ok(());
         }
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        Err(e) => {
+            unsafe { CloseHandle(process) };
+            return Err(e);
+        }
     }
-    return Ok(());
+
+    info!("Found existing instance with pid {}; terminating it", pid);
+    let (terminated, wait_result) = unsafe {
+        let terminated = TerminateProcess(process, 1) != 0;
+        let wait_result = if terminated {
+            Some(WaitForSingleObject(process, 10_000))
+        } else {
+            None
+        };
+        CloseHandle(process);
+        (terminated, wait_result)
+    };
+    if !terminated {
+        return Err(anyhow!("Unable to terminate existing process with pid {}", pid));
+    }
+    if wait_result != Some(0) {
+        return Err(anyhow!("Timed out waiting for process {} to terminate", pid));
+    }
+    match std::fs::remove_file(&id_path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
+    }
+    Ok(())
 }
 
 fn main() -> Result<()> {
